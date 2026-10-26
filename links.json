@@ -1,0 +1,92 @@
+[
+  {
+    "group": "NotebookLM 產物",
+    "title": "NotebookLM 產物總覽頁（語音、影片、簡報、資訊圖表、心智圖）",
+    "url": "https://187-127-109-145.sslip.io/yahboom-microros-pi5/",
+    "desc": "語音導覽約 22 分鐘、影片摘要約 6.6 分鐘、21 頁簡報、三層架構資訊圖表"
+  },
+  {
+    "group": "NotebookLM 產物",
+    "title": "NotebookLM 筆記本（可直接提問）",
+    "url": "https://notebooklm.google.com/notebook/c842a8ef-d514-410b-8281-4d0fb0a29286",
+    "desc": "22 個來源：學習規劃＋20 單元講義＋原始碼分析"
+  },
+  {
+    "group": "本教材影片（YouTube 私人）",
+    "title": "電腦模擬示範（精華版，4 支）",
+    "url": "https://www.youtube.com/playlist?list=PLR7jGHAzkwiY",
+    "desc": "開模擬、SLAM 建圖、Nav2 導航、自己寫避障節點"
+  },
+  {
+    "group": "本教材影片（YouTube 私人）",
+    "title": "20 單元有聲投影片影片",
+    "url": "https://www.youtube.com/playlist?list=PLL8HRt5nNsd4",
+    "desc": "每單元一支，和網頁同一份語音，適合通勤時看"
+  },
+  {
+    "group": "本教材",
+    "title": "GitHub repo（講義原稿、研究筆記、模擬套件）",
+    "url": "https://github.com/chenghyang2001/yahboom-microros-pi5",
+    "desc": "lessons/ 是 20 個單元的講義原稿；sim/microros_pi5_sim 是電腦模擬套件"
+  },
+  {
+    "group": "官方資源",
+    "title": "官方教學頁（說明書 QR code 指向這裡）",
+    "url": "https://www.yahboom.net/study/MicroROS-Pi5",
+    "desc": "Yahboom 官方線上教材"
+  },
+  {
+    "group": "官方資源",
+    "title": "官方 GitHub：YahboomTechnology/MicroROS-Car-Pi5",
+    "url": "https://github.com/YahboomTechnology/MicroROS-Car-Pi5",
+    "desc": "155 份 PDF 課程文件"
+  },
+  {
+    "group": "官方資源",
+    "title": "官方影片播放清單（56 支）",
+    "url": "https://www.youtube.com/playlist?list=PL6KtTPU_PfxpQAITcWXgn978DXj3mskCJ",
+    "desc": "各課操作示範，多數有英文旁白"
+  },
+  {
+    "group": "官方資源",
+    "title": "官方原始碼與附件（Google Drive）",
+    "url": "https://drive.google.com/drive/folders/1lKw5HH327gybrgEGlkNAB9pJP9602Ht4",
+    "desc": "18. Summary of program source code、出廠韌體、硬體資料"
+  },
+  {
+    "group": "開箱與組裝影片",
+    "title": "產品總覽：Raspberry Pi 5 ROS2 Robot Car",
+    "url": "https://youtu.be/x_MQeoQp2xI",
+    "desc": "官方 2 分鐘總覽"
+  },
+  {
+    "group": "開箱與組裝影片",
+    "title": "官方組裝影片",
+    "url": "https://youtu.be/LKdZUSuHCHI",
+    "desc": "5 分鐘組裝流程"
+  },
+  {
+    "group": "開箱與組裝影片",
+    "title": "開箱：Unboxing the Yahboom MicroROS-Pi5",
+    "url": "https://youtu.be/6mVjYICWMo4",
+    "desc": "Happy DIY Tech 開箱"
+  },
+  {
+    "group": "開箱與組裝影片",
+    "title": "官方開箱與評測",
+    "url": "https://youtu.be/BuvS9U3kKLE",
+    "desc": "15 分鐘完整開箱"
+  },
+  {
+    "group": "開箱與組裝影片",
+    "title": "組裝：Install LiDAR, Camera & Anti-Collision",
+    "url": "https://youtu.be/rkfFmIpZ6HE",
+    "desc": "Happy DIY Tech 詳細組裝"
+  },
+  {
+    "group": "延伸學習",
+    "title": "K136 ROS 2 工具演練：小烏龜 ROS 2 指令（精華版）",
+    "url": "https://www.youtube.com/playlist?list=PLb0N3K9nVtOg",
+    "desc": "配合 W2：ros2 node／topic／service／param／action／bag 全部實際操作"
+  }
+]

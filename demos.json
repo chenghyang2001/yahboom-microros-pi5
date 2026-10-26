@@ -1,0 +1,146 @@
+{
+  "W4": [
+    {
+      "title": "本單元有聲投影片影片（W4）",
+      "youtube": "kT1230dl60s"
+    },
+    {
+      "title": "電腦模擬示範 1：開模擬、看模型與話題、開車、轉雲台",
+      "youtube": "pNIErAozFfI"
+    }
+  ],
+  "B5": [
+    {
+      "title": "本單元有聲投影片影片（B5）",
+      "youtube": "WsBsQSaCMC8"
+    },
+    {
+      "title": "電腦模擬示範 1：用 ros2 topic pub 控制 /cmd_vel 與雲台",
+      "youtube": "pNIErAozFfI"
+    }
+  ],
+  "M4": [
+    {
+      "title": "本單元有聲投影片影片（M4）",
+      "youtube": "4Ws4VYjZPRI"
+    },
+    {
+      "title": "電腦模擬示範 4：讀 /scan 前方距離、遇障停車",
+      "youtube": "ME9kcqrZJYA"
+    }
+  ],
+  "M5": [
+    {
+      "title": "本單元有聲投影片影片（M5）",
+      "youtube": "OjnJ4hLSbFg"
+    },
+    {
+      "title": "電腦模擬示範 4：自己寫避障節點（本單元的程式實跑）",
+      "youtube": "ME9kcqrZJYA"
+    }
+  ],
+  "A1": [
+    {
+      "title": "本單元有聲投影片影片（A1）",
+      "youtube": "6UyIQv8SXgg"
+    },
+    {
+      "title": "電腦模擬示範 2：slam_toolbox 建圖並存地圖",
+      "youtube": "kEFPokqhrFw"
+    }
+  ],
+  "A2": [
+    {
+      "title": "本單元有聲投影片影片（A2）",
+      "youtube": "mNg1tzjCZhw"
+    },
+    {
+      "title": "電腦模擬示範 3：Nav2 定位、規劃、走到三個目標",
+      "youtube": "v79o-HXZHTE"
+    }
+  ],
+  "W1": [
+    {
+      "title": "本單元有聲投影片影片（W1）",
+      "youtube": "x9twqB4yJqE"
+    }
+  ],
+  "W2": [
+    {
+      "title": "本單元有聲投影片影片（W2）",
+      "youtube": "a4dy-RChIrc"
+    }
+  ],
+  "W3": [
+    {
+      "title": "本單元有聲投影片影片（W3）",
+      "youtube": "qsTH17UuyVM"
+    }
+  ],
+  "B1": [
+    {
+      "title": "本單元有聲投影片影片（B1）",
+      "youtube": "J4oCXed07aM"
+    }
+  ],
+  "B2": [
+    {
+      "title": "本單元有聲投影片影片（B2）",
+      "youtube": "_8u4DCkhPlA"
+    }
+  ],
+  "B3": [
+    {
+      "title": "本單元有聲投影片影片（B3）",
+      "youtube": "JB6VmzuzJNk"
+    }
+  ],
+  "B4": [
+    {
+      "title": "本單元有聲投影片影片（B4）",
+      "youtube": "rnqrgkOfTHM"
+    }
+  ],
+  "B6": [
+    {
+      "title": "本單元有聲投影片影片（B6）",
+      "youtube": "oLePZcW7kbQ"
+    }
+  ],
+  "M1": [
+    {
+      "title": "本單元有聲投影片影片（M1）",
+      "youtube": "tL5AdGnhnyY"
+    }
+  ],
+  "M2": [
+    {
+      "title": "本單元有聲投影片影片（M2）",
+      "youtube": "98SnlossLnU"
+    }
+  ],
+  "M3": [
+    {
+      "title": "本單元有聲投影片影片（M3）",
+      "youtube": "LLl-3jrMKLI"
+    }
+  ],
+  "A3": [
+    {
+      "title": "本單元有聲投影片影片（A3）",
+      "youtube": "U__ASk3lh7Y"
+    }
+  ],
+  "A4": [
+    {
+      "title": "本單元有聲投影片影片（A4）",
+      "youtube": "-h94M1WK3dU"
+    }
+  ],
+  "A5": [
+    {
+      "title": "本單元有聲投影片影片（A5）",
+      "youtube": "ai7Ddtmxr14"
+    }
+  ]
+}
