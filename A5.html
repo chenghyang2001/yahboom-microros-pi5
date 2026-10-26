@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A5 電腦與車互通：DDS、ROS_DOMAIN_ID、Humble 與 Jazzy｜Yahboom MicroROS-Pi5 × ROS 2 學習地圖</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-lesson">
+<header class="topbar"><a href="index.html">← 學習地圖</a><span>A5</span></header>
+<main class="container lesson" data-lesson-id="A5">
+
+<section class="lesson-head card-box" id="sec-0" data-audio="audio/A5-0.mp3">
+<div class="eyebrow"><span class="badge level-A">高級</span>
+<span class="unit-id">A5</span></div>
+<h1>電腦與車互通：DDS、ROS_DOMAIN_ID、Humble 與 Jazzy</h1>
+<div class="meta"><span class="badge">⏱ 1 小時</span><span class="badge car-yes">🚗 真車：是</span></div>
+<dl class="goal">
+<dt>🎯 學習目標</dt><dd>搞懂 ROS 2 節點怎麼透過 DDS 自動找到彼此，把電腦的 WSL 設定成能和車上的 Humble 容器互通，並知道 Humble 與 Jazzy 混用的風險。</dd>
+<dt>✅ 完成標準</dt><dd>在電腦的 RViz 看到車上的 /scan 光達點，以及建圖時的 /map。</dd>
+</dl>
+<div class="player-bar">
+<button class="btn primary" id="play-all" type="button">▶ 全部播放</button>
+<label class="rate">播放速度
+<select id="rate">
+<option value="0.8">0.8×</option><option value="1" selected>1×</option>
+<option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+</select></label>
+<span class="now-playing" id="now-playing" aria-live="polite"></span>
+</div>
+</section>
+<section class="sec card-box" id="sec-1" data-audio="audio/A5-1.mp3">
+<div class="sec-head"><h2>1. DDS 探索：節點怎麼找到彼此</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>ROS 2 沒有一台中央伺服器，節點之間是自己找朋友的。每個節點一啟動，就在區域網路上大聲喊：我是誰、我發布什麼話題、我想訂閱什麼。聽到的節點如果剛好需要，就直接和它連線。負責這件事的底層叫 DDS，資料分發服務。好處是不用設定，同一個網路裡自動就通；壞處是只要網路把這種廣播擋掉，例如 WSL 預設的虛擬網路，節點就完全找不到彼此。</p></details>
+<div class="md"><h3>1.1 DDS 是什麼</h3>
+<p><strong>DDS（Data Distribution Service，資料分發服務）</strong>是 ROS 2 話題、服務、動作的底層通訊標準。官方教材的比喻是<strong>旋轉火鍋</strong>：資料放在「資料匯流排」上轉，每個節點只夾自己要的那一盤，不用知道是誰煮的。</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>ROS 1</th>
+<th>ROS 2（DDS）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>怎麼找到彼此</td>
+<td>先問中央的 master</td>
+<td>每個節點自己用<strong>多播（multicast）</strong>廣播「我在這」</td>
+</tr>
+<tr>
+<td>master 掛掉</td>
+<td>全部失聯</td>
+<td>沒有 master，不會單點故障</td>
+</tr>
+<tr>
+<td>需要設定</td>
+<td>每台都要設 <code>ROS_MASTER_URI</code></td>
+<td>同網段、同 Domain ID 就自動通</td>
+</tr>
+</tbody>
+</table>
+<p><strong>探索（discovery）</strong>的兩個前提：</p>
+<ol>
+<li>雙方在<strong>同一個網段</strong>，而且網路允許 UDP 多播通過。</li>
+<li>雙方的 <strong><code>ROS_DOMAIN_ID</code> 相同</strong>。</li>
+</ol>
+<h3>1.2 這台車的網路其實已經是「多機」</h3>
+<p>車子本身就是分散式系統：</p>
+<ul>
+<li>micro-ROS agent 容器用 <code>--net=host</code></li>
+<li>ROS 2 Humble 容器（<code>ros2_humble.sh</code>）也用 <code>--net=host</code></li>
+</ul>
+<p><strong>host 網路模式</strong>代表容器直接用 Pi 5 的網卡，所以容器裡的節點對外就像直接跑在 Pi 5 上。電腦只要和 Pi 5 在同一個網路、同一個 Domain ID，就能直接看到車上所有話題。</p>
+<h3>1.3 QoS：連得上但收不到的另一個原因</h3>
+<p><strong>QoS（服務品質）</strong>是發布者和訂閱者對「怎麼送資料」的約定。最常遇到的是 Reliability（可靠性）：</p>
+<table>
+<thead>
+<tr>
+<th>發布者</th>
+<th>訂閱者</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RELIABLE</td>
+<td>RELIABLE</td>
+<td>收得到</td>
+</tr>
+<tr>
+<td>RELIABLE</td>
+<td>BEST_EFFORT</td>
+<td>收得到（相容）</td>
+</tr>
+<tr>
+<td>BEST_EFFORT</td>
+<td>RELIABLE</td>
+<td><strong>收不到</strong>，會出現 QoS 不相容警告</td>
+</tr>
+<tr>
+<td>BEST_EFFORT</td>
+<td>BEST_EFFORT</td>
+<td>收得到</td>
+</tr>
+</tbody>
+</table>
+<p>感測器話題（像光達）常用 BEST_EFFORT。所以在 RViz 看不到光達點時，把顯示項目的 Reliability Policy 改成 <strong>Best Effort</strong> 試試看（第 6 節）。</p></div>
+</section>
+<section class="sec card-box" id="sec-2" data-audio="audio/A5-2.mp3">
+<div class="sec-head"><h2>2. ROS_DOMAIN_ID=20：同頻道才聽得到</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>Domain ID 就像對講機的頻道。調到同一個頻道的人才聽得到彼此，頻道不同就像在不同的房間。這台車出廠設定是二十，寫在三個地方：ESP32 控制板裡、車上 Docker 容器的 bashrc 裡，還有你的電腦。三個地方任何一個不一樣，ros2 node list 就看不到 YB Car Node。改完環境變數之後還要重啟 ros2 daemon，否則指令會拿舊的快取騙你。</p></details>
+<div class="md"><h3>2.1 三個地方要一致</h3>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>怎麼看／怎麼設</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ESP32 控制板</td>
+<td><code>config_robot.py</code> 的 <code>robot.set_ros_domain_id(20)</code>（寫入方式見 A3 第 2 節）</td>
+</tr>
+<tr>
+<td>車上 Docker 容器</td>
+<td>容器內 <code>~/.bashrc</code> 的 <code>export ROS_DOMAIN_ID=20</code></td>
+</tr>
+<tr>
+<td>你的電腦 WSL</td>
+<td>自己加到 <code>~/.bashrc</code></td>
+</tr>
+</tbody>
+</table>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（檢查）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">echo $ROS_DOMAIN_ID</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">echo &#x27;export ROS_DOMAIN_ID=20&#x27; &gt;&gt; ~/.bashrc
+source ~/.bashrc
+ros2 daemon stop</code></pre>
+</div>
+<p><strong><code>ros2 daemon</code></strong> 是 <code>ros2</code> 指令在背景用來加速的小程式，它會記住上一次探索到的節點。改了 Domain ID 或網路設定後要 <code>ros2 daemon stop</code>，下一個 <code>ros2</code> 指令會自動以新設定重啟它。</p>
+<h3>2.2 Domain ID 的範圍</h3>
+<ul>
+<li>官方 ROS 2 教材建議 <strong>0～101</strong>。原理：DDS 從埠 7400 起算，每個 domain 佔 250 個埠，再扣掉 Linux 系統保留的埠。</li>
+<li>一個 domain 最多約 120 個節點。</li>
+</ul>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>FAQ 說 Domain ID 合法範圍是 0～101，但 <code>config_robot.py</code> 原始碼的 <code>set_ros_domain_id</code> 會把大於 100 的值壓成 100。為了三個地方都一致，請用 <strong>0～100</strong>。家裡只有一台車就維持預設 <strong>20</strong>；同一個網路有好幾台車又不想互相干擾，才給每台不同的 ID。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-3" data-audio="audio/A5-3.mp3">
+<div class="sec-head"><h2>3. WSL2 網路：改成 mirrored 模式</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>這是電腦端最關鍵的一步。WSL2 預設躲在 Windows 後面的一個虛擬小網路裡，就像住在大樓裡的套房，外面的人喊話它聽不到，它的廣播也傳不出去，所以 DDS 探索跨不過去。Windows 11 提供一個鏡像模式，叫 mirrored，讓 WSL 直接共用 Windows 的網卡，就像把套房的門直接開在大街上。改一個設定檔、重啟 WSL 就好。</p></details>
+<div class="md"><h3>3.1 編輯 .wslconfig</h3>
+<p>在 Windows 的使用者家目錄（<code>%USERPROFILE%</code>）建立或編輯 <code>.wslconfig</code>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Windows（PowerShell）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-powershell">notepad &quot;$env:USERPROFILE\.wslconfig&quot;</code></pre>
+</div>
+<p>內容加上：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">%USERPROFILE%\.wslconfig</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-ini">[wsl2]
+networkingMode=mirrored</code></pre>
+</div>
+<p>存檔後<strong>完整關閉 WSL</strong> 再重開：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Windows（PowerShell）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-powershell">wsl --shutdown</code></pre>
+</div>
+<p>需求：Windows 11 22H2 以上。</p>
+<h3>3.2 確認生效</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ip addr</code></pre>
+</div>
+<p>mirrored 模式下，WSL 看到的 IP 應該和 Windows 的 WiFi 網卡相同（例如連車子熱點 <code>Micro_ros</code> 時是 <code>10.42.0.x</code>）。如果還是 <code>172.x.x.x</code> 這種內部 IP，代表設定沒生效。</p>
+<h3>3.3 防火牆</h3>
+<p>mirrored 模式下，Windows 的防火牆（含 Hyper-V 防火牆）可能擋掉進來的 DDS 封包，症狀是「電腦發的車收得到，車發的電腦收不到」。Microsoft 文件提供的放行指令如下，請在<strong>系統管理員</strong> PowerShell 執行（需實機確認）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Windows（系統管理員 PowerShell）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-powershell">Set-NetFirewallHyperVVMSetting -Name &#x27;{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}&#x27; -DefaultInboundAction Allow</code></pre>
+</div>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>電腦要和車在同一個網路：最簡單是電腦直接連車的熱點 <code>Micro_ros</code>（密碼 <code>12345678</code>），車子 IP 固定是 <code>10.42.0.1</code>；或照 B2 讓車連你家 WiFi，再用 <code>ros2 topic echo /rpi5_ip</code> 找車子的 IP。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-4" data-audio="audio/A5-4.mp3">
+<div class="sec-head"><h2>4. Jazzy 的探索範圍設定與 static peers</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>Jazzy 對探索範圍做了改版。以前的 Humble 用一個叫 localhost only 的開關，Jazzy 換成探索範圍這個新設定，可以選只在本機、整個子網路，或完全關閉。我們要和車子講話，所以設成子網路。如果你的網路環境把多播擋掉了，還有一招叫 static peers，直接把車子的 IP 告訴電腦，讓它不靠廣播、主動去敲門。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）：加到 ~/.bashrc</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">export ROS_DOMAIN_ID=20
+export ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th><code>ROS_AUTOMATIC_DISCOVERY_RANGE</code></th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SUBNET</code></td>
+<td>在同一個子網路裡自動探索（要和車互通就用這個）</td>
+</tr>
+<tr>
+<td><code>LOCALHOST</code></td>
+<td>只和本機的節點互通</td>
+</tr>
+<tr>
+<td><code>OFF</code></td>
+<td>不自動探索</td>
+</tr>
+</tbody>
+</table>
+<p>多播不通時（例如某些公司或學校的 WiFi），用 <strong>static peers</strong> 直接指定車子 IP：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">export ROS_STATIC_PEERS=10.42.0.1
+ros2 daemon stop</code></pre>
+</div>
+<p>多個 IP 用分號 <code>;</code> 分隔。車上的 Humble 沒有這個設定；只在電腦端設定，能不能讓雙向都通，請以實際測試為準（需實車確認）。</p>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p><code>ROS_LOCALHOST_ONLY</code> 是 Humble 的舊設定，在 Jazzy 已被 <code>ROS_AUTOMATIC_DISCOVERY_RANGE</code> 取代。如果你的 <code>~/.bashrc</code> 裡殘留 <code>export ROS_LOCALHOST_ONLY=1</code>，電腦就只會跟自己講話，請刪掉。</p>
+</div>
+<h3>4.1 第一個互通測試：talker 與 listener</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run demo_nodes_py talker</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run demo_nodes_py listener</code></pre>
+</div>
+<p>電腦印出 <code>I heard: [Hello World: N]</code> 就是互通成功。再試試看車上的話題：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 node list
+ros2 topic list
+ros2 topic hz /scan</code></pre>
+</div>
+<p>看到 <code>/YB_Car_Node</code>、<code>/scan</code> 頻率有數字，電腦就已經「看得到車」了。</p></div>
+</section>
+<section class="sec card-box" id="sec-5" data-audio="audio/A5-5.mp3">
+<div class="sec-head"><h2>5. Humble 與 Jazzy 混用的風險與建議</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>車上跑的是 Humble，你的 WSL 是 Jazzy，兩個版本混用就像兩個國家的人講話，日常用語大致相通，專業術語就容易雞同鴨講。標準訊息像速度、光達、影像通常沒問題，但 ROS 官方並不保證跨版本能互通，自訂訊息、Nav2、TF 這些比較容易出事。所以建議是：看資料、遙控可以直接用 Jazzy；要做認真的事，就在電腦上用 Docker 跑一個 Humble 容器，和車子同版本最穩。</p></details>
+<div class="md"><h3>5.1 風險整理</h3>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>Jazzy 直接和車上 Humble 互通</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>標準訊息（<code>std_msgs</code>、<code>geometry_msgs</code>、<code>sensor_msgs</code>）</td>
+<td>通常可以</td>
+<td>兩版預設都是 Fast DDS，但官方不保證跨版本</td>
+</tr>
+<tr>
+<td><code>/scan</code>、<code>/cmd_vel</code> 看資料、遙控</td>
+<td>通常可以</td>
+<td>入門最常用</td>
+</tr>
+<tr>
+<td>Yahboom 自訂訊息（<code>yahboomcar_msgs</code> 等）</td>
+<td><strong>很可能不行</strong></td>
+<td>電腦沒有這些套件，就算有，版本間定義也可能不同</td>
+</tr>
+<tr>
+<td>Nav2、TF、行為樹、參數服務</td>
+<td>風險高</td>
+<td>參數格式、外掛名稱在版本間有改（見 A2 第 6 節）</td>
+</tr>
+<tr>
+<td><code>RMW_IMPLEMENTATION</code></td>
+<td>兩端要相同</td>
+<td>都用預設的 Fast DDS 就好，不要一邊改成 Cyclone DDS</td>
+</tr>
+</tbody>
+</table>
+<h3>5.2 建議：電腦端用 Docker 跑 Humble</h3>
+<p>先在 WSL 裡裝好 Docker Engine（例如 <code>sudo apt install docker.io</code>，並把自己加進 <code>docker</code> 群組），然後：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）：只要指令列工具</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">docker run -it --rm --net=host --ipc=host -e ROS_DOMAIN_ID=20 ros:humble bash</code></pre>
+</div>
+<p><code>ros:humble</code> 映像只有指令列工具，沒有 RViz。要開 RViz 用 <code>osrf/ros:humble-desktop</code>，並把 WSLg 的顯示通道帶進容器（需實機確認）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）：含 RViz 的 Humble 容器</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">docker run -it --rm --net=host --ipc=host \
+  -e ROS_DOMAIN_ID=20 \
+  -e DISPLAY=$DISPLAY -e WAYLAND_DISPLAY=$WAYLAND_DISPLAY -e XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR \
+  -v /tmp/.X11-unix:/tmp/.X11-unix -v /mnt/wslg:/mnt/wslg \
+  osrf/ros:humble-desktop bash</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>參數</th>
+<th>為什麼要加</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--net=host</code></td>
+<td>容器用 WSL 的網卡，mirrored 模式下等於用 Windows 的網卡，才能和車互相探索</td>
+</tr>
+<tr>
+<td><code>--ipc=host</code></td>
+<td>Fast DDS 在同一台機器上會用共享記憶體傳資料；不加的話，容器和 WSL 主機上的節點可能「看得到卻收不到」</td>
+</tr>
+<tr>
+<td><code>-e ROS_DOMAIN_ID=20</code></td>
+<td>和車同頻道</td>
+</tr>
+<tr>
+<td><code>DISPLAY</code>、<code>/mnt/wslg</code> 等</td>
+<td>讓容器裡的 RViz 視窗顯示在 Windows 桌面</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>A3 多機導航的 <code>multi_nav_display_launch.py</code>、<code>map_server_launch.py</code> 需要 Yahboom 的 <code>yahboomcar_nav</code>、<code>yahboomcar_multi</code> 套件。可以把本專案 <code>source-code/</code> 裡的 <code>yahboomcar_ws/src</code> 掛進這個 Humble 容器再 <code>colcon build</code>；或直接用官方提供的 Humble 虛擬機。</p>
+</div>
+<h3>5.3 一張決策表</h3>
+<table>
+<thead>
+<tr>
+<th>你想做的事</th>
+<th>建議環境</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>看 <code>/scan</code>、<code>/odom</code>、遙控 <code>/cmd_vel</code></td>
+<td>電腦 Jazzy 直接用</td>
+</tr>
+<tr>
+<td>電腦 RViz 看建圖、導航畫面</td>
+<td>Jazzy 可以試；有怪問題就改 Docker <code>osrf/ros:humble-desktop</code></td>
+</tr>
+<tr>
+<td>電腦跑 Yahboom 的 launch、自訂訊息、多機導航 RViz</td>
+<td>Docker Humble 或官方 Humble 虛擬機</td>
+</tr>
+<tr>
+<td>練習觀念、跑模擬（A1、A2 的模擬版）</td>
+<td>電腦 Jazzy（模擬全在電腦內，不跨版本）</td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section class="sec card-box" id="sec-6" data-audio="audio/A5-6.mp3">
+<div class="sec-head"><h2>6. 在電腦 RViz 看車的 /scan 與地圖</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>最後來驗收。車上照常開 agent、進容器、跑底層 bringup，電腦這邊只要開 RViz。先看光達：把固定座標設成 laser frame，加一個雷射掃描的顯示，選 scan 話題，就會看到一圈點。再看地圖：車上開 Gmapping 建圖，電腦 RViz 把固定座標改成 map，加一個地圖顯示選 map 話題。這樣 Pi 5 不用自己畫圖，跑起來輕鬆很多。</p></details>
+<div class="md"><h3>6.1 車上</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">sh ~/start_agent_rpi5.sh</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（終端 A）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_bringup yahboomcar_bringup_launch.py</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（終端 B，docker exec 進同一個容器；要看地圖時才開）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_nav map_gmapping_launch.py</code></pre>
+</div>
+<p>建圖時一樣需要遙控（A1 第 4.2 節的 <code>yahboom_keyboard</code>）。這次<strong>不用</strong>在車上開 <code>display_launch.py</code>，RViz 改在電腦開。</p>
+<h3>6.2 電腦</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）（或第 5.2 節的 Humble 容器內）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">rviz2</code></pre>
+</div>
+<p><strong>看光達：</strong></p>
+<ol>
+<li>左側 <strong>Global Options → Fixed Frame</strong> 輸入 <code>laser_frame</code>。</li>
+<li>左下 <strong>Add → By topic → <code>/scan</code> → LaserScan</strong>。</li>
+<li>看不到點：展開 LaserScan → <strong>Topic → Reliability Policy</strong> 改 <code>Best Effort</code>；<strong>Size (m)</strong> 調大到 <code>0.05</code>。</li>
+</ol>
+<p><strong>看地圖：</strong></p>
+<ol>
+<li>Fixed Frame 改成 <code>map</code>（要等車上的 gmapping 開始發布 <code>map → odom</code>）。</li>
+<li><strong>Add → By topic → <code>/map</code> → Map</strong>。</li>
+<li>地圖沒出現：展開 Map → <strong>Topic → Durability Policy</strong> 改 <code>Transient Local</code>。</li>
+<li>再加 <strong>TF</strong> 顯示，可以看到 <code>map</code>、<code>odom</code>、<code>base_footprint</code>、<code>laser_frame</code> 的座標軸跟著車移動。</li>
+</ol>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p><code>/scan</code> 的 <code>frame_id</code> 是 <code>laser_frame</code>（ESP32 韌體設定），所以只看光達時不需要任何 TF，Fixed Frame 直接設 <code>laser_frame</code> 最簡單。要在 <code>map</code> 或 <code>odom</code> 座標下看光達，就需要車上 bringup 與建圖節點提供完整 TF 鏈。</p>
+</div>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>WiFi 頻寬有限。電腦遠端看 <code>/scan</code> 和 <code>/map</code> 很順，但若同時遠端看相機影像（<code>/usb_cam/image_raw</code>），可能會卡；看影像請用壓縮話題 <code>/usb_cam/image_raw/compressed</code>。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-7" data-audio="audio/A5-7.mp3">
+<div class="sec-head"><h2>7. 出問題時怎麼辦</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>電腦和車連不起來時，請從下往上一層一層查：先確認網路通不通，再確認頻道一不一樣，接著確認探索有沒有被擋，最後才是版本和 QoS 的問題。每改一個設定，都記得重啟 ros2 daemon。用 ping 確認網路、用 talker 和 listener 確認探索，是最快的兩個檢查。</p></details>
+<div class="md"><h3>7.1 由下往上的檢查順序</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）：1. 網路通不通</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ping -c 3 10.42.0.1</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）：2. 頻道與探索設定</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">echo $ROS_DOMAIN_ID
+echo $ROS_AUTOMATIC_DISCOVERY_RANGE
+echo $ROS_LOCALHOST_ONLY
+ros2 daemon stop
+ros2 node list</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內：3. 車上自己看得到嗎</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 node list
+ros2 topic hz /scan</code></pre>
+</div>
+<h3>7.2 症狀對照表</h3>
+<table>
+<thead>
+<tr>
+<th>症狀</th>
+<th>最可能的原因</th>
+<th>怎麼做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ping</code> 不通</td>
+<td>電腦和車不在同一網路</td>
+<td>電腦連 <code>Micro_ros</code> 熱點，或兩邊都連同一個路由器</td>
+</tr>
+<tr>
+<td>WSL 的 <code>ip addr</code> 是 <code>172.x.x.x</code></td>
+<td>mirrored 沒生效</td>
+<td>檢查 <code>%USERPROFILE%\.wslconfig</code>；<code>wsl --shutdown</code> 後重開</td>
+</tr>
+<tr>
+<td><code>ping</code> 通，<code>ros2 node list</code> 卻空的</td>
+<td>Domain ID 不同，或 daemon 快取舊資料</td>
+<td>兩邊都設 <code>20</code>；<code>ros2 daemon stop</code></td>
+</tr>
+<tr>
+<td>還是空的</td>
+<td>多播被擋、防火牆</td>
+<td>試 <code>ROS_STATIC_PEERS=10.42.0.1</code>；照 3.3 節放行 Hyper-V 防火牆</td>
+</tr>
+<tr>
+<td>電腦能發給車、車的資料電腦收不到</td>
+<td>Windows 防火牆擋連入</td>
+<td>照 3.3 節；或暫時關閉防火牆測試，確認後再設規則</td>
+</tr>
+<tr>
+<td>看得到話題名稱，<code>echo</code> 卻沒資料</td>
+<td>QoS 不相容，或 Docker 容器少了 <code>--ipc=host</code></td>
+<td><code>ros2 topic echo /scan --qos-reliability best_effort</code> 試試；容器加 <code>--ipc=host</code></td>
+</tr>
+<tr>
+<td>RViz 有 <code>/scan</code> 但沒有點</td>
+<td>Fixed Frame 錯、Reliability 不符</td>
+<td>Fixed Frame 設 <code>laser_frame</code>；Reliability 改 Best Effort</td>
+</tr>
+<tr>
+<td>RViz 的 Map 一直顯示 No map received</td>
+<td>建圖節點沒開，或 Durability 不符</td>
+<td>車上開 gmapping；Durability 改 Transient Local</td>
+</tr>
+<tr>
+<td>車上看不到 <code>/YB_Car_Node</code></td>
+<td>控制板與容器 Domain ID 不同，或 agent 沒連上</td>
+<td>容器 <code>vi ~/.bashrc</code> 改 <code>ROS_DOMAIN_ID</code>；Pi 5 主機重開 agent、按 Reset</td>
+</tr>
+<tr>
+<td>自訂訊息的話題在電腦上顯示不出來</td>
+<td>電腦沒有該訊息套件，或 Humble／Jazzy 定義不同</td>
+<td>改用 Docker Humble 並編譯 Yahboom 套件</td>
+</tr>
+<tr>
+<td><code>ros2</code> 指令在電腦上變很慢、列出一堆陌生節點</td>
+<td>同網路有其他人也用 Domain 20</td>
+<td>換一個 Domain ID（三個地方都要改）</td>
+</tr>
+</tbody>
+</table></div>
+</section>
+
+<section class="quiz card-box" id="quiz"><h2>📝 小測驗</h2><div class="quiz-item" data-answer="1"><p class="q">1. ROS 2 的節點是怎麼找到彼此的？</p><div class="opts"><button class="opt" type="button" data-i="0">先連到中央的 master</button><button class="opt" type="button" data-i="1">透過 DDS 在區域網路上用多播自動探索</button><button class="opt" type="button" data-i="2">要手動輸入每個節點的 IP</button></div><p class="explain" hidden></p><template class="explain-text">ROS 2 沒有 master，DDS 讓每個節點自己廣播與探索；同網段、同 Domain ID 就會自動連上。</template></div><div class="quiz-item" data-answer="1"><p class="q">2. 為什麼 WSL2 要把 networkingMode 改成 mirrored？</p><div class="opts"><button class="opt" type="button" data-i="0">讓 WSL 跑得更快</button><button class="opt" type="button" data-i="1">預設的 NAT 虛擬網路會擋掉 DDS 多播探索，mirrored 讓 WSL 共用 Windows 網卡</button><button class="opt" type="button" data-i="2">為了讓 WSL 能上網</button></div><p class="explain" hidden></p><template class="explain-text">NAT 模式下 WSL 與車不在同一網段，多播跨不過去；mirrored 讓 WSL 直接使用 Windows 的網路。</template></div><div class="quiz-item" data-answer="1"><p class="q">3. 改了 ROS_DOMAIN_ID 之後，ros2 node list 還是顯示舊結果，應該怎麼做？</p><div class="opts"><button class="opt" type="button" data-i="0">重灌 ROS</button><button class="opt" type="button" data-i="1">執行 ros2 daemon stop 讓背景快取重啟</button><button class="opt" type="button" data-i="2">等一天再試</button></div><p class="explain" hidden></p><template class="explain-text">ros2 daemon 會快取探索結果；停掉它，下一個 ros2 指令就會用新設定重新探索。</template></div><div class="quiz-item" data-answer="0"><p class="q">4. Jazzy 裡取代 ROS_LOCALHOST_ONLY 的設定是？</p><div class="opts"><button class="opt" type="button" data-i="0">ROS_AUTOMATIC_DISCOVERY_RANGE</button><button class="opt" type="button" data-i="1">ROS_MASTER_URI</button><button class="opt" type="button" data-i="2">ROS_DISTRO</button></div><p class="explain" hidden></p><template class="explain-text">Jazzy 用 ROS_AUTOMATIC_DISCOVERY_RANGE（SUBNET、LOCALHOST、OFF 等）控制探索範圍，另有 ROS_STATIC_PEERS 可指定對端 IP。</template></div><div class="quiz-item" data-answer="1"><p class="q">5. 電腦要跑 Yahboom 的 launch 與自訂訊息，最穩的做法是？</p><div class="opts"><button class="opt" type="button" data-i="0">直接用 Jazzy，一定相容</button><button class="opt" type="button" data-i="1">在電腦用 Docker 跑 Humble 容器，和車同版本</button><button class="opt" type="button" data-i="2">把車子升級成 Jazzy</button></div><p class="explain" hidden></p><template class="explain-text">官方不保證 Humble 與 Jazzy 互通，自訂訊息與 Nav2 風險高；電腦端用 Humble 容器最穩。</template></div><p class="quiz-score">得分：<span class="score">0</span> / 5</p></section>
+<footer class="lesson-foot card-box">
+<button class="btn primary" id="mark-done" type="button">✔ 標記為完成</button>
+<nav class="pager"><a class="btn" href="A4.html">← A4 上一單元</a><span></span></nav>
+</footer>
+</main>
+<audio id="player" preload="none"></audio>
+<script src="app.js"></script>
+</body>
+</html>

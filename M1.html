@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>M1 OpenCV 基礎與 ROS 影像話題｜Yahboom MicroROS-Pi5 × ROS 2 學習地圖</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-lesson">
+<header class="topbar"><a href="index.html">← 學習地圖</a><span>M1</span></header>
+<main class="container lesson" data-lesson-id="M1">
+
+<section class="lesson-head card-box" id="sec-0" data-audio="audio/M1-0.mp3">
+<div class="eyebrow"><span class="badge level-M">中級</span>
+<span class="unit-id">M1</span></div>
+<h1>OpenCV 基礎與 ROS 影像話題</h1>
+<div class="meta"><span class="badge">⏱ 90 分鐘</span><span class="badge car-part">🚗 真車：部分</span></div>
+<dl class="goal">
+<dt>🎯 學習目標</dt><dd>學會用 OpenCV 讀影像、畫圖、二值化與辨識 QR code，並理解 ROS 2 怎麼用 /image_raw 話題與 cv_bridge 傳影像。</dd>
+<dt>✅ 完成標準</dt><dd>筆電 webcam 跑出灰階與邊緣畫面；車上容器內 rqt_image_view 看到 /image_raw 與 pub_image 轉發的 /image。</dd>
+</dl>
+<div class="player-bar">
+<button class="btn primary" id="play-all" type="button">▶ 全部播放</button>
+<label class="rate">播放速度
+<select id="rate">
+<option value="0.8">0.8×</option><option value="1" selected>1×</option>
+<option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+</select></label>
+<span class="now-playing" id="now-playing" aria-live="polite"></span>
+</div>
+</section>
+<section class="sec card-box" id="sec-1" data-audio="audio/M1-1.mp3">
+<div class="sec-head"><h2>1. 影像在電腦眼中是什麼</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>在讓車子「看懂」世界之前，先要知道一張照片在電腦裡長什麼樣子。對 OpenCV 來說，一張彩色影像就是一個三層的數字表格，每個格子是一個像素，每個像素有藍、綠、紅三個數字，範圍零到兩百五十五。注意順序是藍綠紅，不是我們習慣的紅綠藍，這是初學者最常踩的第一個坑。之後的灰階、二值化、找顏色，全部都是在對這張數字表格做運算。</p></details>
+<div class="md"><p><strong>OpenCV</strong>（Open Source Computer Vision，開源電腦視覺函式庫）在 Python 裡把影像存成 numpy 陣列：</p>
+<table>
+<thead>
+<tr>
+<th>你想知道的</th>
+<th>寫法</th>
+<th>結果範例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>影像大小</td>
+<td><code>img.shape</code></td>
+<td><code>(480, 640, 3)</code> → <strong>高 480、寬 640</strong>、3 個通道</td>
+</tr>
+<tr>
+<td>某個像素的顏色</td>
+<td><code>(b, g, r) = img[100, 100]</code></td>
+<td>先 y（列）後 x（行）</td>
+</tr>
+<tr>
+<td>把某點塗黑</td>
+<td><code>img[i, j] = (0, 0, 0)</code></td>
+<td>顏色元組是 <strong>B、G、R</strong></td>
+</tr>
+<tr>
+<td>裁切</td>
+<td><code>img[y1:y2, x1:x2]</code></td>
+<td>一樣先 y 後 x</td>
+</tr>
+<tr>
+<td>縮放</td>
+<td><code>cv2.resize(img, (寬, 高))</code></td>
+<td>這裡卻是<strong>先寬後高</strong></td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p><code>img.shape</code> 回傳（高, 寬），<code>cv2.resize</code> 要的卻是（寬, 高）。兩者剛好相反，記不住就每次都印出 <code>img.shape</code> 對照。</p>
+</div>
+<p>官方這一章（6.1～6.4）的練習腳本都放在車上容器的同一個資料夾：</p>
+<table>
+<thead>
+<tr>
+<th>課</th>
+<th>腳本</th>
+<th>在做什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>6.1 入門</td>
+<td><code>1_1.py</code>～<code>1_4.py</code></td>
+<td>讀圖、存圖、開攝影機、改像素</td>
+</tr>
+<tr>
+<td>6.2 幾何變換</td>
+<td><code>2_1.py</code>～<code>2_4.py</code></td>
+<td>縮放、裁切、平移 <code>warpAffine</code>、鏡像</td>
+</tr>
+<tr>
+<td>6.3 處理與繪圖</td>
+<td><code>3_1.py</code>～<code>3_9.py</code></td>
+<td>灰階、二值化、Canny 邊緣、畫線框圓、寫字</td>
+</tr>
+<tr>
+<td>6.4 美化</td>
+<td><code>4_1_1.py</code>、<code>4_1_2.py</code>、<code>4_2.py</code>、<code>4_3.py</code></td>
+<td>影像修復 inpaint、亮度、美白</td>
+</tr>
+</tbody>
+</table>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cd ~/yahboomcar_ws/src/yahboomcar_astra/scripts/opencv/
+python3 1_1.py    # 讀 yahboom.jpg 並顯示，按 q 離開
+python3 3_3.py    # 高斯模糊 + Canny 邊緣偵測</code></pre>
+</div>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>官方文件與程式有幾處對不上，照抄會困惑：</p>
+<ul>
+<li>範例結尾寫 <code>img.release()</code>，但 <code>img</code> 是圖片陣列，沒有 <code>release()</code>，按 q 離開時會跳 <code>AttributeError</code>。只有 <code>1_3.py</code> 的 <code>frame.release()</code> 是對的（那是攝影機物件）。看到這個錯誤不用緊張，刪掉那行即可。</li>
+<li><code>imread</code> 旗標表把 <code>IMREAD_UNCHANGED</code> 列了兩次，第二個（值 2）其實是 <code>IMREAD_ANYDEPTH</code>。</li>
+<li>6.2 文字說裁切 X 300–500、Y 500–700，程式實際是 <code>img[0:100,100:200]</code>，以程式為準。</li>
+<li>6.4 的 <code>4_1_2.py</code> 必須先跑 <code>4_1_1.py</code> 產生 <code>damaged.jpg</code> 才能執行。</li>
+</ul>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-2" data-audio="audio/M1-2.mp3">
+<div class="sec-head"><h2>2. 先在筆電用 webcam 練：安裝與第一支程式</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>好消息是，這一章大部分內容不需要車子，用筆電內建的鏡頭就能練。我們先在 Windows 裝好 Python 版的 OpenCV，寫一支小程式打開鏡頭，同時顯示原始畫面、灰階和邊緣三種效果。等你在筆電上看懂每一步在做什麼，上車之後只剩下 ROS 和硬體的問題，除錯範圍會小很多。</p></details>
+<div class="md"><p><strong>安裝</strong>（Windows 用 PowerShell 或 Git Bash 都可以）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Windows</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">python -m pip install opencv-python numpy qrcode
+python -c &quot;import cv2; print(cv2.__version__)&quot;</code></pre>
+</div>
+<p>把下面存成 <code>cam_basic.py</code>，放在任一資料夾執行 <code>python cam_basic.py</code>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Windows（cam_basic.py）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">&quot;&quot;&quot;筆電 webcam 練習：原圖、灰階、二值化、Canny 邊緣、畫框寫字。按 q 離開。&quot;&quot;&quot;
+import sys
+import cv2 as cv
+import numpy as np
+
+
+def main():
+    cap = cv.VideoCapture(0)          # 0 = 第一支鏡頭；外接鏡頭可試 1
+    if not cap.isOpened():
+        print(&quot;錯誤：打不開鏡頭，請關掉 Teams/LINE 等占用鏡頭的程式，或改用 1&quot;, file=sys.stderr)
+        sys.exit(1)
+    cap.set(cv.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv.CAP_PROP_FRAME_HEIGHT, 480)
+    while True:
+        ret, frame = cap.read()       # ret=False 代表這一幀沒讀到
+        if not ret:
+            print(&quot;讀不到畫面&quot;, file=sys.stderr)
+            break
+        gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)                 # 6.3：灰階
+        _, binary = cv.threshold(gray, 180, 255, cv.THRESH_BINARY_INV)  # 6.3：二值化
+        edges = cv.Canny(cv.GaussianBlur(gray, (3, 3), 0), 50, 50)     # 6.3：邊緣
+        cv.rectangle(frame, (220, 140), (420, 340), (0, 255, 0), 2)    # 綠框（BGR）
+        cv.putText(frame, &#x27;This is Yahboom!&#x27;, (50, 50),
+                   cv.FONT_HERSHEY_SIMPLEX, 1, (0, 200, 0), 2)
+        # 三張灰階圖轉回三通道才能和彩色圖拼在一起
+        row = np.hstack([frame, cv.cvtColor(edges, cv.COLOR_GRAY2BGR)])
+        cv.imshow(&#x27;frame | edges&#x27;, cv.resize(row, (960, 360)))
+        cv.imshow(&#x27;binary&#x27;, cv.resize(binary, (320, 240)))
+        if cv.waitKey(1) &amp; 0xFF == ord(&#x27;q&#x27;):
+            break
+    cap.release()
+    cv.destroyAllWindows()
+
+
+if __name__ == &quot;__main__&quot;:
+    main()</code></pre>
+</div>
+<p>試著改改看：把 <code>threshold</code> 的 180 改成 100、把 Canny 的 50, 50 改成 100, 200，觀察畫面怎麼變。這就是 6.3 那九支腳本的濃縮版。</p>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p><code>cv.waitKey(1)</code> 不只是讀鍵盤，它也負責讓視窗有時間重畫。迴圈裡少了它，視窗會一片灰白、沒有回應。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-3" data-audio="audio/M1-3.mp3">
+<div class="sec-head"><h2>3. QR code 產生與辨識，與 AR 需要的相機內參</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>QR code 是讓機器人讀「指令卡」最簡單的方法，第三單元會用它來控制車子前進後退。它內建糾錯碼，就算被遮住三成左右還是讀得出來。車上官方程式用 pyzbar 解碼，但在 Windows 上 pyzbar 常常缺少底層函式庫，所以筆電練習改用 OpenCV 內建的 QR 偵測器，原理一樣：找到四個角、讀出文字、在畫面上框起來。</p></details>
+<div class="md"><p><strong>車上的官方版本</strong>（出廠映像已裝好 <code>qrcode</code>、<code>pyzbar</code>、<code>libzbar-dev</code>）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cd /root/yahboomcar_ws/src/yahboomcar_visual/simple_qrcode/
+python3 QRcode_Create.py    # 依提示輸入內容，例如 forward，按 Enter 產生圖片
+python3 QRcode_Parsing.py   # 開鏡頭，QR code 對準鏡頭，終端機印出內容</code></pre>
+</div>
+<p><strong>筆電版</strong>：先產生幾張之後 M3 會用到的指令卡，再用鏡頭辨識。</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Windows（qr_make.py）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">&quot;&quot;&quot;產生 M3 qrTracker 用的指令卡：forward/back/left/right/stop。&quot;&quot;&quot;
+import qrcode
+
+for word in [&quot;forward&quot;, &quot;back&quot;, &quot;left&quot;, &quot;right&quot;, &quot;stop&quot;]:
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_H,
+                       box_size=10, border=4)
+    qr.add_data(word)
+    qr.make(fit=True)
+    qr.make_image(fill_color=&quot;black&quot;, back_color=&quot;white&quot;).save(f&quot;qr_{word}.png&quot;)
+    print(&quot;已產生&quot;, f&quot;qr_{word}.png&quot;)</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Windows（qr_webcam.py）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">&quot;&quot;&quot;用 OpenCV 內建 QRCodeDetector 辨識，不需要 pyzbar。按 q 離開。&quot;&quot;&quot;
+import sys
+import cv2 as cv
+
+cap = cv.VideoCapture(0)
+if not cap.isOpened():
+    sys.exit(&quot;錯誤：打不開鏡頭&quot;)
+detector = cv.QRCodeDetector()
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+    text, points, _ = detector.detectAndDecode(frame)
+    if points is not None and text:
+        pts = points.astype(int).reshape(-1, 2)
+        cv.polylines(frame, [pts], True, (0, 255, 0), 3)
+        cv.putText(frame, text, tuple(pts[0]), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        print(&quot;讀到：&quot;, text)   # M3 的 qrTracker 就是把這個字串轉成速度
+    cv.imshow(&#x27;qr&#x27;, frame)
+    if cv.waitKey(1) &amp; 0xFF == ord(&#x27;q&#x27;):
+        break
+cap.release()
+cv.destroyAllWindows()</code></pre>
+</div>
+<p><strong>6.6 AR 擴增實境</strong>：把虛擬圖形疊在真實畫面上，需要知道鏡頭的「內參」（焦距、中心點）與「畸變係數」，所以<strong>沒有標定過的鏡頭不能用</strong>。車上的指令：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run yahboomcar_visual simple_AR
+# 視窗內按 f 切換效果、q 離開；另一個終端可用話題切換：
+ros2 topic pub /Graphics_topic std_msgs/msg/String &quot;data: Desk&quot;
+ros2 run rqt_image_view rqt_image_view   # 左上選 /simpleAR/camera</code></pre>
+</div>
+<p>效果有 12 種：<code>Triangle</code>、<code>Rectangle</code>、<code>Parallelogram</code>、<code>WindMill</code>、<code>TableTennisTable</code>、<code>Ball</code>、<code>Arrow</code>、<code>Knife</code>、<code>Desk</code>、<code>Bench</code>、<code>Stickman</code>、<code>ParallelBars</code>。標定方法在 M3 第 1 小節。</p></div>
+</section>
+<section class="sec card-box" id="sec-4" data-audio="audio/M1-4.mp3">
+<div class="sec-head"><h2>4. ROS 2 怎麼傳影像：/image_raw 與 cv_bridge</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>到這裡為止，程式都是自己打開鏡頭自己看。可是在機器人上，常常是好幾個程式都想看同一個鏡頭，所以 ROS 的做法是：只讓一個「相機節點」打開鏡頭，把每一幀影像廣播到一個叫 image raw 的話題，誰想看就訂閱。問題是 ROS 傳的是 ROS 的影像訊息，OpenCV 看不懂，中間就需要一座翻譯橋，叫做 cv bridge，負責兩種格式互相轉換。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title"></span><button class="copy-btn" type="button">複製</button></div>
+<pre><code> 鏡頭 ─▶ usb_cam_node_exe ──/image_raw──▶ 你的節點 ──(cv_bridge)──▶ OpenCV 處理
+                 (sensor_msgs/Image)          │
+                                              └──(cv_bridge)──/image──▶ rqt_image_view</code></pre>
+</div>
+<ul>
+<li><strong><code>sensor_msgs/Image</code></strong>：ROS 的影像訊息，裡面有 <code>height</code>、<code>width</code>、<code>encoding</code>（像素格式，例如 <code>bgr8</code>、<code>rgb8</code>、<code>yuv422</code>）、<code>data</code>（一長串位元組）。</li>
+<li><strong><code>cv_bridge</code></strong>：<code>imgmsg_to_cv2(msg, "bgr8")</code> 把 ROS 訊息轉成 OpenCV 陣列；<code>cv2_to_imgmsg(frame, "bgr8")</code> 反向轉回去。</li>
+<li>指定 <code>"bgr8"</code> 的好處：不管相機原本送什麼格式，拿到的都是 OpenCV 慣用的 BGR，顏色才不會紅藍顛倒。</li>
+</ul>
+<p>官方 <code>astra_rgb_image.py</code>（訂閱並顯示）與 <code>pub_image.py</code>（訂閱、轉換、再發布）的核心就這幾行：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（/root/yahboomcar_ws/src/yahboomcar_visual/yahboomcar_visual/ 節錄）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">from cv_bridge import CvBridge
+self.bridge = CvBridge()
+self.sub_img = self.create_subscription(Image, &#x27;/image_raw&#x27;, self.handleTopic, 100)
+frame = self.bridge.imgmsg_to_cv2(msg, &quot;bgr8&quot;)          # ROS → OpenCV
+# pub_image.py 另外再發布：
+self.pub_img = self.create_publisher(Image, &#x27;/image&#x27;, 500)
+msg = self.bridge.cv2_to_imgmsg(frame, &quot;bgr8&quot;)          # OpenCV → ROS
+self.pub_img.publish(msg)</code></pre>
+</div>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>套件名 <code>yahboomcar_astra</code>、節點名 <code>astra_rgb_image</code> 裡的「astra」是歷史命名，原本給 Astra 深度相機用。這台車用的是 2MP USB 相機，名字沿用而已。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-5" data-audio="audio/M1-5.mp3">
+<div class="sec-head"><h2>5. 沒車也能練 cv_bridge：在 WSL 自己發一個影像話題</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>筆電的鏡頭要接進 WSL 很麻煩，所以我們換個方法：寫一個節點自己「畫」影像，一個會移動的綠色圓點，每秒發布十次到 image raw 話題。這樣不需要任何鏡頭，就能完整體驗發布者、cv bridge 和 rqt image view 三件事。之後在車上看到真正的相機畫面，你就知道背後發生了什麼。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">sudo apt update
+sudo apt install -y ros-jazzy-cv-bridge ros-jazzy-rqt-image-view python3-opencv
+mkdir -p ~/m1 &amp;&amp; cd ~/m1</code></pre>
+</div>
+<p>把下面存成 <code>~/m1/fake_camera.py</code>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）（~/m1/fake_camera.py）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">&quot;&quot;&quot;假相機節點：畫一個移動的綠點，發布到 /image_raw（sensor_msgs/Image）。&quot;&quot;&quot;
+import math
+import numpy as np
+import cv2 as cv
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
+
+
+class FakeCamera(Node):
+    def __init__(self):
+        super().__init__(&#x27;fake_camera&#x27;)
+        self.pub = self.create_publisher(Image, &#x27;/image_raw&#x27;, 10)
+        self.bridge = CvBridge()
+        self.t = 0.0
+        self.timer = self.create_timer(0.1, self.tick)   # 10 Hz
+
+    def tick(self):
+        frame = np.full((480, 640, 3), 40, np.uint8)       # 深灰底
+        x = int(320 + 200 * math.cos(self.t))
+        y = int(240 + 120 * math.sin(self.t))
+        cv.circle(frame, (x, y), 40, (0, 255, 0), -1)        # BGR 綠色、填滿
+        cv.putText(frame, f&#x27;x={x} y={y}&#x27;, (20, 40), cv.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        msg = self.bridge.cv2_to_imgmsg(frame, &#x27;bgr8&#x27;)      # OpenCV → ROS
+        msg.header.stamp = self.get_clock().now().to_msg()
+        self.pub.publish(msg)
+        self.t += 0.1
+
+
+def main():
+    rclpy.init()
+    node = FakeCamera()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+if __name__ == &#x27;__main__&#x27;:
+    main()</code></pre>
+</div>
+<p>開三個 WSL 終端（每個都先 <code>source /opt/ros/jazzy/setup.bash</code>）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash"># 終端 1：發布
+python3 ~/m1/fake_camera.py
+# 終端 2：檢查話題、頻率、格式
+ros2 topic list
+ros2 topic hz /image_raw
+ros2 topic echo /image_raw --no-arr     # --no-arr 不印 data 大陣列，只看 encoding、width 等欄位
+# 終端 3：看畫面
+ros2 run rqt_image_view rqt_image_view  # 左上拉選 /image_raw</code></pre>
+</div>
+<p>看到綠點繞圈，就代表你已經懂了 ROS 影像話題的完整流程。進階練習：再寫一個節點訂閱 <code>/image_raw</code>、轉灰階、發布到 <code>/image</code>，就等於自己做了一份官方的 <code>pub_image</code>。</p></div>
+</section>
+<section class="sec card-box" id="sec-6" data-audio="audio/M1-6.mp3">
+<div class="sec-head"><h2>6. 上車：usb_cam、astra_rgb_image、pub_image</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>現在換成真正的車。流程是：在 Pi 5 主機上啟動 micro ROS agent，進入 ROS 2 容器，啟動 USB 相機節點，然後用官方的訂閱程式和轉發程式觀察影像。這些程式會跳出視窗，所以一定要在 VNC 遠端桌面或接螢幕的情況下操作，純 SSH 文字終端是看不到畫面的。多開終端時記得用 docker exec 進同一個容器。</p></details>
+<div class="md"><p><strong>步驟 1：進容器</strong>（只有影像課可以不開 agent；但 M3 起一定要開，建議養成習慣）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">sh ~/start_agent_rpi5.sh      # 終端 A：啟動 agent，然後按一下控制板 reset 鈕
+sh ros2_humble.sh             # 終端 B：在家目錄執行，進入 ROS 2 容器</code></pre>
+</div>
+<p><strong>步驟 2：多開一個終端進同一個容器</strong>（不要再跑一次 <code>ros2_humble.sh</code>，那會開出另一個新容器）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">docker ps -a                  # 找到正在執行的容器 ID，例如 ef0e1b7da319（每次都不同）
+docker exec -it ef0e1b7da319 /bin/bash</code></pre>
+</div>
+<p><strong>步驟 3：相機節點與兩支官方程式</strong>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash"># 終端 B：啟動單目 USB 相機，發布 /image_raw
+ros2 run usb_cam usb_cam_node_exe
+# 終端 C：
+ros2 topic list                               # 應看到 /image_raw
+ros2 topic hz /image_raw
+ros2 run yahboomcar_visual astra_rgb_image    # 訂閱 /image_raw 並顯示
+# 終端 D：
+ros2 run yahboomcar_visual pub_image          # 訂閱 /image_raw，發布 /image
+ros2 run rqt_image_view rqt_image_view        # 選 /image
+ros2 run rqt_graph rqt_graph                  # 看節點與話題的連線圖</code></pre>
+</div>
+<p>在 <code>rqt_graph</code> 裡應該看到：<code>usb_cam</code> 節點 → <code>/image_raw</code> → 訂閱它的節點（<code>/get_astra_rgb_node</code> 等）；<code>pub_image</code> 再往外發 <code>/image</code>。</p>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<ul>
+<li>官方文件把 <code>ros2 topic list</code> 拼成 <code>ros2 topoic list</code>，照抄會說找不到指令。</li>
+<li>官方說 <code>/image_raw</code> 的 encoding 是 <code>rgb8</code>，同一句又說「表示 yuv422」，互相矛盾。實際以 <code>ros2 topic echo /image_raw --no-arr</code> 看到的 <code>encoding</code> 欄位為準；程式裡統一指定 <code>"bgr8"</code> 讓 cv_bridge 幫你轉。</li>
+<li>官方另有一段寫 <code>sudo apt-get install ros-humble-usb-cam</code>：出廠映像已裝好（位置 <code>/opt/ros/humble/share/usb_cam/</code>），不需要重裝。新做的容器才要在啟動檔加 <code>-v /dev/video0:/dev/video0</code> 掛載相機（需實車確認 <code>ros2_humble.sh</code> 內容）。</li>
+</ul>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-7" data-audio="audio/M1-7.mp3">
+<div class="sec-head"><h2>7. 出問題時怎麼辦</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>影像課最常見的問題只有三種：視窗出不來、畫面是黑的、話題有但沒資料。遇到時不要急著重灌，先依照下面的表一格一格檢查。尤其要記得，一支鏡頭同一時間只能被一個程式打開，相機節點開著的時候，你自己寫的程式再去開鏡頭一定會失敗，這不是程式寫錯，是鏡頭被搶走了。</p></details>
+<div class="md"><table>
+<thead>
+<tr>
+<th>症狀</th>
+<th>可能原因</th>
+<th>怎麼做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cannot connect to X server</code>、視窗沒出現</td>
+<td>用純 SSH 執行有 <code>imshow</code> 的程式</td>
+<td>改在 VNC 桌面開終端執行；容器需要 X11 顯示轉發（出廠腳本已設，需實車確認）</td>
+</tr>
+<tr>
+<td>畫面全黑、<code>ret</code> 一直是 False</td>
+<td>鏡頭編號不對，或被別的程式占用</td>
+<td>主機上 <code>ls /dev/video*</code> 看編號；先關掉 <code>usb_cam_node_exe</code> 再跑 <code>python3 1_3.py</code></td>
+</tr>
+<tr>
+<td>Windows 上打不開鏡頭</td>
+<td>Teams、LINE、相機 App 占用；或隱私設定禁止桌面程式用相機</td>
+<td>關掉其他程式；Windows 設定 → 隱私權 → 相機 → 允許桌面應用程式</td>
+</tr>
+<tr>
+<td><code>ros2 topic list</code> 有 <code>/image_raw</code>，但 <code>hz</code> 沒數字</td>
+<td>相機節點其實沒拿到鏡頭（看它的終端有沒有錯誤）</td>
+<td>重新插拔相機、重開 <code>usb_cam_node_exe</code></td>
+</tr>
+<tr>
+<td>rqt_image_view 下拉選單是空的</td>
+<td>在別的容器或 <code>ROS_DOMAIN_ID</code> 不同</td>
+<td>用 <code>docker exec</code> 進同一個容器；<code>echo $ROS_DOMAIN_ID</code> 兩邊要一樣</td>
+</tr>
+<tr>
+<td>顏色紅藍顛倒</td>
+<td>把 RGB 當 BGR 處理</td>
+<td>轉換時指定 <code>"bgr8"</code>；MediaPipe 要 RGB 時才用 <code>cv.cvtColor(..., cv.COLOR_BGR2RGB)</code></td>
+</tr>
+<tr>
+<td>按 q 離開時噴 <code>AttributeError: 'numpy.ndarray' object has no attribute 'release'</code></td>
+<td>官方範例的小 bug</td>
+<td>刪掉 <code>img.release()</code> 那一行</td>
+</tr>
+<tr>
+<td>WSL 的 <code>rqt_image_view</code> 黑畫面</td>
+<td>WSLg 的 OpenGL 問題</td>
+<td>先 <code>export LIBGL_ALWAYS_SOFTWARE=1</code> 再開</td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section class="videos card-box"><h2>📺 官方影片</h2><div class="yt-grid"><figure class="yt" data-yt="Vko4Lfua-nA"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 1"><img src="https://i.ytimg.com/vi/Vko4Lfua-nA/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 1</figcaption></figure><figure class="yt" data-yt="XC5KQlaDzNg"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 2"><img src="https://i.ytimg.com/vi/XC5KQlaDzNg/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 2</figcaption></figure><figure class="yt" data-yt="AOh87GC8TOo"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 3"><img src="https://i.ytimg.com/vi/AOh87GC8TOo/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 3</figcaption></figure><figure class="yt" data-yt="Qu8xEgG93hc"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 4"><img src="https://i.ytimg.com/vi/Qu8xEgG93hc/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 4</figcaption></figure><figure class="yt" data-yt="lpm7rAdEBUI"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 5"><img src="https://i.ytimg.com/vi/lpm7rAdEBUI/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 5</figcaption></figure><figure class="yt" data-yt="OmUe0kuHerM"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 6"><img src="https://i.ytimg.com/vi/OmUe0kuHerM/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 6</figcaption></figure><figure class="yt" data-yt="zGHaw4BgqEY"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 7"><img src="https://i.ytimg.com/vi/zGHaw4BgqEY/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 7</figcaption></figure></div></section>
+<section class="quiz card-box" id="quiz"><h2>📝 小測驗</h2><div class="quiz-item" data-answer="1"><p class="q">1. OpenCV 讀進來的彩色影像，每個像素三個數字的順序是？</p><div class="opts"><button class="opt" type="button" data-i="0">紅、綠、藍</button><button class="opt" type="button" data-i="1">藍、綠、紅</button><button class="opt" type="button" data-i="2">綠、紅、藍</button></div><p class="explain" hidden></p><template class="explain-text">OpenCV 預設是 BGR，所以 (255,0,0) 是藍色。這也是 cv_bridge 要指定 bgr8 的原因。</template></div><div class="quiz-item" data-answer="1"><p class="q">2. img.shape 回傳 (480, 640, 3)，這張圖的寬是多少？</p><div class="opts"><button class="opt" type="button" data-i="0">480</button><button class="opt" type="button" data-i="1">640</button><button class="opt" type="button" data-i="2">3</button></div><p class="explain" hidden></p><template class="explain-text">shape 是（高, 寬, 通道），所以寬 640、高 480；但 cv2.resize 要傳（寬, 高）。</template></div><div class="quiz-item" data-answer="1"><p class="q">3. cv_bridge 在 ROS 影像流程中負責什麼？</p><div class="opts"><button class="opt" type="button" data-i="0">打開 USB 鏡頭</button><button class="opt" type="button" data-i="1">在 sensor_msgs/Image 與 OpenCV 陣列之間互相轉換</button><button class="opt" type="button" data-i="2">把影像壓縮成 JPG 上傳</button></div><p class="explain" hidden></p><template class="explain-text">imgmsg_to_cv2 把 ROS 訊息轉成 OpenCV，cv2_to_imgmsg 反向轉換；開鏡頭是 usb_cam 的工作。</template></div><div class="quiz-item" data-answer="1"><p class="q">4. usb_cam_node_exe 正在執行時，你又跑了一支 cv.VideoCapture(0) 的程式，畫面全黑。最可能的原因？</p><div class="opts"><button class="opt" type="button" data-i="0">OpenCV 版本太舊</button><button class="opt" type="button" data-i="1">鏡頭已被相機節點占用</button><button class="opt" type="button" data-i="2">ROS_DOMAIN_ID 不同</button></div><p class="explain" hidden></p><template class="explain-text">一支鏡頭同時只能被一個程式打開。要嘛關掉相機節點，要嘛改成訂閱 /image_raw。</template></div><div class="quiz-item" data-answer="1"><p class="q">5. 想在容器裡多開一個終端，正確做法是？</p><div class="opts"><button class="opt" type="button" data-i="0">再執行一次 sh ros2_humble.sh</button><button class="opt" type="button" data-i="1">docker ps -a 找 ID 後 docker exec -it &lt;ID&gt; /bin/bash</button><button class="opt" type="button" data-i="2">重新開機</button></div><p class="explain" hidden></p><template class="explain-text">再跑一次 ros2_humble.sh 會開出另一個新容器，看不到前一個容器裡的節點。</template></div><p class="quiz-score">得分：<span class="score">0</span> / 5</p></section>
+<footer class="lesson-foot card-box">
+<button class="btn primary" id="mark-done" type="button">✔ 標記為完成</button>
+<nav class="pager"><a class="btn" href="B6.html">← B6 上一單元</a><a class="btn" href="M2.html">M2 下一單元 →</a></nav>
+</footer>
+</main>
+<audio id="player" preload="none"></audio>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>M3 視覺互動：顏色追蹤、人臉追蹤、巡線、QR、手勢控車｜Yahboom MicroROS-Pi5 × ROS 2 學習地圖</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-lesson">
+<header class="topbar"><a href="index.html">← 學習地圖</a><span>M3</span></header>
+<main class="container lesson" data-lesson-id="M3">
+
+<section class="lesson-head card-box" id="sec-0" data-audio="audio/M3-0.mp3">
+<div class="eyebrow"><span class="badge level-M">中級</span>
+<span class="unit-id">M3</span></div>
+<h1>視覺互動：顏色追蹤、人臉追蹤、巡線、QR、手勢控車</h1>
+<div class="meta"><span class="badge">⏱ 2 小時</span><span class="badge car-yes">🚗 真車：是</span></div>
+<dl class="goal">
+<dt>🎯 學習目標</dt><dd>看懂「影像→座標→PID→雲台角度或 /cmd_vel」這條控制鏈，並在實車上完成顏色追蹤、巡線、QR code 與手勢控車。</dd>
+<dt>✅ 完成標準</dt><dd>實車上用 colorHSV＋colorTracker 框選一個顏色後按空白鍵，雲台會跟著物體轉動。</dd>
+</dl>
+<div class="player-bar">
+<button class="btn primary" id="play-all" type="button">▶ 全部播放</button>
+<label class="rate">播放速度
+<select id="rate">
+<option value="0.8">0.8×</option><option value="1" selected>1×</option>
+<option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+</select></label>
+<span class="now-playing" id="now-playing" aria-live="polite"></span>
+</div>
+</section>
+<section class="sec card-box" id="sec-1" data-audio="audio/M3-1.mp3">
+<div class="sec-head"><h2>1. 開工前的檢查：agent、Domain ID、雲台與相機</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>這一單元開始，程式算出來的結果要真的讓車子動起來，所以三件事缺一不可：micro ROS agent 要連上、樹莓派和控制板的 ROS DOMAIN ID 要一樣、而且不能有兩個程式搶同一支鏡頭。最常見的狀況是畫面跑得好好的、終端機也一直印角度，可是雲台和輪子完全不動，那幾乎都是前兩件事沒做好。所以我們先用一行指令手動轉一下雲台，確認整條路是通的。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">sh ~/start_agent_rpi5.sh     # 終端 A：啟動 agent，然後按控制板 reset 鈕，等連線成功
+sh ros2_humble.sh            # 終端 B：進入容器（多開終端請用 docker ps -a ＋ docker exec -it &lt;ID&gt; /bin/bash）</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">echo $ROS_DOMAIN_ID                          # 要和控制板設定的一樣（出廠 20）
+ros2 node list                               # 要看到 /YB_Car_Node
+ros2 topic pub --once /servo_s1 std_msgs/msg/Int32 &quot;data: 30&quot;    # 雲台水平轉到 30 度
+ros2 topic pub --once /servo_s1 std_msgs/msg/Int32 &quot;data: 0&quot;     # 轉回正中
+ros2 topic pub --once /servo_s2 std_msgs/msg/Int32 &quot;data: -30&quot;   # 俯仰往下</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>雲台舵機</th>
+<th>話題</th>
+<th>型別</th>
+<th>範圍</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S1 水平（左右）</td>
+<td><code>servo_s1</code></td>
+<td><code>std_msgs/Int32</code></td>
+<td>-90～90</td>
+</tr>
+<tr>
+<td>S2 俯仰（上下）</td>
+<td><code>servo_s2</code></td>
+<td><code>std_msgs/Int32</code></td>
+<td>-90～20</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<ul>
+<li>原始碼裡的話題名寫成 <code>servo_s1</code>、<code>servo_s2</code>（沒有前導斜線），因為節點沒有命名空間，實際就是 <code>/servo_s1</code>、<code>/servo_s2</code>，兩種寫法都對得上。</li>
+<li>這一單元的官方程式（<code>colorHSV</code>、<code>face_fllow</code>、<code>follow_line</code>、<code>qrTracker</code>、<code>HandCtrl</code> 等）<strong>都自己用 <code>cv.VideoCapture(0)</code> 打開鏡頭</strong>，所以<strong>不要同時開 <code>usb_cam_node_exe</code></strong>，否則會搶鏡頭、畫面全黑。</li>
+<li>所有程式都會開 OpenCV 視窗，請在 VNC 桌面的終端執行。手勢控車類的課，第一次先把車架高讓輪子離地。</li>
+</ul>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-2" data-audio="audio/M3-2.mp3">
+<div class="sec-head"><h2>2. 單目相機標定（8.1）</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>每顆鏡頭都有一點變形，越靠近畫面邊緣，直線就越彎。相機標定就是拍很多張已知尺寸的棋盤格，讓程式反推出鏡頭的焦距、中心點和變形係數。出廠映像已經標定過，所以這一節可以先看懂、不急著做；等你換了鏡頭，或第一單元的擴增實境效果明顯歪掉時，再回來重做一次。</p></details>
+<div class="md"><p><strong>準備</strong>：9x6 內角點的棋盤格（也就是 10x7 格），每格 20 mm，平整不反光。</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run usb_cam usb_cam_node_exe            # 先開相機（標定完要關掉）
+ros2 run camera_calibration cameracalibrator --size 9x6 --square 0.02 --ros-args --remap /image:=/image_raw</code></pre>
+</div>
+<p>在視窗裡移動棋盤格：左右（X）、上下（Y）、遠近（Size）、傾斜（Skew），直到右側四條進度條變綠 → 按 <strong>CALIBRATE</strong> → 按 <strong>SAVE</strong>，結果存在 <code>/tmp/calibrationdata.tar.gz</code>。</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">sudo mv /tmp/calibrationdata.tar.gz ~
+cd ~
+tar -xvf calibrationdata.tar.gz              # 得到 png、ost.yaml、ost.txt
+ls /opt/ros/                                 # 先確認版本資料夾，應該是 humble
+sudo cp ost.yaml /opt/ros/humble/share/usb_cam/config
+cd /opt/ros/humble/share/usb_cam/config
+sudo mv camera_info.yaml camera_info_BK.yaml # 先備份原檔
+sudo mv ost.yaml camera_info.yaml</code></pre>
+</div>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>官方文件最後三行寫的是 <strong><code>/opt/ros/foxy/share/usb_cam/config</code></strong>，但車上是 Humble，照抄會說找不到資料夾。上面已改成 <code>humble</code>；做之前用 <code>ls /opt/ros/</code> 確認。另外容器是暫時的，改完要 <code>docker commit</code> 才會保留（見 M5 第 6 小節）。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-3" data-audio="audio/M3-3.mp3">
+<div class="sec-head"><h2>3. 顏色追蹤：HSV 選色＋PID 控雲台（8.2、8.3）</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>用紅綠藍來找顏色很不可靠，因為燈光一暗，三個數字全部一起變。所以要換到 HSV 色彩空間，H 是色相、S 是飽和度、V 是亮度，找顏色只要盯著色相，亮度變化影響就小很多。找到色塊之後算出中心點，和畫面中心比一比，差多少就是「誤差」。PID 控制器會把誤差換成雲台要轉的角度，誤差大就轉多一點，誤差小就轉少一點，讓色塊一直待在畫面中央。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title"></span><button class="copy-btn" type="button">複製</button></div>
+<pre><code>鏡頭 → colorHSV（HSV 遮罩 → 最大色塊 → 中心座標）──/Current_point──▶ colorTracker
+                    └── 也發布 /image_raw                                     │ PID
+                                                                              ▼
+                                                       servo_s1 / servo_s2（雲台角度）</code></pre>
+</div>
+<p><strong>PID 一句話版</strong>：P＝看「現在差多少」、I＝看「累積差了多久」、D＝看「差距變化得多快」，三者加權相加就是輸出。官方 <code>colorTracker.py</code> 的核心：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（colorTracker.py 節錄）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">[x_Pid, y_Pid] = self.linear_pid.update([point_x - 320, point_y - 240])  # 誤差 = 色塊中心 - 畫面中心
+if self.img_flip == True:
+    self.PWMServo_X += x_Pid
+    self.PWMServo_Y += y_Pid
+else:
+    self.PWMServo_X -= x_Pid
+    self.PWMServo_Y += y_Pid
+# 限幅：X 在 -90~90，Y 在 -90~20，然後發布 servo_s1、servo_s2</code></pre>
+</div>
+<p><strong>實車操作</strong>（兩個節點都要開）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run yahboomcar_astra colorHSV           # 終端 1：開鏡頭、選色、發布 /Current_point
+ros2 run yahboomcar_astra colorTracker       # 終端 2：PID 控雲台
+ros2 run rqt_reconfigure rqt_reconfigure     # 終端 3：即時調參數</code></pre>
+</div>
+<p><strong>操作順序（少一步就不會動）</strong>：</p>
+<ol>
+<li>在影像視窗按 <strong><code>r</code></strong> 進入選色模式。</li>
+<li>用滑鼠<strong>框出只含單一顏色</strong>的區域，放開滑鼠。右側出現黑白遮罩，只有該顏色是白的。</li>
+<li>按<strong>空白鍵</strong>進入追蹤模式。</li>
+<li>慢慢移動物體，雲台會跟著轉。<code>i</code> 切到辨識模式（讀上次存的顏色，存在 <code>colorHSV.text</code>）、<code>q</code> 離開。</li>
+</ol>
+<p><strong>rqt_reconfigure 參數</strong>（改完要在 GUI 空白處點一下才會寫進程式）：</p>
+<table>
+<thead>
+<tr>
+<th>節點（<code>ros2 node list</code> 看到的名字）</th>
+<th>參數</th>
+<th>預設值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ColorIdentify</code>（<code>colorHSV</code> 程式）</td>
+<td><code>Hmin</code>、<code>Smin</code>、<code>Vmin</code>、<code>Hmax</code>、<code>Smax</code>、<code>Vmax</code></td>
+<td>0、85、126、9、253、253（紅色）</td>
+</tr>
+<tr>
+<td><code>ColorTracker</code>（<code>colorTracker</code> 程式）</td>
+<td><code>linear_Kp</code>、<code>linear_Ki</code>、<code>linear_Kd</code></td>
+<td>20.0、0.0、2.0</td>
+</tr>
+</tbody>
+</table>
+<p><strong>8.3 框選物體追蹤</strong>：不用先選顏色，直接框目標物：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run yahboomcar_astra mono_Tracker       # 按 r → 框選目標 → 放開 → 空白鍵；物體要慢慢移動
+ros2 run rqt_reconfigure rqt_reconfigure     # 節點 monoIdentify，Kp/Ki/Kd 預設 12、0、0.9</code></pre>
+</div>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p><code>mono_Tracker.py</code> 的 <code>img_flip</code> 兩個分支寫得一模一樣（<code>target_servox -= x_Pid</code>、<code>target_servoy += y_Pid</code>），是官方複製貼上的小瑕疵；如果你翻轉了影像，雲台方向可能會反過來。</p>
+</div>
+<p><strong>沒車先練</strong>：下面這支程式完全照官方的操作順序（r、框選、空白鍵），只是把雲台換成畫面上的「虛擬角度」。注意它的 PID 正負號只是示意，真車方向以官方程式為準。</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Windows（color_track_sim.py）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">&quot;&quot;&quot;筆電 webcam 版顏色追蹤：r 進選色、滑鼠框選、空白鍵開始追蹤，算出「虛擬雲台」角度。q 離開。&quot;&quot;&quot;
+import sys
+import cv2 as cv
+import numpy as np
+
+state = {&quot;mode&quot;: &quot;identify&quot;, &quot;p0&quot;: None, &quot;p1&quot;: None, &quot;dragging&quot;: False}
+
+
+def on_mouse(event, x, y, flags, param):
+    if state[&quot;mode&quot;] != &quot;init&quot;:
+        return
+    if event == cv.EVENT_LBUTTONDOWN:
+        state.update(p0=(x, y), p1=(x, y), dragging=True)
+    elif event == cv.EVENT_MOUSEMOVE and state[&quot;dragging&quot;]:
+        state[&quot;p1&quot;] = (x, y)
+    elif event == cv.EVENT_LBUTTONUP:
+        state.update(p1=(x, y), dragging=False)
+
+
+def roi_to_hsv_range(hsv, p0, p1):
+    &quot;&quot;&quot;把框選區域的 HSV 最小、最大值當作門檻，並稍微放寬。&quot;&quot;&quot;
+    x0, x1 = sorted((p0[0], p1[0]))
+    y0, y1 = sorted((p0[1], p1[1]))
+    if x1 - x0 &lt; 5 or y1 - y0 &lt; 5:
+        return None
+    roi = hsv[y0:y1, x0:x1].reshape(-1, 3)
+    low = np.clip(roi.min(axis=0) - [5, 20, 20], 0, 255)
+    high = np.clip(roi.max(axis=0) + [5, 20, 20], 0, 255)
+    high[0] = min(high[0], 180)                     # OpenCV 的 H 只到 180
+    return low.astype(np.uint8), high.astype(np.uint8)
+
+
+class SimplePID:
+    def __init__(self, kp, ki, kd):
+        self.kp, self.ki, self.kd = kp, ki, kd
+        self.integral, self.last = 0.0, 0.0
+
+    def update(self, error):
+        self.integral += error
+        derivative = error - self.last
+        self.last = error
+        return self.kp * error + self.ki * self.integral + self.kd * derivative
+
+
+def main():
+    cap = cv.VideoCapture(0)
+    if not cap.isOpened():
+        sys.exit(&quot;錯誤：打不開鏡頭&quot;)
+    cv.namedWindow(&#x27;frame&#x27;)
+    cv.setMouseCallback(&#x27;frame&#x27;, on_mouse)
+    hsv_range = None
+    pid_x, pid_y = SimplePID(0.02, 0.0, 0.01), SimplePID(0.02, 0.0, 0.01)
+    servo_x, servo_y = 0.0, -30.0                    # 虛擬雲台：X ±90、Y -90~20（和車上一樣）
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frame = cv.resize(frame, (640, 480))
+        hsv = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
+        key = cv.waitKey(10) &amp; 0xFF
+        if key in (ord(&#x27;r&#x27;), ord(&#x27;R&#x27;)):
+            state[&quot;mode&quot;], hsv_range = &quot;init&quot;, None
+        elif key == 32 and hsv_range is not None:    # 空白鍵
+            state[&quot;mode&quot;] = &quot;tracking&quot;
+        elif key in (ord(&#x27;q&#x27;), ord(&#x27;Q&#x27;)):
+            break
+        if state[&quot;mode&quot;] == &quot;init&quot; and state[&quot;p0&quot;] and state[&quot;p1&quot;]:
+            cv.rectangle(frame, state[&quot;p0&quot;], state[&quot;p1&quot;], (0, 255, 0), 2)
+            if not state[&quot;dragging&quot;]:
+                hsv_range = roi_to_hsv_range(hsv, state[&quot;p0&quot;], state[&quot;p1&quot;])
+        if hsv_range is not None:
+            mask = cv.inRange(hsv, hsv_range[0], hsv_range[1])
+            mask = cv.morphologyEx(mask, cv.MORPH_OPEN, np.ones((5, 5), np.uint8))
+            contours, _ = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+            cv.imshow(&#x27;mask&#x27;, mask)
+            if contours:
+                (cx, cy), r = cv.minEnclosingCircle(max(contours, key=cv.contourArea))
+                if r &gt; 10:
+                    cv.circle(frame, (int(cx), int(cy)), int(r), (255, 0, 255), 2)
+                    if state[&quot;mode&quot;] == &quot;tracking&quot;:
+                        # 誤差 = 色塊中心 - 畫面中心 (320, 240)，PID 輸出累加到舵機角度
+                        servo_x = float(np.clip(servo_x - pid_x.update(cx - 320), -90, 90))
+                        servo_y = float(np.clip(servo_y - pid_y.update(cy - 240), -90, 20))
+        cv.putText(frame, f&quot;mode={state[&#x27;mode&#x27;]}  servo_s1={int(servo_x)} servo_s2={int(servo_y)}&quot;,
+                   (10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+        cv.drawMarker(frame, (320, 240), (0, 0, 255), cv.MARKER_CROSS, 20, 2)
+        cv.imshow(&#x27;frame&#x27;, frame)
+    cap.release()
+    cv.destroyAllWindows()
+
+
+if __name__ == &quot;__main__&quot;:
+    main()</code></pre>
+</div>
+<p>用 M2 建好的環境執行：<code>~/mp-venv/Scripts/python color_track_sim.py</code>（只需要 OpenCV，任何裝了 <code>opencv-python</code> 的 Python 都可以）。</p></div>
+</section>
+<section class="sec card-box" id="sec-4" data-audio="audio/M3-4.mp3">
+<div class="sec-head"><h2>4. 人臉追蹤（8.4）</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>人臉追蹤和顏色追蹤是同一套控制邏輯，只是「找目標」的方法換成 Haar 級聯分類器。它是一種很老派、不需要顯示卡的人臉偵測方法，速度快但只認正臉。找到臉框之後，一樣算誤差、一樣經過 PID、一樣送到兩個雲台舵機。要特別注意官方節點名稱拼錯了，必須照著錯的拼法打才跑得動。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run yahboomcar_astra face_fllow         # 注意：fllow 是官方拼法，打 follow 會找不到
+ros2 run rqt_reconfigure rqt_reconfigure     # 節點 FaceTracker，Kp/Ki/Kd 預設 20、0、0.9</code></pre>
+</div>
+<p>成功的樣子：畫面上臉被綠框框住，終端機一直印 <code>servo1 ...</code> 角度，雲台跟著你的臉轉。</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（face_fllow.py 節錄）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">face_patterns = cv2.CascadeClassifier(&#x27;/root/yahboomcar_ws/src/yahboomcar_astra/yahboomcar_astra/haarcascade_frontalface_default.xml&#x27;)
+faces = face_patterns.detectMultiScale(frame, scaleFactor=1.1, minNeighbors=5, minSize=(100, 100))
+[x_Pid, y_Pid] = self.PID_controller.update([point_x - 320, point_y - 240])</code></pre>
+</div>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<ul>
+<li>節點名 <code>face_fllow</code> 是官方拼錯（應為 follow），但 <code>setup.py</code> 就是這樣登記的，<strong>照打 <code>face_fllow</code></strong>。</li>
+<li>官方程式把臉框<strong>左上角</strong>（x, y）當目標，而不是臉的中心，所以雲台停下來時臉會偏右下；畫面有多張臉時只用最後一張。</li>
+<li><code>minSize=(100, 100)</code> 代表臉要夠大才偵測得到，請離鏡頭一公尺內。</li>
+</ul>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-5" data-audio="audio/M3-5.mp3">
+<div class="sec-head"><h2>5. 自動巡線（8.5）：偏差變成角速度</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>巡線是第一個真的讓輪子動起來的視覺課。原理很直覺：每一幀找出地上那條線的中心點，看它偏離畫面中央多少。線在右邊，車就往右轉；線在左邊，就往左轉；線在正中間，就直直往前開。這個左右偏差經過 PID 之後，變成速度指令裡的角速度，前進速度則固定不變。另外程式也會聽光達，前方太近有東西就停車並叫一聲。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（follow_line.py 節錄）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">[z_Pid, _] = self.PID_controller.update([(point_x - 320)*1.0/16, 0])  # 偏差除以 16 縮小
+twist.angular.z = -z_Pid          # img_flip=True 時取負號
+twist.linear.x = self.linear      # 前進速度固定（預設 0.18 m/s）
+if abs(point_x-320) &lt; 40: twist.angular.z = 0.0    # 線在中間 ±40 像素內：直走（死區）
+if self.warning &gt; 10:             # 光達：前方 ±90° 內、0.2 m 以外、小於 ResponseDist 的點超過 10 個
+    self.pub_cmdVel.publish(Twist())   # 停車
+    b.data = 1; self.pub_Buzzer.publish(b)   # 蜂鳴器響</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run yahboomcar_astra follow_line
+ros2 run rqt_reconfigure rqt_reconfigure     # 節點 follow_line</code></pre>
+</div>
+<p><strong>操作順序</strong>：</p>
+<ol>
+<li>程式一啟動會把雲台俯仰設到 -75 度（往下看）。確認畫面看得到地上的線，不夠的話用 <code>ros2 topic pub --once /servo_s2 std_msgs/msg/Int32 "data: -60"</code> 微調。</li>
+<li>在影像視窗按 <strong><code>r</code></strong> → 滑鼠框住<strong>線本身</strong>的一段 → 放開，右側只剩線的部分是白色。</li>
+<li>按<strong>空白鍵</strong>開始巡線。找不到線時會印 <code>Not Found</code> 並停車。</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>參數</th>
+<th>意義</th>
+<th>預設</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Kp</code>、<code>Ki</code>、<code>Kd</code></td>
+<td>PID（實際會除以 <code>scale</code>）</td>
+<td>60、0、20</td>
+</tr>
+<tr>
+<td><code>scale</code></td>
+<td>PID 縮放係數</td>
+<td>1000</td>
+</tr>
+<tr>
+<td><code>linear</code></td>
+<td>前進速度 m/s</td>
+<td>0.18</td>
+</tr>
+<tr>
+<td><code>ResponseDist</code></td>
+<td>避障距離 m</td>
+<td>0.55</td>
+</tr>
+<tr>
+<td><code>LaserAngle</code></td>
+<td>光達偵測角度</td>
+<td>30</td>
+</tr>
+<tr>
+<td><code>Hmin</code>～<code>Vmax</code></td>
+<td>線的 HSV 範圍（框選後自動填入）</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<ul>
+<li>PDF 說「以黃線為例」卻寫「框選藍色線區域」，前後不一致；什麼顏色都可以，重點是框到線本身。</li>
+<li>原始碼雖然宣告了 <code>LaserAngle</code> 參數，但避障判斷實際寫死看前方 ±90°，改 <code>LaserAngle</code> 不會有效果（以車上檔案為準）。</li>
+<li>第一次跑請把 <code>linear</code> 調到 0.1，地上用寬 2～3 公分、和地板顏色反差大的膠帶。</li>
+</ul>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-6" data-audio="audio/M3-6.mp3">
+<div class="sec-head"><h2>6. QR code 與手勢控車（8.6～8.10）</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>最後一組是「看懂指令就動」。QR code 控車是讀出卡片上的文字，再照對照表送出速度；手勢控車則是用第二單元學過的手指伸直判斷，比五就前進、握拳就後退。這幾支程式反應比較慢，而且只要誤判一次車子就會動，所以第一次一定要把車架高、讓輪子懸空測試，確認每個指令對應的動作都正確，再放到地上。</p></details>
+<div class="md"><p><strong>8.6 QR code 控車</strong>（指令卡可用 M1 的 <code>qr_make.py</code> 產生）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run yahboomcar_astra qrTracker          # q 關閉</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>QR 內容</th>
+<th><code>pub_vel(x, y, z)</code></th>
+<th>實際動作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>forward</code></td>
+<td><code>(0.3, 0.0, 0.0)</code></td>
+<td>前進</td>
+</tr>
+<tr>
+<td><code>back</code></td>
+<td><code>(-0.3, 0.0, 0.0)</code></td>
+<td>後退</td>
+</tr>
+<tr>
+<td><code>left</code></td>
+<td><code>(0.0, 0.0, 1.0)</code></td>
+<td><strong>原地左轉</strong>（不是橫移）</td>
+</tr>
+<tr>
+<td><code>right</code></td>
+<td><code>(0.0, 0.0, -1.0)</code></td>
+<td><strong>原地右轉</strong></td>
+</tr>
+<tr>
+<td><code>turnleft</code></td>
+<td><code>(0.3, 0.0, 0.5)</code></td>
+<td>邊走邊左轉</td>
+</tr>
+<tr>
+<td><code>turnright</code></td>
+<td><code>(0.3, 0.0, -0.5)</code></td>
+<td>邊走邊右轉</td>
+</tr>
+<tr>
+<td><code>stop</code></td>
+<td><code>(0.0, 0.0, 0.0)</code></td>
+<td>停止</td>
+</tr>
+</tbody>
+</table>
+<p><strong>8.7～8.10 手勢與手掌</strong>（都在 <code>yahboomcar_mediapipe</code> 套件，共用 <code>media_library.py</code>）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run yahboomcar_mediapipe HandCtrl       # 8.7 手勢控制移動
+ros2 run yahboomcar_mediapipe RobotCtrl      # 8.8 手掌位置控制移動
+ros2 run yahboomcar_mediapipe FingerCtrl     # 8.9 手勢觸發動作組
+ros2 run yahboomcar_mediapipe control_shape  # 8.10 手掌控制雲台</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>程式</th>
+<th>判斷</th>
+<th>動作（依原始碼）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>HandCtrl</code></td>
+<td>五指全開／拳頭／只有食指／食指＋中指</td>
+<td>前進 0.3／後退 0.3／原地左轉 0.5／原地右轉 0.5</td>
+</tr>
+<tr>
+<td><code>RobotCtrl</code></td>
+<td>手掌中心（landmark 9）y ≤ 210／y ≥ 270；x ≤ 290／x ≥ 350</td>
+<td>前進 0.2／後退 0.2；左轉／右轉（角速度 ±0.2）</td>
+</tr>
+<tr>
+<td><code>FingerCtrl</code></td>
+<td><code>Yes</code>（食指＋中指）／<code>OK</code>／<code>Thumb_down</code>／食指＋小指／五指</td>
+<td>走方形／轉圈／前進再後退／S 形／停止</td>
+</tr>
+<tr>
+<td><code>control_shape</code></td>
+<td>手掌中心離開中央死區（x 290～350、y 210～270）</td>
+<td>每幀雲台轉 2 度，把手掌拉回中央</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<ul>
+<li>8.9 的 PDF 對照表排版錯亂，看不出哪個手勢對哪個動作；上表是照 <code>FingerCtrl.py</code> 原始碼整理的。注意原始碼裡的 <code>Yes</code> 是<strong>食指＋中指（比 V）</strong>，不是比讚。</li>
+<li>8.8 原文把「右」寫成 bottom，是筆誤；而且左右其實是<strong>原地旋轉</strong>（角速度），不是橫移。</li>
+<li>官方提醒 8.8 在 Pi 5 上可能跑得很慢，先架高測試；手要慢慢動，太快影像處理跟不上。</li>
+<li><code>control_shape</code> 裡的 <code>ThumbTOforefinger</code> 原本是控制機械手爪開合用的（從機械臂課程沿用），這台車沒有手爪，可忽略。</li>
+</ul>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-7" data-audio="audio/M3-7.mp3">
+<div class="sec-head"><h2>7. 出問題時怎麼辦</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>視覺控車的問題可以分成三層來查：第一層是畫面，有沒有影像、有沒有框到東西；第二層是話題，程式有沒有真的發出舵機角度或速度；第三層是硬體，控制板有沒有收到。用 ros2 topic echo 看話題，就能立刻知道問題卡在哪一層，不用整台車亂猜。</p></details>
+<div class="md"><table>
+<thead>
+<tr>
+<th>症狀</th>
+<th>檢查</th>
+<th>怎麼做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>有畫面、終端機一直印角度，但雲台／輪子不動</td>
+<td><code>ros2 node list</code> 有沒有 <code>/YB_Car_Node</code>；<code>echo $ROS_DOMAIN_ID</code></td>
+<td>重啟 agent 並按 reset；Domain ID 改成和控制板一致</td>
+</tr>
+<tr>
+<td>畫面全黑</td>
+<td>是否同時開了 <code>usb_cam_node_exe</code> 或另一支視覺程式</td>
+<td>一次只開一支會開鏡頭的程式；<code>ls /dev/video*</code></td>
+</tr>
+<tr>
+<td>按了空白鍵還是不追</td>
+<td>有沒有先按 <code>r</code> 並框選成功（右側遮罩要出現白色色塊）</td>
+<td>重新 <code>r</code> → 框選單一顏色 → 空白鍵</td>
+</tr>
+<tr>
+<td>追一下就丟失目標</td>
+<td>環境光改變、框到雜色、物體移動太快</td>
+<td>換環境要重新選色；在 rqt_reconfigure 收窄 HSV；物體慢慢移動</td>
+</tr>
+<tr>
+<td>雲台抖個不停</td>
+<td>PID 太大</td>
+<td>把 <code>Kp</code> 調小、<code>Kd</code> 稍微加大；改完在 GUI 空白處點一下</td>
+</tr>
+<tr>
+<td>巡線一直左右甩</td>
+<td>角速度太大或速度太快</td>
+<td>降低 <code>Kp</code> 或把 <code>linear</code> 調到 0.1</td>
+</tr>
+<tr>
+<td>巡線突然停下並叫</td>
+<td>光達偵測到前方 <code>ResponseDist</code> 內有東西</td>
+<td>清空前方，或暫時把 <code>ResponseDist</code> 調小</td>
+</tr>
+<tr>
+<td>rqt_reconfigure 看不到節點</td>
+<td>剛開啟還沒刷新</td>
+<td>按 Refresh；確認在同一個容器</td>
+</tr>
+<tr>
+<td><code>ros2 run yahboomcar_astra face_follow</code> 說找不到</td>
+<td>拼法</td>
+<td>改打 <code>face_fllow</code></td>
+</tr>
+<tr>
+<td>手勢控車車子亂跑</td>
+<td>誤判</td>
+<td>立刻 Ctrl+C，再發 <code>ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{}"</code> 停車</td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section class="videos card-box"><h2>📺 官方影片</h2><div class="yt-grid"><figure class="yt" data-yt="1m0jfKBknls"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 1"><img src="https://i.ytimg.com/vi/1m0jfKBknls/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 1</figcaption></figure><figure class="yt" data-yt="2eXFiC_hwuo"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 2"><img src="https://i.ytimg.com/vi/2eXFiC_hwuo/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 2</figcaption></figure><figure class="yt" data-yt="Pv0OzpAUiUk"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 3"><img src="https://i.ytimg.com/vi/Pv0OzpAUiUk/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 3</figcaption></figure><figure class="yt" data-yt="u_ujn2X0TM4"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 4"><img src="https://i.ytimg.com/vi/u_ujn2X0TM4/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 4</figcaption></figure><figure class="yt" data-yt="UbSkyTiqVxU"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 5"><img src="https://i.ytimg.com/vi/UbSkyTiqVxU/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 5</figcaption></figure><figure class="yt" data-yt="q7VXHUFZLvs"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 6"><img src="https://i.ytimg.com/vi/q7VXHUFZLvs/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 6</figcaption></figure><figure class="yt" data-yt="XB6IoaSK43A"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 7"><img src="https://i.ytimg.com/vi/XB6IoaSK43A/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 7</figcaption></figure><figure class="yt" data-yt="ompfnQhFX-M"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 8"><img src="https://i.ytimg.com/vi/ompfnQhFX-M/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 8</figcaption></figure><figure class="yt" data-yt="heZTYURACdA"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 9"><img src="https://i.ytimg.com/vi/heZTYURACdA/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 9</figcaption></figure></div></section>
+<section class="quiz card-box" id="quiz"><h2>📝 小測驗</h2><div class="quiz-item" data-answer="1"><p class="q">1. 顏色追蹤為什麼要把影像轉成 HSV？</p><div class="opts"><button class="opt" type="button" data-i="0">HSV 檔案比較小</button><button class="opt" type="button" data-i="1">色相 H 和亮度 V 分開，光線變化對找顏色的影響較小</button><button class="opt" type="button" data-i="2">雲台只看得懂 HSV</button></div><p class="explain" hidden></p><template class="explain-text">BGR 三個值會隨亮度一起變；HSV 把顏色和亮度拆開，選色比較穩。</template></div><div class="quiz-item" data-answer="1"><p class="q">2. colorHSV 與 colorTracker 的操作順序是？</p><div class="opts"><button class="opt" type="button" data-i="0">直接按空白鍵</button><button class="opt" type="button" data-i="1">按 r → 滑鼠框選單一顏色 → 放開 → 按空白鍵</button><button class="opt" type="button" data-i="2">按 q → 框選 → 按 i</button></div><p class="explain" hidden></p><template class="explain-text">少了 r 或框選，就沒有 HSV 範圍；少了空白鍵，就不會進入追蹤模式。</template></div><div class="quiz-item" data-answer="1"><p class="q">3. 人臉追蹤的正確啟動指令是？</p><div class="opts"><button class="opt" type="button" data-i="0">ros2 run yahboomcar_astra face_follow</button><button class="opt" type="button" data-i="1">ros2 run yahboomcar_astra face_fllow</button><button class="opt" type="button" data-i="2">ros2 run yahboomcar_mediapipe face_fllow</button></div><p class="explain" hidden></p><template class="explain-text">官方把 follow 拼成 fllow，setup.py 就是這樣登記的，必須照打。</template></div><div class="quiz-item" data-answer="1"><p class="q">4. 巡線時，線的中心在畫面 x=400，車子會怎麼做？</p><div class="opts"><button class="opt" type="button" data-i="0">加速前進</button><button class="opt" type="button" data-i="1">依偏差 400-320 經 PID 算出角速度轉向</button><button class="opt" type="button" data-i="2">停車並響蜂鳴器</button></div><p class="explain" hidden></p><template class="explain-text">偏差 80 超過 ±40 死區，(80/16) 經 PID 變成 angular.z；前進速度維持 linear。</template></div><div class="quiz-item" data-answer="1"><p class="q">5. QR code 內容是 left 時，車子實際上會？</p><div class="opts"><button class="opt" type="button" data-i="0">向左平移</button><button class="opt" type="button" data-i="1">原地左轉</button><button class="opt" type="button" data-i="2">後退</button></div><p class="explain" hidden></p><template class="explain-text">pub_vel(0.0, 0.0, 1.0) 只有角速度，所以是原地旋轉，官方文字說 move left 容易誤導。</template></div><p class="quiz-score">得分：<span class="score">0</span> / 5</p></section>
+<footer class="lesson-foot card-box">
+<button class="btn primary" id="mark-done" type="button">✔ 標記為完成</button>
+<nav class="pager"><a class="btn" href="M2.html">← M2 上一單元</a><a class="btn" href="M4.html">M4 下一單元 →</a></nav>
+</footer>
+</main>
+<audio id="player" preload="none"></audio>
+<script src="app.js"></script>
+</body>
+</html>

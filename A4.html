@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A4 ESP32 與 micro-ROS 韌體開發｜Yahboom MicroROS-Pi5 × ROS 2 學習地圖</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-lesson">
+<header class="topbar"><a href="index.html">← 學習地圖</a><span>A4</span></header>
+<main class="container lesson" data-lesson-id="A4">
+
+<section class="lesson-head card-box" id="sec-0" data-audio="audio/A4-0.mp3">
+<div class="eyebrow"><span class="badge level-A">高級</span>
+<span class="unit-id">A4</span></div>
+<h1>ESP32 與 micro-ROS 韌體開發</h1>
+<div class="meta"><span class="badge">⏱ 4 小時</span><span class="badge car-no">🚗 真車：否</span></div>
+<dl class="goal">
+<dt>🎯 學習目標</dt><dd>在 ESP32-S3 上用 ESP-IDF 與 micro-ROS（rclc）寫出自己的 ROS 2 節點，看懂 publisher、subscriber、timer、executor 的關係，並學會把車子的控制板燒回出廠韌體。</dd>
+<dt>✅ 完成標準</dt><dd>ESP32 開發板上跑自己的 micro-ROS 發布節點，電腦或 Pi 5 用 ros2 topic echo 收得到它的資料；若用過車上控制板練習，已燒回 microROS_Robot_V2.0.0.bin 並用 config_robot.py 重設，ros2 node list 重新看到 /YB_Car_Node。</dd>
+</dl>
+<div class="player-bar">
+<button class="btn primary" id="play-all" type="button">▶ 全部播放</button>
+<label class="rate">播放速度
+<select id="rate">
+<option value="0.8">0.8×</option><option value="1" selected>1×</option>
+<option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+</select></label>
+<span class="now-playing" id="now-playing" aria-live="polite"></span>
+</div>
+</section>
+<section class="sec card-box" id="sec-1" data-audio="audio/A4-1.mp3">
+<div class="sec-head"><h2>1. 為什麼要學韌體開發，以及最重要的警告</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>前面的單元，我們都在 Pi 5 這個大腦上寫程式；這一課要往下走一層，改寫 ESP32 這個小腦。ESP32 負責每十毫秒量一次輪子轉速、跑馬達控制、讀陀螺儀和光達，這些要準時的事交給它最穩。它跑的是 micro-ROS，一種瘦身版的 ROS 2，讓只有幾百 KB 記憶體的小晶片也能當 ROS 節點。開始前請記住一件事：把練習程式燒進車上的控制板，會蓋掉出廠韌體，車子會暫時不能動。</p></details>
+<div class="md"><h3>1.1 三層關係複習</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">micro-ROS 資料路徑</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-text"> ESP32-S3（你寫的韌體，rclc）       Pi 5 或電腦                    其他 ROS 2 節點
+┌────────────────────┐  序列 /dev/ttyUSB0 @921600  ┌──────────────────┐  DDS  ┌─────────────┐
+│ node / publisher / │ ═══ 或 WiFi UDP:8090 ═════▶ │ micro-ROS agent  │ ════▶ │ ros2 topic  │
+│ subscriber / timer │ ◀══════════════════════════ │（翻譯官，Docker） │ ◀════ │ rviz / nav2 │
+└────────────────────┘                             └──────────────────┘       └─────────────┘</code></pre>
+</div>
+<ul>
+<li><strong>micro-ROS</strong>：ROS 2 給微控制器（MCU）用的版本。MCU 上用 C 語言的 <strong>rclc</strong> 函式庫寫程式。</li>
+<li><strong>micro-ROS agent</strong>：MCU 說的是精簡協定（Micro XRCE-DDS），agent 把它翻譯成一般 ROS 2 的 DDS。<strong>agent 沒開，ESP32 就一直卡在 <code>Connecting agent</code>。</strong></li>
+<li>車子出廠走<strong>序列</strong>（Pi 5 的 <code>sh ~/start_agent_rpi5.sh</code>）；這一課的練習走 <strong>WiFi UDP</strong>（埠 <code>8090</code>）。</li>
+</ul>
+<h3>1.2 硬體選擇：強烈建議另買一片 ESP32-S3 開發板</h3>
+<table>
+<thead>
+<tr>
+<th>練習對象</th>
+<th>優點</th>
+<th>風險</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ESP32-S3 開發板</strong>（DevKitC 類，建議）</td>
+<td>不影響車子；燒錯也沒關係</td>
+<td>LED、按鍵腳位和車上控制板不同，要自己改 GPIO</td>
+</tr>
+<tr>
+<td>車上的 microROS 控制板</td>
+<td>馬達、IMU、光達都現成</td>
+<td><strong>會覆蓋出廠韌體</strong>；馬達類程式燒完輪子會立刻轉</td>
+</tr>
+</tbody>
+</table>
+<p>板子一定要選 <strong>ESP32-S3</strong>（官方一律 <code>idf.py set-target esp32s3</code>）。</p>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p><strong>燒練習程式會蓋掉出廠韌體。</strong> 出廠韌體 <code>microROS_Robot_V2.0.0.bin</code> 只有 .bin、沒有原始碼；燒了練習程式之後，車子就不再是 <code>/YB_Car_Node</code>，所有遙控、建圖、導航都不能用，直到你照第 7 節燒回出廠韌體並用 <code>config_robot.py</code> 重設。馬達類練習（官方 16-7、16-9、16-16、17-6、17-7）<strong>燒完輪子就會轉，一定先把車架空</strong>。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-2" data-audio="audio/A4-2.mp3">
+<div class="sec-head"><h2>2. 安裝 ESP-IDF v5.1.2（在電腦 WSL）</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>ESP-IDF 是 ESP32 原廠的開發工具包，裡面有編譯器、燒錄工具和設定介面。官方教材用 v5.1.2 版，我們照用，不要裝最新版，因為 micro-ROS 元件和範例都是對這一版測過的。安裝分四步：裝相依套件、下載原始碼、只裝 esp32s3 的工具鏈、最後啟用環境。第四步每開一個新終端都要重做一次，忘了就會找不到 idf 點 py 指令。</p></details>
+<div class="md"><h3>2.1 安裝</h3>
+<p>官方文件以 Ubuntu 為例，在電腦的 WSL 裡照做即可：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash"># 1) 相依套件
+sudo apt-get install git wget flex bison gperf python3 python3-pip python3-venv cmake ninja-build ccache libffi-dev libssl-dev dfu-util libusb-1.0-0
+
+# 2) 下載 ESP-IDF v5.1.2
+mkdir -p ~/esp
+cd ~/esp
+git clone -b v5.1.2 --recursive https://github.com/espressif/esp-idf.git
+
+# 3) 只裝 esp32s3 工具鏈
+cd esp-idf
+./install.sh esp32s3
+
+# 4) 啟用環境（每開一個新終端都要做！）
+source ~/esp/esp-idf/export.sh</code></pre>
+</div>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>官方另有預先裝好 ESP-IDF 與 micro-ROS 元件的 Ubuntu 虛擬機（<code>21. Virtual machine file compression package</code>），裡面的範例在 <code>~/esp/Samples/esp32_samples/</code>、<code>~/esp/Samples/microros_samples/</code>。用虛擬機可以省下安裝時間；本課以自己在 WSL 安裝為主。WSL 是 Ubuntu 24.04、Python 3.12，與官方測試的環境不同，<code>install.sh</code> 若出現 Python 套件錯誤請記下完整訊息再排查（需實機確認）。</p>
+</div>
+<h3>2.2 讓 WSL 看得到 USB 序列埠</h3>
+<p>WSL 預設看不到 USB 裝置，要用 Windows 的 <strong>usbipd-win</strong> 把板子「借」給 WSL：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Windows（系統管理員 PowerShell）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-powershell">winget install usbipd
+usbipd list
+usbipd bind --busid &lt;BUSID&gt;
+usbipd attach --wsl --busid &lt;BUSID&gt;</code></pre>
+</div>
+<p><code>&lt;BUSID&gt;</code> 換成 <code>usbipd list</code> 裡 CP210x 或 USB JTAG/serial 那一列的編號（例如 <code>2-3</code>）。每次重插板子都要再 <code>attach</code> 一次。</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ls /dev/ttyUSB* /dev/ttyACM*
+sudo usermod -aG dialout $USER</code></pre>
+</div>
+<ul>
+<li>車上控制板（CP2102 晶片）通常出現為 <code>/dev/ttyUSB0</code>；開發板接「原生 USB」孔時可能是 <code>/dev/ttyACM0</code>。</li>
+<li>加入 <code>dialout</code> 群組後要<strong>關掉 WSL 終端重開</strong>才生效，否則燒錄會出現權限錯誤。</li>
+</ul></div>
+</section>
+<section class="sec card-box" id="sec-3" data-audio="audio/A4-3.mp3">
+<div class="sec-head"><h2>3. 第一個程式：build、flash、monitor 與 menuconfig</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>第一個程式先不碰 ROS，只燒官方的 hello world，確認整條工具鏈是通的。三個最常用的指令要記住：build 是編譯，flash 是燒進板子，monitor 是打開序列埠看板子印出的訊息。三個可以串成一行一次做完。離開監看畫面要按 Ctrl 加右中括號，不是 Ctrl C。接著用 menuconfig 這個文字選單，把 Flash 大小、CPU 速度這些硬體設定調成和車上控制板一樣。</p></details>
+<div class="md"><h3>3.1 hello_world</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">source ~/esp/esp-idf/export.sh
+cd ~/esp/esp-idf/examples/get-started/hello_world
+idf.py set-target esp32s3
+idf.py build
+idf.py flash -p /dev/ttyUSB0
+idf.py monitor -p /dev/ttyUSB0</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>指令</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>idf.py set-target esp32s3</code></td>
+<td>指定晶片，每個新專案做一次</td>
+</tr>
+<tr>
+<td><code>idf.py build</code></td>
+<td>編譯，產出 <code>build/*.bin</code></td>
+</tr>
+<tr>
+<td><code>idf.py flash</code></td>
+<td>燒錄（只有一個序列裝置時可省略 <code>-p</code>）</td>
+</tr>
+<tr>
+<td><code>idf.py monitor</code></td>
+<td>看序列輸出，<strong>離開按 Ctrl+]</strong></td>
+</tr>
+<tr>
+<td><code>idf.py build flash monitor</code></td>
+<td>一次做完（官方每課都用這行）</td>
+</tr>
+</tbody>
+</table>
+<p>燒錄進度到 100% 並顯示 <code>Done</code> 就是成功。燒錄不會自動開始時，手動進入燒錄模式：<strong>按住 BOOT0 → 按一下 Reset → 放開 BOOT0</strong>。</p>
+<h3>3.2 menuconfig：官方推薦設定</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">mkdir -p ~/esp/Samples/esp32_samples
+cd ~/esp/Samples/esp32_samples
+idf.py create-project main
+cd main
+idf.py set-target esp32s3
+idf.py menuconfig</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>選單位置</th>
+<th>設定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Serial flasher config</code></td>
+<td>Flash size 改 <strong>4MB</strong>，勾選 <code>Detect flash size when flashing bootloader</code></td>
+</tr>
+<tr>
+<td><code>Component config</code> → <code>ESP PSRAM</code></td>
+<td>啟用 <code>Support for external, SPI-connected RAM</code></td>
+</tr>
+<tr>
+<td><code>Component config</code> → <code>ESP System Settings</code> → <code>CPU frequency</code></td>
+<td><strong>240MHz</strong></td>
+</tr>
+<tr>
+<td><code>Component config</code> → <code>FreeRTOS</code> → <code>Kernel</code> → <code>configTICK_RATE_HZ</code></td>
+<td><strong>1000</strong>（1 毫秒一個 tick，10 毫秒的延遲才準）</td>
+</tr>
+<tr>
+<td><code>Partition Table</code></td>
+<td><code>Single factory app (large), no OTA</code></td>
+</tr>
+</tbody>
+</table>
+<p>按 <code>S</code> 存檔、<code>Q</code> 離開，設定存在專案根目錄的 <code>sdkconfig</code>。</p>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>這些數值是照車上控制板（ESP32-S3-WROOM-1U-N4R2：4MB Flash＋2MB PSRAM）設的。你的開發板 Flash 或 PSRAM 大小若不同，要改成開發板的規格，否則可能開機失敗。不確定時，先保留預設值，只改 CPU 頻率和 tick。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-4" data-audio="audio/A4-4.mp3">
+<div class="sec-head"><h2>4. 安裝 micro-ROS 的 ESP-IDF 元件</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>ESP-IDF 本身不懂 ROS，要另外裝一個 micro-ROS 元件，它會在第一次編譯時下載並編出一個 lib microros 點 a 的靜態函式庫。這個元件預設很節省，只允許兩個發布者和兩個訂閱者，所以官方建議先把上限改成三。改完上限一定要清掉舊的函式庫重新編，否則改了等於沒改。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">mkdir -p ~/esp/Samples/extra_components
+cd ~/esp/Samples/extra_components
+git clone -b humble https://github.com/micro-ROS/micro_ros_espidf_component.git
+cd micro_ros_espidf_component
+
+source ~/esp/esp-idf/export.sh
+pip3 install catkin_pkg lark-parser empy colcon-common-extensions</code></pre>
+</div>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p><code>pip3 install</code> <strong>一定要在 <code>source export.sh</code> 之後</strong>執行，這樣套件才會裝進 ESP-IDF 自己的 Python 虛擬環境。如果沒先 source，Ubuntu 24.04 會拒絕把套件裝進系統 Python（出現 <code>externally-managed-environment</code>）。分支用 <code>humble</code>，對應車上的 ROS 2 Humble 與 agent 映像 <code>microros/micro-ros-agent:humble</code>。</p>
+</div>
+<h3>4.1 調高 publisher／subscriber 上限</h3>
+<p>編輯 <code>micro_ros_espidf_component/colcon.meta</code> 的 <code>rmw_microxrcedds</code> 區塊：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">colcon.meta（rmw_microxrcedds 區塊，官方建議值）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-json">&quot;rmw_microxrcedds&quot;: {
+    &quot;cmake-args&quot;: [
+        &quot;-DRMW_UXRCE_XML_BUFFER_LENGTH=400&quot;,
+        &quot;-DRMW_UXRCE_TRANSPORT=udp&quot;,
+        &quot;-DRMW_UXRCE_MAX_NODES=1&quot;,
+        &quot;-DRMW_UXRCE_MAX_PUBLISHERS=3&quot;,
+        &quot;-DRMW_UXRCE_MAX_SUBSCRIPTIONS=3&quot;,
+        &quot;-DRMW_UXRCE_MAX_SERVICES=1&quot;,
+        &quot;-DRMW_UXRCE_MAX_CLIENTS=1&quot;,
+        &quot;-DRMW_UXRCE_MAX_HISTORY=3&quot;
+    ]
+},</code></pre>
+</div>
+<h3>4.2 重編 libmicroros.a</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cd ~/esp/Samples/extra_components/micro_ros_espidf_component/examples/int32_publisher
+idf.py clean-microros
+idf.py set-target esp32s3
+ls ../../*.a</code></pre>
+</div>
+<p>看到 <code>Configuring done</code>、<code>Generating done</code>，且 <code>ls</code> 列出 <code>libmicroros.a</code> 就成功。這一步要從 GitHub 下載很多東西，網路不穩容易失敗，失敗就再跑一次。</p>
+<p>自己的專案要用這個元件，在專案根目錄的 <code>CMakeLists.txt</code> 加：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">專案根目錄 CMakeLists.txt（依實際相對路徑調整）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-cmake">set (EXTRA_COMPONENT_DIRS &quot;../../extra_components&quot;)</code></pre>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-5" data-audio="audio/A4-5.mp3">
+<div class="sec-head"><h2>5. rclc 程式骨架：node、publisher、timer、executor</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>每個 micro-ROS 程式都長得差不多，像填表格。先連 WiFi，再設定 Domain ID 和 agent 的位址，然後一直嘗試連 agent，連上了才往下走。接著建立節點、發布者和定時器，最後把定時器交給一位調度員，叫 executor。調度員要放在無窮迴圈裡不停巡邏，看哪個定時器到點了就呼叫對應的函式。忘了讓調度員巡邏，你寫的函式永遠不會被執行。</p></details>
+<div class="md"><h3>5.1 名詞對照</h3>
+<table>
+<thead>
+<tr>
+<th>rclc 名詞</th>
+<th>白話</th>
+<th>對應 Pi 5 上的 Python（rclpy）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>support</code></td>
+<td>micro-ROS 的執行環境</td>
+<td><code>rclpy.init()</code></td>
+</tr>
+<tr>
+<td><code>node</code></td>
+<td>節點，程式在 ROS 網路裡的身分</td>
+<td><code>Node("名字")</code></td>
+</tr>
+<tr>
+<td><code>publisher</code> / <code>subscription</code></td>
+<td>發布者／訂閱者</td>
+<td><code>create_publisher</code> / <code>create_subscription</code></td>
+</tr>
+<tr>
+<td><code>timer</code></td>
+<td>定時器，到點呼叫 callback</td>
+<td><code>create_timer</code></td>
+</tr>
+<tr>
+<td><code>executor</code></td>
+<td>調度員，決定何時呼叫哪個 callback</td>
+<td><code>rclpy.spin()</code></td>
+</tr>
+<tr>
+<td><code>std_msgs__msg__Int32</code></td>
+<td>C 語言裡的訊息型別名稱（包名__msg__型別）</td>
+<td><code>from std_msgs.msg import Int32</code></td>
+</tr>
+</tbody>
+</table>
+<h3>5.2 骨架（官方第 17 組各課共用，逐字節錄）</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">main/main.c 的 micro-ROS 骨架（官方節錄，在電腦 WSL 編譯）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-c">// 1) 連 WiFi（SSID/密碼來自 menuconfig 的 micro-ROS Settings-&gt;WiFi Configuration）
+ESP_ERROR_CHECK(uros_network_interface_initialize());
+
+// 2) 取 ROS 參數（來自 menuconfig）
+#define ROS_NAMESPACE   CONFIG_MICRO_ROS_NAMESPACE
+#define ROS_DOMAIN_ID   CONFIG_MICRO_ROS_DOMAIN_ID
+#define ROS_AGENT_IP    CONFIG_MICRO_ROS_AGENT_IP
+#define ROS_AGENT_PORT  CONFIG_MICRO_ROS_AGENT_PORT
+
+// 3) 建立 init options，設 domain id 與 agent 位址
+rcl_allocator_t allocator = rcl_get_default_allocator();
+rclc_support_t support;
+rcl_init_options_t init_options = rcl_get_zero_initialized_init_options();
+RCCHECK(rcl_init_options_init(&amp;init_options, allocator));
+RCCHECK(rcl_init_options_set_domain_id(&amp;init_options, ROS_DOMAIN_ID));
+rmw_init_options_t *rmw_options = rcl_init_options_get_rmw_init_options(&amp;init_options);
+RCCHECK(rmw_uros_options_set_udp_address(ROS_AGENT_IP, ROS_AGENT_PORT, rmw_options));
+
+// 4) 反覆嘗試連 agent，成功才往下（每 500ms 重試）
+while (1) {
+    ESP_LOGI(TAG, &quot;Connecting agent: %s:%s&quot;, ROS_AGENT_IP, ROS_AGENT_PORT);
+    state_agent = rclc_support_init_with_options(&amp;support, 0, NULL, &amp;init_options, &amp;allocator);
+    if (state_agent == ESP_OK) { ESP_LOGI(TAG, &quot;Connected agent: %s:%s&quot;, ROS_AGENT_IP, ROS_AGENT_PORT); break; }
+    vTaskDelay(pdMS_TO_TICKS(500));
+}
+
+// 5) 建節點 → publisher / subscription / timer → 加進 executor
+rcl_node_t node;
+RCCHECK(rclc_node_init_default(&amp;node, &quot;節點名&quot;, ROS_NAMESPACE, &amp;support));
+rclc_executor_t executor;
+RCCHECK(rclc_executor_init(&amp;executor, &amp;support.context, handle_num, &amp;allocator));
+RCCHECK(rclc_executor_add_timer(&amp;executor, &amp;timer));
+
+// 6) 主迴圈：讓 executor 不停巡邏
+while (1) {
+    rclc_executor_spin_some(&amp;executor, RCL_MS_TO_NS(100));
+    usleep(1000);
+}</code></pre>
+</div>
+<h3>5.3 官方 17-1：發布 Int32（<code>microros_samples/publisher</code>）</h3>
+<ul>
+<li>節點 <code>esp32_publisher</code>，話題 <code>publisher</code>，型別 <code>std_msgs/msg/Int32</code>。</li>
+<li>timer 100 毫秒（10 Hz），<code>handle_num = 1</code>。</li>
+<li>callback <code>timer_callback</code> 做三件事：印 <code>Publishing: %d</code>、<code>rcl_publish(&amp;publisher, &amp;msg, NULL)</code>、<code>msg.data++</code>。</li>
+</ul>
+<p>建立 publisher 與 timer 的寫法（依官方說明整理）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">publisher 與 timer（依官方 17-1 說明整理）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-c">rclc_publisher_init_default(&amp;publisher, &amp;node,
+    ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32), &quot;publisher&quot;);
+rclc_timer_init_default(&amp;timer, &amp;support, RCL_MS_TO_NS(100), timer_callback);</code></pre>
+</div>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>沒有官方虛擬機的範例檔時，最快的做法是直接從元件內建的 <code>examples/int32_publisher</code> 改起：它和官方 17-1 做的事幾乎一樣，而且 4.2 節已經編過一次。把整個資料夾複製一份再改，不要改原檔。</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cp -r ~/esp/Samples/extra_components/micro_ros_espidf_component/examples/int32_publisher ~/esp/Samples/my_publisher
+cd ~/esp/Samples/my_publisher</code></pre>
+</div>
+<p>複製到別處後，<code>CMakeLists.txt</code> 裡指向元件的路徑要跟著改成 <code>set (EXTRA_COMPONENT_DIRS "../extra_components")</code> 這類正確的相對位置（需實機確認範例的寫法）。</p>
+</div>
+<h3>5.4 menuconfig 裡的 micro-ROS 設定</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">source ~/esp/esp-idf/export.sh
+idf.py menuconfig</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>選單</th>
+<th>填什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>micro-ROS Settings</code> → <code>Agent IP</code></td>
+<td><strong>跑 agent 那台機器的區網 IP</strong>（不是 localhost）</td>
+</tr>
+<tr>
+<td><code>micro-ROS Settings</code> → <code>Agent Port</code></td>
+<td><code>8090</code>（對應 agent 的 <code>--port 8090</code>）</td>
+</tr>
+<tr>
+<td><code>micro-ROS Settings</code> → <code>WiFi Configuration</code></td>
+<td><code>WiFi SSID</code>、<code>WiFi Password</code></td>
+</tr>
+<tr>
+<td><code>micro-ROS example-app settings</code></td>
+<td><code>ROS domain id</code>（預設 <code>20</code>）、<code>Ros namespace</code>（預設空白）</td>
+</tr>
+</tbody>
+</table>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">idf.py build flash monitor</code></pre>
+</div>
+<p>monitor 會先印 <code>Connecting agent: ...</code>，等第 6 節開好 agent 才會變成 <code>Connected agent</code>。</p></div>
+</section>
+<section class="sec card-box" id="sec-6" data-audio="audio/A4-6.mp3">
+<div class="sec-head"><h2>6. 開 UDP agent、驗證發布與訂閱</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>板子燒好之後，要開一個 UDP 版的 agent 讓它連進來。agent 可以開在電腦上，也可以開在車上的 Pi 5，只要和 ESP32 在同一個 WiFi，而且 menuconfig 裡填的 Agent IP 就是那台機器。連上後，用熟悉的 ros2 node list 看看有沒有 esp32 publisher 這個節點，再用 topic echo 和 topic hz 看資料和頻率。十赫茲左右就代表成功了。</p></details>
+<div class="md"><h3>6.1 開 agent（二選一）</h3>
+<p><strong>選項 A：開在車上的 Pi 5</strong>（Pi 5 已經有 Docker 和 ROS 2 容器，最省事）</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機（另開終端，不影響車子原本的序列 agent）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">docker run -it --rm -v /dev:/dev -v /dev/shm:/dev/shm --privileged --net=host microros/micro-ros-agent:humble udp4 --port 8090 -v4</code></pre>
+</div>
+<p>menuconfig 的 Agent IP 填 <strong>Pi 5 的 IP</strong>（熱點模式是 <code>10.42.0.1</code>，開發板要先連上車的熱點 <code>Micro_ros</code>）。和車上原本的序列 agent 同時存在是否互相干擾，官方沒寫（需實車確認）；有疑慮就先把序列 agent 關掉。</p>
+<p><strong>選項 B：開在電腦 WSL</strong>（需先在 WSL 裝好 Docker Engine，並照 A5 設好 mirrored 網路）</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">docker run -it --rm -v /dev:/dev -v /dev/shm:/dev/shm --privileged --net=host microros/micro-ros-agent:humble udp4 --port 8090 -v4</code></pre>
+</div>
+<p>Agent IP 填 <strong>Windows 電腦的 WiFi IP</strong>（mirrored 模式下 WSL 和 Windows 共用 IP）。Windows 防火牆可能擋 UDP 8090 的連入，連不上時先檢查防火牆（需實機確認）。</p>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>agent 只能開<strong>一個</strong>同埠的；結束請按 <strong>Ctrl+C</strong>，不要直接關終端，否則容器會殘留在背景，下次啟動就報錯。殘留時：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機或電腦 WSL（開 agent 的那台）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">docker ps -a | grep microros/micro-ros-agent
+docker stop &lt;殘留的 CONTAINER ID&gt;</code></pre>
+</div>
+</div>
+<h3>6.2 驗證發布者</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（或任何 ROS_DOMAIN_ID=20 的 ROS 2 環境）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 node list
+ros2 node info /esp32_publisher
+ros2 topic echo /publisher
+ros2 topic hz /publisher</code></pre>
+</div>
+<p>看到數字一直加 1，頻率約 10 Hz 就成功。</p>
+<h3>6.3 驗證訂閱者（官方 17-2）</h3>
+<p>官方 17-2 的節點 <code>esp32_subscriber</code> 訂閱話題 <code>subscriber</code>（<code>std_msgs/msg/Int32</code>），callback 收到就印 <code>Received: %d</code>。加訂閱者的關鍵一行：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">加入訂閱（官方 17-2 說明）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-c">RCCHECK(rclc_executor_add_subscription(&amp;executor, &amp;subscriber, &amp;recv_msg, &amp;callback, ON_NEW_DATA));</code></pre>
+</div>
+<p>燒好後從 ROS 2 端送一個數字：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 topic pub /subscriber std_msgs/msg/Int32 &quot;data: 123&quot;</code></pre>
+</div>
+<p><code>idf.py monitor</code> 印出 <code>Received: 123</code> 就成功。</p>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p><code>handle_num</code> 是 executor 最多要照顧幾個「事件來源」，要大於等於「timer 數＋subscriber 數」。官方 17-3 同時有 3 個 timer＋3 個 subscriber，所以 <code>handle_num = 6</code>，也剛好用滿第 4.1 節的「3／3」上限。設太小時，多出來的 callback 會靜悄悄地不執行。</p>
+</div>
+<h3>6.4 接著可以做的官方練習</h3>
+<table>
+<thead>
+<tr>
+<th>官方課</th>
+<th>節點／話題</th>
+<th>需要的硬體</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>17-3 多話題</td>
+<td><code>esp32_pub_sub</code>：<code>publisher_1/2/3</code>、<code>subscriber_1/2/3</code></td>
+<td>只要板子</td>
+</tr>
+<tr>
+<td>17-4 蜂鳴器</td>
+<td><code>beep_subscriber</code>：<code>beep</code>（<code>std_msgs/msg/UInt16</code>）</td>
+<td>外接主動蜂鳴器</td>
+</tr>
+<tr>
+<td>17-5 舵機</td>
+<td><code>servo_subscriber</code>：<code>servo_s1</code>、<code>servo_s2</code>（<code>std_msgs/msg/Int32</code>）</td>
+<td>外接舵機</td>
+</tr>
+<tr>
+<td>17-6 速度</td>
+<td><code>twist_subscriber</code>：<code>cmd_vel</code>（<code>geometry_msgs/msg/Twist</code>）</td>
+<td>馬達、編碼器（<strong>架空</strong>）</td>
+</tr>
+<tr>
+<td>17-7 里程計</td>
+<td><code>odom_publisher</code>：<code>odom_raw</code>（<code>nav_msgs/msg/Odometry</code>，20 Hz）</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>17-8 IMU</td>
+<td><code>imu_publisher</code>：<code>imu</code>（<code>sensor_msgs/msg/Imu</code>，20 Hz）</td>
+<td>ICM42670P</td>
+</tr>
+<tr>
+<td>17-9 光達</td>
+<td><code>lidar_publisher</code>：<code>scan</code>（<code>sensor_msgs/msg/LaserScan</code>，約 11 Hz）</td>
+<td>MS200</td>
+</tr>
+<tr>
+<td>17-10 序列傳輸</td>
+<td><code>custom_transport</code>：<code>custom_publisher</code></td>
+<td>只要 USB 線，改用序列 agent</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>官方 17-8 的驗證段落文字寫 <code>Subscribe to the data of the /odom_raw topic</code>，但指令是 <code>ros2 topic echo /imu</code>，文字是複製錯誤，以指令為準。17-10 文件寫「串口 2」，但用的 GPIO43／44 其實是 UART0（Type-C 燒錄口）。另外官方 IMU 範例把「度／秒」和「g」直接塞進 Imu 訊息，而 ROS 標準是 rad/s 與 m/s²，自己做融合時要注意單位。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-7" data-audio="audio/A4-7.mp3">
+<div class="sec-head"><h2>7. 燒回出廠韌體與 config_robot.py 重設</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>用車上控制板練習完，一定要把出廠韌體燒回去，車子才會變回原本的樣子。出廠韌體是一個合併好的單一檔案，燒在位址零，而且要勾選 DoNotChgBin，意思是不要讓工具改動這個檔。這和自己編的程式分成三個檔、燒在三個位址完全不同，千萬別搞混。燒完之後，再到 Pi 5 用 config robot 點 py 把車型、Domain ID 和 namespace 寫回去。</p></details>
+<div class="md"><h3>7.1 用 Windows 的 Flash Download Tool 燒錄（官方做法）</h3>
+<ol>
+<li>安裝 <strong>CP2102 驅動</strong>（隨附資料 <code>Hardware related information → CP2102 serial port chip → CP2102-Windows driver file.zip</code>，64 位元執行 <code>CP210xVCPInstaller_x64.exe</code>）。Type-C 線接控制板標 <strong>Serial</strong> 的孔，裝置管理員 → 連接埠要看到 CP210x。</li>
+<li>若之前用 <code>usbipd attach</code> 把板子借給 WSL，先在 Windows PowerShell 執行 <code>usbipd detach --busid &lt;BUSID&gt;</code> 還給 Windows。</li>
+<li>下載 Espressif <strong>flash_download_tool</strong>（<code>https://www.espressif.com.cn/zh-hans/support/download/other-tools</code>），開啟後晶片選 <strong>ESP32-S3</strong>。</li>
+<li><code>SPIDownload</code> 頁籤設定：</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>欄位</th>
+<th>設定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>檔案</td>
+<td><code>microROS_Robot_V2.0.0.bin</code>（本專案在 <code>source-code/firmware/Factory-Firmware/</code>）</td>
+</tr>
+<tr>
+<td>位址</td>
+<td><strong><code>0x0</code></strong></td>
+</tr>
+<tr>
+<td>勾選</td>
+<td><strong><code>DoNotChgBin</code></strong></td>
+</tr>
+<tr>
+<td>COM</td>
+<td>控制板的 COM 埠</td>
+</tr>
+<tr>
+<td>其他</td>
+<td>保持預設</td>
+</tr>
+</tbody>
+</table>
+<ol>
+<li>按 <strong>Start</strong>。沒自動開始：<strong>按住 BOOT0 → 按 Reset → 放開 BOOT0</strong>。</li>
+<li>出現藍色 <strong>FINISH</strong> 後，斷電重啟或按 Reset。</li>
+<li>驗證：用序列埠助手（隨附 <code>UartAssist.exe</code>），<strong>115200、8 bit、1 stop、無 parity、無流控</strong>，按 Reset，要看到 <code>hello Yahboom</code> 和下一行的韌體版本號。</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>出廠韌體</th>
+<th>自己編的程式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>檔案</td>
+<td>單一檔 <code>microROS_Robot_V2.0.0.bin</code></td>
+<td><code>bootloader.bin</code>、<code>partition-table.bin</code>、<code>main.bin</code></td>
+</tr>
+<tr>
+<td>位址</td>
+<td><code>0x0</code></td>
+<td><code>0x0000</code>、<code>0x8000</code>、<code>0x10000</code></td>
+</tr>
+<tr>
+<td>DoNotChgBin</td>
+<td><strong>要勾</strong></td>
+<td>不用</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>已經裝好 ESP-IDF 的話，也可以在 WSL 用 ESP-IDF 內附的 esptool 燒（這是文件外的做法，官方只教 Windows 工具，需實機確認）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">source ~/esp/esp-idf/export.sh
+esptool.py --chip esp32s3 -p /dev/ttyUSB0 write_flash 0x0 microROS_Robot_V2.0.0.bin</code></pre>
+</div>
+</div>
+<h3>7.2 用 config_robot.py 重設參數</h3>
+<p>燒回出廠韌體後，把板子接回 Pi 5，在 VNC 桌面：Docker 終端 <code>exit</code>、agent 終端 Ctrl+C，然後確認 <code>config_robot.py</code> 是單車設定：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">config_robot.py 必須是這幾行（在 Pi 5 主機的 /home/pi）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">robot.set_car_type(robot.CAR_TYPE_RPI5)
+robot.set_ros_domain_id(20)
+robot.set_ros_serial_baudrate(921600)
+robot.set_ros_namespace(&quot;&quot;)</code></pre>
+</div>
+<p>短按控制板 Reset，<strong>5 秒內</strong>（燈每 300 毫秒閃）執行：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cd ~
+python3 config_robot.py</code></pre>
+</div>
+<p>確認印出的 <code>domain_id: 20</code>、<code>ros_namespace:</code> 空白、車型 <code>CAR_TYPE_RPI5</code>，再按一次 Reset。最後照常開 agent 與容器：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">sh ~/start_agent_rpi5.sh</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 node list</code></pre>
+</div>
+<p>重新看到 <code>/YB_Car_Node</code> 就完全恢復了。</p>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p><code>config_robot.py</code> 裡的 <code>CAR_TYPE_RPI5</code> 讓板子走序列埠接 Pi 5；如果誤設成 <code>CAR_TYPE_COMPUTER</code>，板子會改走 WiFi UDP，Pi 5 的序列 agent 就永遠連不上。兩種版本用的是<strong>同一個</strong>出廠韌體，差別只在這個參數。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-8" data-audio="audio/A4-8.mp3">
+<div class="sec-head"><h2>8. 出問題時怎麼辦</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>韌體開發的除錯鏈很長，問題可能在 WiFi、agent、Docker、Domain ID 或序列埠任何一環，而且很多失敗不會報錯，只是一直顯示正在連線。先看板子的序列輸出卡在哪一步，再看指示燈怎麼閃，最後用下面這張表對照。記住一個萬用招：關掉 agent、按板子的 Reset、再重開 agent。</p></details>
+<div class="md"><table>
+<thead>
+<tr>
+<th>症狀</th>
+<th>最可能的原因</th>
+<th>怎麼做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>idf.py: command not found</code></td>
+<td>新終端忘了啟用環境</td>
+<td><code>source ~/esp/esp-idf/export.sh</code></td>
+</tr>
+<tr>
+<td>WSL 裡沒有 <code>/dev/ttyUSB0</code></td>
+<td>USB 沒借給 WSL</td>
+<td>Windows 執行 <code>usbipd attach --wsl --busid &lt;BUSID&gt;</code></td>
+</tr>
+<tr>
+<td>燒錄出現 Permission denied</td>
+<td>不在 <code>dialout</code> 群組</td>
+<td><code>sudo usermod -aG dialout $USER</code> 後重開終端</td>
+</tr>
+<tr>
+<td>燒錄失敗、連不到板子</td>
+<td>序列埠被 monitor、序列 agent 或序列助手佔用</td>
+<td>先 Ctrl+] 離開 monitor、Ctrl+C 關序列 agent、關掉 UartAssist</td>
+</tr>
+<tr>
+<td>燒錄卡在等待連線</td>
+<td>沒進燒錄模式</td>
+<td>按住 BOOT0 → 按 Reset → 放開 BOOT0</td>
+</tr>
+<tr>
+<td>一直印 <code>Connecting agent: ...</code></td>
+<td>agent 沒開、埠不是 8090、Agent IP 填錯、WiFi 不同網段</td>
+<td>檢查 menuconfig 的 Agent IP／Port／WiFi；agent 和板子要同一個區網</td>
+</tr>
+<tr>
+<td>agent 啟動就報錯</td>
+<td>已有一個 agent 或上次殘留的容器</td>
+<td><code>docker ps -a \| grep microros/micro-ros-agent</code>、<code>docker stop &lt;ID&gt;</code></td>
+</tr>
+<tr>
+<td><code>ros2 node list</code> 看不到 <code>esp32_publisher</code></td>
+<td>Domain ID 不一致</td>
+<td>menuconfig 的 <code>ROS domain id</code> 與 ROS 端 <code>ROS_DOMAIN_ID</code> 都設 20；改完 <code>ros2 daemon stop</code></td>
+</tr>
+<tr>
+<td>建立 subscriber 失敗、某個 callback 不執行</td>
+<td>超過 <code>colcon.meta</code> 上限或 <code>handle_num</code> 太小</td>
+<td>改 <code>colcon.meta</code> 後 <code>idf.py clean-microros</code> 重編；調大 <code>handle_num</code></td>
+</tr>
+<tr>
+<td>改了 <code>colcon.meta</code> 卻沒變化</td>
+<td>沒清掉舊的 <code>libmicroros.a</code></td>
+<td><code>idf.py clean-microros</code> 再 build</td>
+</tr>
+<tr>
+<td>17-10 燒完 monitor 全是亂碼</td>
+<td>正常：序列埠上跑的是二進位協定</td>
+<td>Ctrl+] 離開，改開序列 agent</td>
+</tr>
+<tr>
+<td>改了 <code>sdkconfig</code> 之後行為怪怪的</td>
+<td>舊的編譯結果殘留</td>
+<td><code>idf.py fullclean</code> 再 build（常見做法，文件未寫）</td>
+</tr>
+<tr>
+<td>車子燒完練習程式後完全不能控制</td>
+<td>出廠韌體被覆蓋</td>
+<td>照第 7 節燒回 <code>microROS_Robot_V2.0.0.bin</code> 並重設</td>
+</tr>
+<tr>
+<td>馬達類程式燒完輪子狂轉</td>
+<td>正常行為</td>
+<td>先架空；按 Reset 重新開始，或斷電</td>
+</tr>
+<tr>
+<td>蜂鳴器一直嗶、車不聽指令</td>
+<td>電池低電壓</td>
+<td>充電</td>
+</tr>
+</tbody>
+</table>
+<p><strong>MCU 指示燈對照</strong>（出廠韌體）：</p>
+<table>
+<thead>
+<tr>
+<th>閃法</th>
+<th>狀態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>每 300 毫秒閃一次</td>
+<td>設定狀態（開機約 5 秒內）</td>
+</tr>
+<tr>
+<td>每 1 秒慢閃</td>
+<td>正在連 agent</td>
+</tr>
+<tr>
+<td>每 50 毫秒快閃</td>
+<td>micro-ROS 錯誤</td>
+</tr>
+<tr>
+<td>每 3 秒快閃 2 次</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>每 100 毫秒閃＋蜂鳴器</td>
+<td>低電壓</td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section class="videos card-box"><h2>📺 官方影片</h2><div class="yt-grid"><figure class="yt" data-yt="WuLcfn4lkRo"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 1"><img src="https://i.ytimg.com/vi/WuLcfn4lkRo/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 1</figcaption></figure><figure class="yt" data-yt="MNMRW13Uzgs"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 2"><img src="https://i.ytimg.com/vi/MNMRW13Uzgs/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 2</figcaption></figure></div></section>
+<section class="quiz card-box" id="quiz"><h2>📝 小測驗</h2><div class="quiz-item" data-answer="1"><p class="q">1. 為什麼 ESP32 需要 micro-ROS agent？</p><div class="opts"><button class="opt" type="button" data-i="0">因為 ESP32 不能接 WiFi</button><button class="opt" type="button" data-i="1">因為 MCU 只會說精簡協定，需要 agent 翻譯成一般 ROS 2 的 DDS</button><button class="opt" type="button" data-i="2">因為 agent 負責供電給 ESP32</button></div><p class="explain" hidden></p><template class="explain-text">micro-ROS 用 Micro XRCE-DDS 與 agent 溝通，由 agent 代替 MCU 出現在 ROS 2 網路裡；agent 沒開，板子就一直卡在 Connecting agent。</template></div><div class="quiz-item" data-answer="1"><p class="q">2. rclc 程式裡，如果忘了在主迴圈呼叫 rclc_executor_spin_some，會怎樣？</p><div class="opts"><button class="opt" type="button" data-i="0">編譯失敗</button><button class="opt" type="button" data-i="1">timer 與 subscriber 的 callback 永遠不會被執行</button><button class="opt" type="button" data-i="2">板子會重開機</button></div><p class="explain" hidden></p><template class="explain-text">executor 是調度員，必須在無窮迴圈中持續巡邏，才會呼叫到期 timer 與收到新資料的 callback。</template></div><div class="quiz-item" data-answer="0"><p class="q">3. 燒回出廠韌體 microROS_Robot_V2.0.0.bin 的正確設定是？</p><div class="opts"><button class="opt" type="button" data-i="0">單一檔燒在 0x0，並勾選 DoNotChgBin</button><button class="opt" type="button" data-i="1">分三個檔燒在 0x0000、0x8000、0x10000</button><button class="opt" type="button" data-i="2">燒在 0x10000，不勾任何選項</button></div><p class="explain" hidden></p><template class="explain-text">出廠韌體是合併好的單一檔，位址 0x0 並勾 DoNotChgBin；三個檔分開燒是自己編譯的專案。</template></div><div class="quiz-item" data-answer="1"><p class="q">4. micro-ROS 元件改了 colcon.meta 的上限後，要做什麼才會生效？</p><div class="opts"><button class="opt" type="button" data-i="0">什麼都不用做</button><button class="opt" type="button" data-i="1">執行 idf.py clean-microros 後重新編譯</button><button class="opt" type="button" data-i="2">重新安裝 ESP-IDF</button></div><p class="explain" hidden></p><template class="explain-text">上限是編進 libmicroros.a 的，必須清掉舊函式庫重編才會套用。</template></div><div class="quiz-item" data-answer="2"><p class="q">5. 在 menuconfig 填 Agent IP 時，應該填什麼？</p><div class="opts"><button class="opt" type="button" data-i="0">127.0.0.1</button><button class="opt" type="button" data-i="1">ESP32 自己的 IP</button><button class="opt" type="button" data-i="2">跑 agent 那台機器的區網 IP</button></div><p class="explain" hidden></p><template class="explain-text">ESP32 要透過 WiFi 找到 agent，所以要填 agent 所在機器在同一個區網裡的 IP，不是 localhost。</template></div><p class="quiz-score">得分：<span class="score">0</span> / 5</p></section>
+<footer class="lesson-foot card-box">
+<button class="btn primary" id="mark-done" type="button">✔ 標記為完成</button>
+<nav class="pager"><a class="btn" href="A3.html">← A3 上一單元</a><a class="btn" href="A5.html">A5 下一單元 →</a></nav>
+</footer>
+</main>
+<audio id="player" preload="none"></audio>
+<script src="app.js"></script>
+</body>
+</html>

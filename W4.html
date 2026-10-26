@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W4 在電腦上看這台車：URDF、RViz、TF｜Yahboom MicroROS-Pi5 × ROS 2 學習地圖</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-lesson">
+<header class="topbar"><a href="index.html">← 學習地圖</a><span>W4</span></header>
+<main class="container lesson" data-lesson-id="W4">
+
+<section class="lesson-head card-box" id="sec-0" data-audio="audio/W4-0.mp3">
+<div class="eyebrow"><span class="badge level-W">暖身</span>
+<span class="unit-id">W4</span></div>
+<h1>在電腦上看這台車：URDF、RViz、TF</h1>
+<div class="meta"><span class="badge">⏱ 1 小時</span><span class="badge car-no">🚗 真車：否</span></div>
+<dl class="goal">
+<dt>🎯 學習目標</dt><dd>看懂 URDF 的 link 與 joint，認得這台車 MicroROS.urdf 裡每個零件的名字，並能在 RViz 看模型、看 TF 樹</dd>
+<dt>✅ 完成標準</dt><dd>在電腦的 RViz 看到這台車的 3D 模型，拖動關節滑桿讓輪子轉、雲台左右上下動</dd>
+</dl>
+<div class="player-bar">
+<button class="btn primary" id="play-all" type="button">▶ 全部播放</button>
+<label class="rate">播放速度
+<select id="rate">
+<option value="0.8">0.8×</option><option value="1" selected>1×</option>
+<option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+</select></label>
+<span class="now-playing" id="now-playing" aria-live="polite"></span>
+</div>
+</section>
+<section class="sec card-box" id="sec-1" data-audio="audio/W4-1.mp3">
+<div class="sec-head"><h2>1. 機器人也需要一份「身體說明書」</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>前面我們讓小烏龜在平面上跑，但真正的車子是立體的，有輪子、有光達、有會轉的雲台。程式要怎麼知道光達裝在車子中心前面幾公分、高幾公分？相機轉了三十度之後在看哪裡？答案是一份身體說明書，叫做 URDF。它像一張骨架圖，寫清楚機器人有哪些骨頭、骨頭之間用什麼關節連起來。有了它，RViz 才能畫出車子的樣子，TF 才能算出每個零件在空間中的位置。這個單元完全在電腦上做，不需要真車。</p></details>
+<div class="md"><p>這個單元會用到三個工具：</p>
+<table>
+<thead>
+<tr>
+<th>工具</th>
+<th>是什麼</th>
+<th>比喻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>URDF（Unified Robot Description Format，統一機器人描述格式）</td>
+<td>用 XML 寫的機器人結構檔</td>
+<td>骨架圖</td>
+</tr>
+<tr>
+<td>RViz（rviz2）</td>
+<td>ROS 的 3D 資料視覺化工具</td>
+<td>透視鏡，讓你「看見」程式裡的資料</td>
+</tr>
+<tr>
+<td>TF（tf2，座標轉換）</td>
+<td>記錄每個零件座標系之間的相對位置</td>
+<td>家族族譜：每個人都記得「我在爸爸的哪裡」</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>本單元在電腦上用本課程附的模擬套件 <code>microros_pi5_sim</code>（放在 <code>~/yahboom_ws</code>），它是根據這台車原始碼裡的 <code>MicroROS.urdf</code> 改的，零件名稱和真車相同。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-2" data-audio="audio/W4-2.mp3">
+<div class="sec-head"><h2>2. URDF 的兩種積木：link 與 joint</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>URDF 只有兩種主要積木。第一種是 link，中文叫連桿，就是一塊硬梆梆不會變形的零件，例如車身、一顆輪子、光達。第二種是 joint，關節，負責把兩個 link 接起來，並規定它們可以怎麼動。每個關節都有一個爸爸 parent 和一個小孩 child，還會寫小孩離爸爸多遠、繞哪個軸轉。常見的關節有三種：可以一直轉的 continuous，像輪子；有角度限制的 revolute，像雲台；完全不動的 fixed，像鎖死在車上的光達。</p></details>
+<div class="md"><p><strong>link 的內容</strong></p>
+<table>
+<thead>
+<tr>
+<th>標籤</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&lt;visual&gt;</code></td>
+<td>外觀：形狀（這台車用 STL 網格檔）、顏色、位置偏移</td>
+</tr>
+<tr>
+<td><code>&lt;collision&gt;</code></td>
+<td>碰撞外形（模擬與避障用）</td>
+</tr>
+<tr>
+<td><code>&lt;inertial&gt;</code></td>
+<td>質量、慣性（物理模擬用）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>joint 的類型</strong></p>
+<table>
+<thead>
+<tr>
+<th>類型</th>
+<th>動法</th>
+<th>這台車上的例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>continuous</code></td>
+<td>無限旋轉</td>
+<td>四顆輪子</td>
+</tr>
+<tr>
+<td><code>revolute</code></td>
+<td>有上下限的旋轉</td>
+<td>雲台兩軸</td>
+</tr>
+<tr>
+<td><code>fixed</code></td>
+<td>固定不動</td>
+<td>IMU、光達</td>
+</tr>
+<tr>
+<td><code>prismatic</code></td>
+<td>直線滑動</td>
+<td>（本車沒有）</td>
+</tr>
+<tr>
+<td><code>floating</code>、<code>planar</code></td>
+<td>浮動、平面</td>
+<td>少用</td>
+</tr>
+</tbody>
+</table>
+<p><strong>一個真實的 joint</strong>（摘自原始碼 <code>MicroROS.urdf</code>，左前輪）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">xml</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-xml">&lt;joint name=&quot;zq_Joint&quot; type=&quot;continuous&quot;&gt;
+  &lt;origin xyz=&quot;0.0455 0.0675 -0.02125&quot; rpy=&quot;0 0 0&quot; /&gt;   &lt;!-- 輪子在車身中心前 4.55 cm、左 6.75 cm、下 2.1 cm --&gt;
+  &lt;parent link=&quot;base_link&quot; /&gt;                          &lt;!-- 爸爸：車身 --&gt;
+  &lt;child link=&quot;zq_Link&quot; /&gt;                             &lt;!-- 小孩：左前輪 --&gt;
+  &lt;axis xyz=&quot;0 1 0&quot; /&gt;                                  &lt;!-- 繞 y 軸（左右方向）轉 --&gt;
+&lt;/joint&gt;</code></pre>
+</div>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>ROS 的座標慣例：<strong>x 朝前、y 朝左、z 朝上</strong>，單位是公尺與弧度。<code>rpy</code> 是 roll、pitch、yaw（繞 x、y、z 的旋轉角）。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-3" data-audio="audio/W4-3.mp3">
+<div class="sec-head"><h2>3. 拆解這台車的 MicroROS.urdf</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>現在來認識這台車骨架上的每一塊骨頭。名字是拼音縮寫，記起來很快：z 是左、y 是右、q 是前、h 是後。所以 zq 是左前輪、yq 是右前輪、yh 是右後輪、zh 是左後輪。jq 是雲台，jq1 負責左右轉，jq2 疊在 jq1 上面，負責上下點頭。所有零件的爸爸都是 base link，也就是車身，只有 jq2 的爸爸是 jq1。這種一層接一層的關係，就是下一節要講的 TF 樹。</p></details>
+<div class="md"><p>原始碼位置：<code>yahboomcar_ws/src/yahboomcar_description/urdf/MicroROS.urdf</code>，<code>&lt;robot name="micro4.0"&gt;</code>，共 9 個 link、8 個 joint。</p>
+<table>
+<thead>
+<tr>
+<th>joint</th>
+<th>類型</th>
+<th>parent → child</th>
+<th>零件</th>
+<th>位置 xyz（公尺）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>zq_Joint</code></td>
+<td>continuous</td>
+<td><code>base_link</code> → <code>zq_Link</code></td>
+<td>左前輪</td>
+<td>0.0455, 0.0675, -0.02125</td>
+</tr>
+<tr>
+<td><code>yq_Joint</code></td>
+<td>continuous</td>
+<td><code>base_link</code> → <code>yq_Link</code></td>
+<td>右前輪</td>
+<td>0.0455, -0.0675, -0.02125</td>
+</tr>
+<tr>
+<td><code>yh_Joint</code></td>
+<td>continuous</td>
+<td><code>base_link</code> → <code>yh_Link</code></td>
+<td>右後輪</td>
+<td>-0.0495, -0.0675, -0.02125</td>
+</tr>
+<tr>
+<td><code>zh_Joint</code></td>
+<td>continuous</td>
+<td><code>base_link</code> → <code>zh_Link</code></td>
+<td>左後輪</td>
+<td>-0.0495, 0.0675, -0.02125</td>
+</tr>
+<tr>
+<td><code>imu_Joint</code></td>
+<td>fixed</td>
+<td><code>base_link</code> → <code>imu_Link</code></td>
+<td>IMU</td>
+<td>-0.003, -0.003, 0.0317</td>
+</tr>
+<tr>
+<td><code>radar_Joint</code></td>
+<td>fixed</td>
+<td><code>base_link</code> → <code>radar_Link</code></td>
+<td>MS200 光達</td>
+<td>0, 0, 0.0789</td>
+</tr>
+<tr>
+<td><code>jq1_Joint</code></td>
+<td>revolute（繞 z，±1.57 rad）</td>
+<td><code>base_link</code> → <code>jq1_Link</code></td>
+<td>雲台左右（舵機 S1）</td>
+<td>0.064, 0, 0.014</td>
+</tr>
+<tr>
+<td><code>jq2_Joint</code></td>
+<td>revolute（繞 y，±1.57 rad）</td>
+<td><code>jq1_Link</code> → <code>jq2_Link</code></td>
+<td>雲台上下（舵機 S2）</td>
+<td>0.0169, 0, 0.024</td>
+</tr>
+</tbody>
+</table>
+<div class="code-block">
+<div class="code-head"><span class="code-title">text</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-text">base_link（車身，約 0.22 kg）
+├── zq_Link   左前輪   ┐
+├── yq_Link   右前輪   │ continuous
+├── yh_Link   右後輪   │
+├── zh_Link   左後輪   ┘
+├── imu_Link  IMU        fixed
+├── radar_Link 光達      fixed
+└── jq1_Link  雲台左右   revolute
+    └── jq2_Link 雲台上下 revolute</code></pre>
+</div>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p><strong>URDF 的角度範圍和真實舵機不同</strong>：URDF 兩個雲台關節都寫 ±1.57 rad（±90°），但真車的 <code>/servo_s2</code> 只接受 [-90, 20] 度（往上最多 20°）。RViz 滑桿拉得到的角度，真車不一定做得到。另外原始碼的 URDF <strong>沒有相機 link</strong>；電腦模擬套件為了在 Gazebo 產生影像，多加了一個 <code>camera_link</code>。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-4" data-audio="audio/W4-4.mp3">
+<div class="sec-head"><h2>4. 在 RViz 看模型、拖關節</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>理論夠了，來動手。在 WSL 進到工作空間，載入環境，再執行 display 這個 launch 檔。它會同時開三個東西：一個是 robot state publisher，負責讀 URDF 並算出每個零件的位置；一個是關節滑桿視窗；還有 RViz。拉動滑桿，你會看到 RViz 裡的輪子跟著轉、雲台跟著擺頭。這就是本單元的過關標準。如果畫面一片空白，通常是左上角的 Fixed Frame 選錯了，把它改成 base link 就好。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cd ~/yahboom_ws &amp;&amp; source install/setup.bash
+ros2 launch microros_pi5_sim display.launch.xml      # RViz＋關節滑桿，看車的模型</code></pre>
+</div>
+<p><strong>畫面上會出現</strong></p>
+<table>
+<thead>
+<tr>
+<th>視窗</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Joint State Publisher（滑桿）</td>
+<td>6 個可動關節：<code>zq_Joint</code>、<code>yq_Joint</code>、<code>yh_Joint</code>、<code>zh_Joint</code>、<code>jq1_Joint</code>、<code>jq2_Joint</code>；<code>Randomize</code> 隨機、<code>Center</code> 全部歸零</td>
+</tr>
+<tr>
+<td>RViz</td>
+<td>3D 模型與座標軸</td>
+</tr>
+</tbody>
+</table>
+<p><strong>RViz 設定（若沒有自動設好）</strong></p>
+<ol>
+<li>左上 <strong>Global Options → Fixed Frame</strong> 選 <code>base_link</code>。</li>
+<li>左下 <strong>Add</strong> → <strong>RobotModel</strong> → Description Topic 選 <code>/robot_description</code>。</li>
+<li>再 <strong>Add</strong> → <strong>TF</strong>，勾選 Show Names，就能看到每個零件的座標軸（紅 x、綠 y、藍 z）。</li>
+</ol>
+<p><strong>觀察這些話題</strong></p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）另一個終端機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">source ~/yahboom_ws/install/setup.bash
+ros2 node list                      # /robot_state_publisher、/joint_state_publisher_gui、/rviz2
+ros2 topic echo /joint_states       # 拉滑桿時數值會變（輪子和雲台的角度，單位弧度）
+ros2 topic echo /robot_description --once   # 整份 URDF 被當成一個話題發出來</code></pre>
+</div>
+<p>資料流：滑桿 <code>joint_state_publisher_gui</code> ──<code>/joint_states</code>──▶ <code>robot_state_publisher</code>（＋URDF）──<code>/tf</code>、<code>/tf_static</code>──▶ RViz。</p></div>
+</section>
+<section class="sec card-box" id="sec-5" data-audio="audio/W4-5.mp3">
+<div class="sec-head"><h2>5. TF：座標系的家族族譜</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>TF 是 ROS 最重要、也最容易讓人頭痛的觀念，我們用族譜來想。每個零件都有自己的座標系，而每個座標系只需要記住一件事：我在爸爸的哪裡、轉了幾度。只要族譜連通，ROS 就能算出任何兩個零件的相對位置，例如光達看到的障礙物，在車身中心的哪裡。固定不動的關係放在 tf static；會變的關係，例如輪子轉動、車子移動，放在 tf。用 view frames 可以把整棵族譜畫成一個 PDF 檔。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run tf2_tools view_frames
+# 約 5 秒後在目前資料夾產生 frames 開頭的 .pdf，用檔案總管打開看
+explorer.exe .</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run tf2_ros tf2_echo base_link radar_Link   # 光達相對車身：約 z=0.079 公尺，不會變
+ros2 run tf2_ros tf2_echo base_link jq2_Link     # 拉雲台滑桿時這裡的數值會變</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>話題</th>
+<th>放什麼</th>
+<th>這台車的例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/tf_static</code></td>
+<td>永遠不變的關係（fixed joint、靜態轉換）</td>
+<td><code>base_link → radar_Link</code>、<code>base_link → imu_Link</code></td>
+</tr>
+<tr>
+<td><code>/tf</code></td>
+<td>會變的關係</td>
+<td>輪子、雲台關節；<code>odom → base_footprint</code>（車在地上的位置）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>真車跑起來之後的完整 TF 樹</strong>（依原始碼的 launch 檔整理）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">text</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-text">map（A1 建圖、A2 導航時才有）
+└── odom
+    └── base_footprint        ← EKF 融合 /odom_raw＋IMU 後發布（yahboomcar_bringup_launch.py）
+        └── base_link         ← 靜態，往上 0.05 公尺（display_launch.py／description_launch.py）
+            ├── 4 個輪子、jq1_Link → jq2_Link、imu_Link、radar_Link   ← robot_state_publisher 讀 URDF
+            ├── imu_frame     ← 靜態 TF，/imu 訊息用的 frame
+            └── laser_frame   ← 靜態 TF（建圖、導航 launch 裡），/scan 訊息用的 frame</code></pre>
+</div>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p><strong>真車上感測器的 frame 名稱和 URDF 的 link 名稱不一樣</strong>：<code>/imu</code> 用 <code>imu_frame</code>、<code>/scan</code> 用 <code>laser_frame</code>，而 URDF 裡叫 <code>imu_Link</code>、<code>radar_Link</code>。所以原廠另外用 <code>static_transform_publisher</code> 補了 <code>base_link → imu_frame</code>、<code>base_link → laser_frame</code>。在 RViz 看光達資料時，如果出現找不到 frame 的錯誤，就是這段 TF 沒有在跑（需實車確認）。電腦模擬套件則直接用 <code>radar_Link</code>、<code>imu_Link</code> 當 frame。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-6" data-audio="audio/W4-6.mp3">
+<div class="sec-head"><h2>6. 在 Gazebo 讓模擬車跑起來</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>只看模型還不夠過癮，我們讓模擬車真的跑。Gazebo 是一個物理模擬器，會模擬重力、摩擦和光達的雷射。模擬車和真車一樣，聽 cmd vel 話題的速度指令，也會發出 scan、odom、imu。也就是說，你在這裡寫的程式和下的指令，之後幾乎可以原封不動搬到真車上。啟動之後，用上一個單元學的 ros2 topic pub 讓車慢慢轉圈，再看 RViz 裡的光達紅點跟著轉動。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cd ~/yahboom_ws &amp;&amp; source install/setup.bash
+ros2 launch microros_pi5_sim sim.launch.xml          # Gazebo 模擬：車可接 /cmd_vel、發 /scan /odom /imu</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）另一個終端機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">source ~/yahboom_ws/install/setup.bash
+ros2 topic list                                     # 應看到 /cmd_vel、/scan、/odom、/imu、/tf
+ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist &quot;{linear: {x: 0.1}, angular: {z: 0.5}}&quot;
+# Ctrl+C 後再發一次零速度讓車停
+ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist &quot;{linear: {x: 0.0}, angular: {z: 0.0}}&quot;</code></pre>
+</div>
+<p><strong>在 RViz 加光達與里程</strong>（若沒有自動開 RViz，另開終端執行 <code>rviz2</code>）：</p>
+<ol>
+<li><strong>Fixed Frame</strong> 改成 <code>odom</code>（車子移動時，模型會在畫面上移動）。</li>
+<li><strong>Add → LaserScan</strong>，Topic 選 <code>/scan</code>，看到一圈紅點就是光達打到牆的位置。</li>
+<li><strong>Add → Odometry</strong>，Topic 選 <code>/odom</code>，會畫出車子走過的箭頭。</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>模擬（電腦）</th>
+<th>真車</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Gazebo 的差速驅動外掛</td>
+<td>ESP32 <code>/YB_Car_Node</code> 驅動 4 顆馬達</td>
+</tr>
+<tr>
+<td>ros_gz_bridge 把 Gazebo 話題轉成 ROS 2</td>
+<td>micro-ROS agent 把 ESP32 話題轉成 ROS 2</td>
+</tr>
+<tr>
+<td><code>/odom</code>（模擬器直接給）</td>
+<td><code>/odom_raw</code>（輪子）→ EKF → <code>/odom</code></td>
+</tr>
+<tr>
+<td><code>/scan</code>、<code>/imu</code></td>
+<td><code>/scan</code>、<code>/imu</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>模擬常見問題</strong></p>
+<table>
+<thead>
+<tr>
+<th>現象</th>
+<th>可能原因</th>
+<th>解法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Gazebo 視窗全黑或很卡</td>
+<td>WSL 的顯示卡加速不足</td>
+<td>先 <code>wsl --shutdown</code> 重開；仍不行可試 <code>LIBGL_ALWAYS_SOFTWARE=1</code> 再啟動</td>
+</tr>
+<tr>
+<td><code>ros2 topic list</code> 看不到 <code>/scan</code></td>
+<td>模擬還在載入，或終端沒 <code>source</code></td>
+<td>等 10 秒；確認有 <code>source ~/yahboom_ws/install/setup.bash</code></td>
+</tr>
+<tr>
+<td>發了 <code>/cmd_vel</code> 車不動</td>
+<td>Gazebo 暫停中，或訊息格式打錯</td>
+<td>按 Gazebo 左下播放鍵；<code>ros2 topic info /cmd_vel</code> 確認型別是 <code>geometry_msgs/msg/Twist</code></td>
+</tr>
+<tr>
+<td>RViz 跳出 frame 不存在的警告</td>
+<td>Fixed Frame 設成不存在的座標系</td>
+<td>改成 <code>odom</code> 或 <code>base_link</code></td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>真車上車體用 4 個馬達各自驅動，但轉彎方式和兩輪差速車一樣（左右兩側速度不同），所以模擬用差速驅動外掛就夠了。Humble 的教材用的是舊的 Gazebo Classic，Jazzy 用的是新的 gz sim，兩者指令不同，本課程的模擬一律以 <code>microros_pi5_sim</code> 為準。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-7" data-audio="audio/W4-7.mp3">
+<div class="sec-head"><h2>7. 真車上怎麼做</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>等車子到了，同樣的事情在車上怎麼做？先照第三單元的流程，開翻譯官、進 ROS 2 容器。然後在容器裡執行 yahboomcar description 套件的 display launch 檔，它會開關節滑桿和 robot state publisher，但不會自動開 RViz。所以要用 docker exec 再開一個終端進同一個容器，執行 rviz2，加上 RobotModel。畫面要透過 VNC 才看得到。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_description display_launch.py</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">docker ps                              # 查 ROS 2 容器的 ID
+docker exec -it &lt;容器ID&gt; /bin/bash     # 進同一個容器</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（第二個終端）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">rviz2
+# Add → RobotModel → Description Topic 選 /robot_description；Fixed Frame 改為 base_link</code></pre>
+</div>
+<p><code>display_launch.py</code> 的內容（原始碼 <code>yahboomcar_description/launch/display_launch.py</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>啟動的節點</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>joint_state_publisher_gui</code></td>
+<td>關節滑桿</td>
+</tr>
+<tr>
+<td><code>robot_state_publisher</code></td>
+<td>讀 <code>urdf/MicroROS.urdf</code>（經 <code>xacro</code> 展開），發布 TF 與 <code>/robot_description</code></td>
+</tr>
+<tr>
+<td><code>tf2_ros static_transform_publisher</code></td>
+<td><code>base_footprint → base_link</code>，<code>0 0 0.05 0 0 0</code>（車身離地 5 公分）</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>電腦模擬</th>
+<th>真車</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2 launch microros_pi5_sim display.launch.xml</code></td>
+<td><code>ros2 launch yahboomcar_description display_launch.py</code> ＋ 另開 <code>rviz2</code></td>
+</tr>
+<tr>
+<td><code>ros2 launch microros_pi5_sim sim.launch.xml</code></td>
+<td><code>sh ~/start_agent_rpi5.sh</code> ＋ 開車電源 ＋ <code>ros2 launch yahboomcar_bringup yahboomcar_bringup_launch.py</code></td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p><strong>官方文件的筆誤</strong>：05-7 把 Fixed Frame 寫成 <code>base_linke</code>，正確是 <code>base_link</code>。ROS 2 基礎課第 21 課寫 <code>ros2 launch yahboomcar_description display.launch.py</code>（以 muto 車為例），但本車原始碼的檔名是 <strong><code>display_launch.py</code></strong>（底線，不是點）。另外 <code>yahboomcar_bringup_launch.py</code> 啟動時會印 <code>robot_type = x3</code>，那是沿用其他車型的程式，不必理會。</p>
+</div></div>
+</section>
+<section class="videos card-box"><h2>📺 官方影片</h2><div class="yt-grid"><figure class="yt" data-yt="AAI_SxInfI4"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 1"><img src="https://i.ytimg.com/vi/AAI_SxInfI4/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 1</figcaption></figure><figure class="yt" data-yt="N8yGIIZQ2MM"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 2"><img src="https://i.ytimg.com/vi/N8yGIIZQ2MM/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 2</figcaption></figure></div></section>
+<section class="quiz card-box" id="quiz"><h2>📝 小測驗</h2><div class="quiz-item" data-answer="1"><p class="q">1. URDF 裡描述「兩個零件怎麼接、可以怎麼動」的是哪個元素？</p><div class="opts"><button class="opt" type="button" data-i="0">link</button><button class="opt" type="button" data-i="1">joint</button><button class="opt" type="button" data-i="2">mesh</button></div><p class="explain" hidden></p><template class="explain-text">joint 定義 parent、child、相對位置 origin、轉軸 axis 與類型；link 是零件本身。</template></div><div class="quiz-item" data-answer="0"><p class="q">2. 這台車的 zq_Link 是什麼零件？</p><div class="opts"><button class="opt" type="button" data-i="0">左前輪</button><button class="opt" type="button" data-i="1">右後輪</button><button class="opt" type="button" data-i="2">雲台</button></div><p class="explain" hidden></p><template class="explain-text">拼音縮寫：z 左、y 右、q 前、h 後，所以 zq 是左前輪；jq1／jq2 才是雲台。</template></div><div class="quiz-item" data-answer="0"><p class="q">3. 輪子的關節類型為什麼是 continuous 而不是 revolute？</p><div class="opts"><button class="opt" type="button" data-i="0">因為輪子可以無限旋轉，沒有角度上下限</button><button class="opt" type="button" data-i="1">因為輪子是固定不動的</button><button class="opt" type="button" data-i="2">因為 continuous 比較省電</button></div><p class="explain" hidden></p><template class="explain-text">continuous 是無限旋轉；revolute 有上下限，用在雲台；fixed 用在 IMU 與光達。</template></div><div class="quiz-item" data-answer="0"><p class="q">4. RViz 裡車子模型沒出現、一片空白，最先檢查什麼？</p><div class="opts"><button class="opt" type="button" data-i="0">Fixed Frame 是否設成存在的座標系，例如 base_link</button><button class="opt" type="button" data-i="1">電池電量</button><button class="opt" type="button" data-i="2">ROS_DOMAIN_ID 是否為 101</button></div><p class="explain" hidden></p><template class="explain-text">Fixed Frame 設成不存在的座標系時 RViz 畫不出東西；看模型時設 base_link，看車移動時設 odom。</template></div><div class="quiz-item" data-answer="1"><p class="q">5. 在真車上看 URDF 模型，正確的 launch 指令是？</p><div class="opts"><button class="opt" type="button" data-i="0">ros2 launch yahboomcar_description display.launch.py</button><button class="opt" type="button" data-i="1">ros2 launch yahboomcar_description display_launch.py</button><button class="opt" type="button" data-i="2">ros2 launch microros_pi5_sim display.launch.xml</button></div><p class="explain" hidden></p><template class="explain-text">本車原始碼檔名是 display_launch.py；display.launch.py 是 ROS 2 基礎課以 muto 車為例的寫法；microros_pi5_sim 是電腦上的模擬套件。</template></div><p class="quiz-score">得分：<span class="score">0</span> / 5</p></section>
+<footer class="lesson-foot card-box">
+<button class="btn primary" id="mark-done" type="button">✔ 標記為完成</button>
+<nav class="pager"><a class="btn" href="W3.html">← W3 上一單元</a><a class="btn" href="B1.html">B1 下一單元 →</a></nav>
+</footer>
+</main>
+<audio id="player" preload="none"></audio>
+<script src="app.js"></script>
+</body>
+</html>

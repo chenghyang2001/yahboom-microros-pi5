@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A1 SLAM 建圖：Gmapping、Cartographer、App 建圖｜Yahboom MicroROS-Pi5 × ROS 2 學習地圖</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-lesson">
+<header class="topbar"><a href="index.html">← 學習地圖</a><span>A1</span></header>
+<main class="container lesson" data-lesson-id="A1">
+
+<section class="lesson-head card-box" id="sec-0" data-audio="audio/A1-0.mp3">
+<div class="eyebrow"><span class="badge level-A">高級</span>
+<span class="unit-id">A1</span></div>
+<h1>SLAM 建圖：Gmapping、Cartographer、App 建圖</h1>
+<div class="meta"><span class="badge">⏱ 2 小時</span><span class="badge car-yes">🚗 真車：是</span></div>
+<dl class="goal">
+<dt>🎯 學習目標</dt><dd>搞懂 SLAM「一邊找自己、一邊畫地圖」的道理，並用車上的 Gmapping 或 Cartographer 建出一張自己房間的地圖。</dd>
+<dt>✅ 完成標準</dt><dd>建出客廳（或房間）地圖，存成 .pgm＋.yaml，並把地圖檔從容器複製到 Pi 5 主機保存。</dd>
+</dl>
+<div class="player-bar">
+<button class="btn primary" id="play-all" type="button">▶ 全部播放</button>
+<label class="rate">播放速度
+<select id="rate">
+<option value="0.8">0.8×</option><option value="1" selected>1×</option>
+<option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+</select></label>
+<span class="now-playing" id="now-playing" aria-live="polite"></span>
+</div>
+</section>
+<section class="sec card-box" id="sec-1" data-audio="audio/A1-1.mp3">
+<div class="sec-head"><h2>1. SLAM 是什麼：一邊找自己、一邊畫地圖</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>想像你被蒙著眼帶進一間沒來過的房子，拿掉眼罩後手上只有一支手電筒和一張白紙。你每走幾步，就用手電筒照照四周的牆，把看到的牆畫到紙上；同時你也要記得自己大概走了幾步、轉了幾度，才知道下一道牆該畫在紙的哪裡。這就是 SLAM，中文叫同時定位與建圖。車子的手電筒就是光達，記步數的就是輪子的里程計。</p></details>
+<div class="md"><p>SLAM（Simultaneous Localization And Mapping，同時定位與建圖）要同時解兩個互相依賴的問題：</p>
+<table>
+<thead>
+<tr>
+<th>問題</th>
+<th>白話</th>
+<th>車上靠什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>定位（Localization）</td>
+<td>「我現在在哪裡、面向哪裡？」</td>
+<td>輪子里程計＋IMU（陀螺儀）＋光達比對</td>
+</tr>
+<tr>
+<td>建圖（Mapping）</td>
+<td>「這附近的牆和障礙物長什麼樣？」</td>
+<td>光達 MS200 每圈 360 度的距離資料</td>
+</tr>
+</tbody>
+</table>
+<p>雞生蛋問題：要畫準地圖必須知道自己在哪；要知道自己在哪又得靠地圖比對。SLAM 演算法就是讓兩件事<strong>互相修正、一起變準</strong>。</p>
+<p>建出來的是一張 <strong>2D 佔據柵格地圖（occupancy grid）</strong>：把地面切成一格一格（本車預設每格 5 公分），每格是三種狀態之一：</p>
+<ul>
+<li>白色：確定是空地，車可以走</li>
+<li>黑色：確定有障礙（牆、桌腳）</li>
+<li>灰色：還沒看過、不知道</li>
+</ul>
+<p>存檔時會得到兩個檔：<code>.pgm</code>（圖片本體）＋<code>.yaml</code>（說明這張圖每格多大、原點在哪）。下一課 A2 的 Nav2 導航就是拿這兩個檔來用。</p>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>這一課是「先建圖」，下一課 A2 是「拿地圖導航」。建圖時你遙控車；導航時車自己走。兩課的地圖檔是同一份，所以這課務必把地圖存好、備份好。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-2" data-audio="audio/A1-2.mp3">
+<div class="sec-head"><h2>2. 建圖的三樣材料：/scan、/odom、TF</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>SLAM 演算法像一位廚師，要三樣材料才能下鍋。第一樣是 scan 話題，光達告訴你四周每個方向多遠有東西。第二樣是 odom 話題，里程計告訴你車子大概走了多遠、轉了多少。第三樣是 TF 座標變換，告訴演算法光達裝在車上哪個位置。少了任何一樣，地圖不是畫不出來，就是畫得歪七扭八。</p></details>
+<div class="md"><h3>2.1 三樣材料從哪來</h3>
+<table>
+<thead>
+<tr>
+<th>材料</th>
+<th>話題／來源</th>
+<th>誰發布</th>
+<th>白話</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>光達掃描</td>
+<td><code>/scan</code>（<code>sensor_msgs/LaserScan</code>）</td>
+<td>ESP32 韌體（<code>/YB_Car_Node</code>）</td>
+<td>一圈 360 個距離值，<code>frame_id</code> 是 <code>laser_frame</code></td>
+</tr>
+<tr>
+<td>里程計</td>
+<td><code>/odom_raw</code> → EKF 融合 → <code>/odom</code></td>
+<td>ESP32 發 <code>/odom_raw</code>；Pi 端 <code>ekf_filter_node</code> 融合 IMU 後發 <code>/odom</code></td>
+<td>「從開機的地方算起，我走到哪了」</td>
+</tr>
+<tr>
+<td>座標關係</td>
+<td><code>/tf</code>、<code>/tf_static</code></td>
+<td>bringup、URDF、launch 裡的靜態 TF</td>
+<td>各零件之間的相對位置</td>
+</tr>
+</tbody>
+</table>
+<h3>2.2 TF 鏈：建圖時誰負責哪一段</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">TF 樹（建圖時）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-text">map ──(SLAM 節點發布)──▶ odom ──(bringup：EKF)──▶ base_footprint ──(URDF)──▶ base_link ──(靜態 TF)──▶ laser_frame</code></pre>
+</div>
+<ul>
+<li><code>odom → base_footprint</code>：由 <code>yahboomcar_bringup_launch.py</code> 啟動的 EKF（<code>robot_localization</code>）發布。<strong>這就是為什麼每次建圖都要先跑 bringup。</strong></li>
+<li><code>base_link → laser_frame</code>：建圖 launch 檔內附的靜態 TF，原始碼逐字如下：</li>
+</ul>
+<div class="code-block">
+<div class="code-head"><span class="code-title">yahboomcar_nav/launch/map_gmapping_launch.py（原始碼節錄，不用執行）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">base_link_to_laser_tf_node = Node(
+ package=&#x27;tf2_ros&#x27;,
+ executable=&#x27;static_transform_publisher&#x27;,
+ name=&#x27;base_link_to_base_laser&#x27;,
+ arguments=[&#x27;-0.0046412&#x27;, &#x27;0&#x27; , &#x27;0.094079&#x27;,&#x27;0&#x27;,&#x27;0&#x27;,&#x27;0&#x27;,&#x27;base_link&#x27;,&#x27;laser_frame&#x27;]
+)</code></pre>
+</div>
+<p>意思是：光達在車身中心往後 0.46 公分、往上 9.4 公分，沒有旋轉。</p>
+<ul>
+<li><code>map → odom</code>：由 SLAM 節點（gmapping 或 Cartographer）發布，用來「修正里程計的累積誤差」。</li>
+</ul>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p><code>bringup</code> 裡<strong>沒有</strong>啟動光達驅動的指令——這台車的光達接在 ESP32 上，<code>/scan</code> 是 ESP32 韌體直接發的。只要 agent 連上、<code>/YB_Car_Node</code> 出現，<code>/scan</code> 就有了。</p>
+</div>
+<h3>2.3 開始前一定要做：陀螺儀初始化</h3>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p><strong>建圖、導航前，先把車斷電、穩穩放在地上，再開機並保持完全不動 5 秒</strong>，讓 IMU（陀螺儀）初始化。官方文件〈Precautions for Radar Mapping and Navigation〉特別提醒：沒做的話，車身明明沒動，RViz 裡的車子模型卻會原地旋轉或往一邊漂，整張地圖會糊掉。這是最常被跳過、卻會讓整個建圖失敗的步驟。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-3" data-audio="audio/A1-3.mp3">
+<div class="sec-head"><h2>3. 三種建圖演算法比較</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>同樣是畫地圖，不同演算法有不同個性。Gmapping 像一群人同時猜你在哪，再挑最像的那個答案，小房間又快又準，但空間一大就吃不消，而且繞一圈回到原點時不會自己對齊。Cartographer 是 Google 做的，把一小段一小段拼成子地圖，繞回原點時會發現並修正，比較適合大空間。電腦上練習則用 slam toolbox，它是 Jazzy 版最常用的建圖套件。</p></details>
+<div class="md"><table>
+<thead>
+<tr>
+<th></th>
+<th>Gmapping</th>
+<th>Cartographer</th>
+<th>slam_toolbox（電腦練習用）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>核心想法</td>
+<td>粒子濾波（RBpf）：很多「我可能在這」的猜測一起比</td>
+<td>子圖（submap）＋圖最佳化（Ceres）</td>
+<td>圖最佳化＋掃描比對</td>
+</tr>
+<tr>
+<td>迴環偵測（loop closure）</td>
+<td><strong>沒有</strong></td>
+<td>有</td>
+<td>有</td>
+</tr>
+<tr>
+<td>適合</td>
+<td>室內小空間、運算量小</td>
+<td>較大的空間</td>
+<td>一般室內，Jazzy 標準選擇</td>
+</tr>
+<tr>
+<td>本車設定檔</td>
+<td><code>/root/gmapping_ws/src/slam_gmapping/params/slam_gmapping.yaml</code></td>
+<td><code>yahboomcar_nav/params/lds_2d.lua</code></td>
+<td>Jazzy 套件內建預設值</td>
+</tr>
+<tr>
+<td>本車上可用</td>
+<td>是（從原始碼自行編譯在 <code>gmapping_ws</code>）</td>
+<td>是</td>
+<td>不在車上，電腦用</td>
+</tr>
+</tbody>
+</table>
+<p><strong>迴環偵測</strong>是什麼？你繞客廳一圈回到起點，理論上地圖的頭尾要接起來。但里程計一路累積誤差，回到原點時可能差了 20 公分，沒有迴環偵測的演算法就會畫出「兩道錯開的牆」。</p>
+<h3>3.1 Gmapping 的重要參數（<code>slam_gmapping.yaml</code> 原檔數值）</h3>
+<table>
+<thead>
+<tr>
+<th>參數</th>
+<th>值</th>
+<th>白話</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>base_frame</code> / <code>odom_frame</code> / <code>map_frame</code></td>
+<td><code>base_footprint</code> / <code>odom</code> / <code>map</code></td>
+<td>三個座標系名稱</td>
+</tr>
+<tr>
+<td><code>delta</code></td>
+<td><code>0.05</code></td>
+<td>地圖解析度，每格 5 公分</td>
+</tr>
+<tr>
+<td><code>particles</code></td>
+<td><code>30</code></td>
+<td>粒子數，越多越準但越吃 CPU</td>
+</tr>
+<tr>
+<td><code>maxUrange</code> / <code>maxRange</code></td>
+<td><code>4.0</code> / <code>6.0</code></td>
+<td>光達只拿 4 公尺內的點來畫圖</td>
+</tr>
+<tr>
+<td><code>linearUpdate</code> / <code>angularUpdate</code></td>
+<td><code>1.0</code> / <code>0.5</code></td>
+<td>走 1 公尺或轉 0.5 弧度才更新一次</td>
+</tr>
+<tr>
+<td><code>map_update_interval</code></td>
+<td><code>5.0</code></td>
+<td>每 5 秒重畫一次地圖</td>
+</tr>
+<tr>
+<td><code>xmin</code>/<code>xmax</code>/<code>ymin</code>/<code>ymax</code></td>
+<td><code>-10.0</code> / <code>10.0</code></td>
+<td>地圖最大 20 m × 20 m</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p><strong>Gmapping 點數限制</strong>：官方文件說 gmapping 只適用「單幀 2D 雷射點數少於 1440」，超過會出現 <code>[mapping-4] process has died</code>。本車 ESP32 發布的 <code>/scan</code> 依範例程式是每圈 360 點（每 1 度一點），在限制內；出廠韌體實際點數請用 <code>ros2 topic echo /scan --once</code> 數一下 <code>ranges</code> 長度確認（需實車確認）。若你以後換別的高解析光達，就要改用 Cartographer。</p>
+</div>
+<h3>3.2 Cartographer 的重要設定（<code>lds_2d.lua</code>）</h3>
+<ul>
+<li><code>tracking_frame = "base_footprint"</code>、<code>published_frame = "odom"</code>、<code>provide_odom_frame = false</code>、<code>use_odometry = true</code></li>
+<li><code>TRAJECTORY_BUILDER_2D.use_imu_data = false</code>（<strong>本車的 Cartographer 沒用 IMU</strong>，靠輪式里程計）</li>
+<li><code>min_range = 0.10</code>、<code>max_range = 3.5</code>（只用 0.1～3.5 公尺內的點）</li>
+<li><code>POSE_GRAPH.constraint_builder.min_score = 0.65</code>（迴環比對分數要夠高才採用）</li>
+</ul></div>
+</section>
+<section class="sec card-box" id="sec-4" data-audio="audio/A1-4.mp3">
+<div class="sec-head"><h2>4. 車上實作：Gmapping 建圖到存檔</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>現在上車實作。整個流程像蓋房子要照順序：先開翻譯官 agent，讓 ESP32 接上 ROS；再進容器啟動底層 bringup，讓里程計和座標變換跑起來；接著開 RViz 看畫面，再啟動建圖節點，最後用鍵盤或手把慢慢開車繞一圈，存檔。順序錯了，最常見的結果就是 RViz 一片空白。</p></details>
+<div class="md"><h3>4.1 前置：agent 與容器</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機（終端 1）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">sh ~/start_agent_rpi5.sh</code></pre>
+</div>
+<p>啟動後按一下 microROS 控制板上的 <strong>Reset</strong> 鈕，等畫面出現連線成功。開機時桌面通常已自動開好 agent 視窗，<strong>不要再開第二個</strong>（agent 只能開一個）。</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機（終端 2）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">sh ros2_humble.sh</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 node list</code></pre>
+</div>
+<p>看到 <code>/YB_Car_Node</code> 才繼續。</p>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p><strong>多開終端要進「同一個」容器</strong>。官方文件每課都只寫「再開一個終端」，但每執行一次 <code>sh ros2_humble.sh</code> 就會開一個<strong>全新的容器</strong>。第 2 個以後的終端請在 Pi 5 主機這樣做：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機（終端 3、4、5…）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">docker ps -a
+docker exec -it &lt;你的 CONTAINER ID&gt; /bin/bash</code></pre>
+</div>
+<p><code>&lt;你的 CONTAINER ID&gt;</code> 換成 <code>docker ps -a</code> 最上面那筆、IMAGE 是 <code>yahboomtechnology/ros-humble:4.0.3</code> 的 ID（每次都不同；文件範例的 <code>ef0e1b7da319</code> 不能照抄）。</p>
+</div>
+<h3>4.2 四個終端依序啟動</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（終端 A：底層）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_bringup yahboomcar_bringup_launch.py</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（終端 B：RViz，此時還沒有地圖是正常的）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_nav display_launch.py</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（終端 C：Gmapping 建圖）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_nav map_gmapping_launch.py</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（終端 D：遙控，鍵盤或手把二選一）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash"># 鍵盤
+ros2 run yahboomcar_ctrl yahboom_keyboard
+# 手把（兩行各開一個終端）
+ros2 run yahboomcar_ctrl yahboom_joy
+ros2 run joy joy_node</code></pre>
+</div>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>RViz 要在 VNC 桌面上才看得到視窗。Pi 5 跑 RViz 會有點卡，A5 會教你改在電腦上開 RViz。</p>
+</div>
+<h3>4.3 開車技巧</h3>
+<ul>
+<li><strong>慢慢走</strong>：官方原文就是 slowly walk。線速度調低，<strong>轉彎尤其要慢</strong>，否則前後兩圈光達對不上，地圖會出現重影。</li>
+<li>先沿著牆走一圈，再進房間中央補灰色區域。</li>
+<li>回到起點後再多走一小段，讓地圖頭尾接上（Gmapping 沒有迴環偵測，起點附近要更小心）。</li>
+<li>地圖中灰色區域都變白或黑了，再存檔。</li>
+</ul>
+<h3>4.4 存地圖</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（終端 E）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_nav save_map_launch.py</code></pre>
+</div>
+<p>存在 <code>/root/yahboomcar_ws/src/yahboomcar_nav/maps/</code>，檔名 <code>yahboom_map.pgm</code> 與 <code>yahboom_map.yaml</code>。原始碼裡這個 launch 有一個 <code>map_path</code> 參數，想存成別的名字可以這樣（不用加副檔名）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_nav save_map_launch.py map_path:=/root/yahboomcar_ws/src/yahboomcar_nav/maps/living_room</code></pre>
+</div>
+<p>存出來的 <code>.yaml</code> 長這樣：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">yahboom_map.yaml（範例內容）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-yaml">image: yahboom_map.pgm
+mode: trinary
+resolution: 0.05
+origin: [-10, -10, 0]
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.25</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>欄位</th>
+<th>白話</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>resolution</code></td>
+<td>每像素 0.05 公尺</td>
+</tr>
+<tr>
+<td><code>origin</code></td>
+<td>地圖左下角在世界座標的位置 (x, y, yaw)；-10 對應 Gmapping 的 <code>xmin</code>/<code>ymin</code></td>
+</tr>
+<tr>
+<td><code>occupied_thresh</code> / <code>free_thresh</code></td>
+<td>佔據機率大於 0.65 算牆、小於 0.25 算空地</td>
+</tr>
+</tbody>
+</table>
+<h3>4.5 把地圖備份到 Pi 5 主機（很重要）</h3>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p><code>ros2_humble.sh</code> 原始碼用的是 <code>docker run -it --rm ...</code>，<strong><code>--rm</code> 代表容器關掉就整個刪除</strong>，而且沒有掛載地圖資料夾。所以你存在容器內的地圖，關掉容器（或重開機）後就會消失（依原始碼推論，需實車確認）。存好地圖後，<strong>容器還開著的時候</strong>，立刻在 Pi 5 主機複製出來：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">mkdir -p ~/maps
+docker cp &lt;你的 CONTAINER ID&gt;:/root/yahboomcar_ws/src/yahboomcar_nav/maps/yahboom_map.pgm ~/maps/
+docker cp &lt;你的 CONTAINER ID&gt;:/root/yahboomcar_ws/src/yahboomcar_nav/maps/yahboom_map.yaml ~/maps/</code></pre>
+</div>
+<p>下次要用時再反向 <code>docker cp ~/maps/yahboom_map.yaml &lt;ID&gt;:/root/yahboomcar_ws/src/yahboomcar_nav/maps/</code>（<code>.pgm</code> 也要一起）。</p>
+</div>
+<h3>4.6 看看系統長什麼樣</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run rqt_graph rqt_graph
+ros2 run tf2_tools view_frames</code></pre>
+</div>
+<p><code>rqt_graph</code> 一開始沒畫面時，選 <code>Nodes/Topics (all)</code> 再按左上角重新整理。<code>view_frames</code> 會在目前目錄產生 TF 樹的 <code>.pdf</code>，可以對照 2.2 節的鏈。</p></div>
+</section>
+<section class="sec card-box" id="sec-5" data-audio="audio/A1-5.mp3">
+<div class="sec-head"><h2>5. 換成 Cartographer，以及手機 App 建圖</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>學會 Gmapping 之後，換 Cartographer 只要改一行：把建圖節點換掉，其他步驟一模一樣。手機 App 建圖則是給不想開電腦的人用的，車上會多開一個叫 rosbridge 的橋，把 ROS 的話題變成網頁看得懂的格式，手機就能直接看地圖、遙控、存檔。要注意兩種演算法存出來的檔名一樣，後存的會蓋掉先存的。</p></details>
+<div class="md"><h3>5.1 Cartographer</h3>
+<p>步驟和第 4 節完全相同，只把終端 C 換成：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（終端 C：Cartographer 建圖）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_nav map_cartographer_launch.py</code></pre>
+</div>
+<p>這個 launch 會啟動 <code>cartographer_ros</code> 的 <code>cartographer_node</code>（讀 <code>lds_2d.lua</code>），再用 <code>occupancy_grid_launch.py</code> 把子圖轉成 <code>/map</code>（解析度 <code>0.05</code>、每 <code>1.0</code> 秒發布一次），並附上同一個 <code>base_link_to_base_laser</code> 靜態 TF。</p>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>Gmapping 和 Cartographer 用 <code>save_map_launch.py</code> 存出來<strong>都叫 <code>yahboom_map</code></strong>，後存的會覆蓋先存的。想比較兩種演算法，請用 <code>map_path:=</code> 存成不同名字，例如 <code>.../maps/room_gmapping</code> 與 <code>.../maps/room_carto</code>。</p>
+</div>
+<h3>5.2 手機 App「ROS Robot」建圖</h3>
+<p><strong>rosbridge</strong> 是什麼？它把 ROS 話題轉成 WebSocket（一種網頁常用的連線方式），手機、瀏覽器不必裝 ROS 也能訂閱和發布話題。</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（終端 A）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_bringup yahboomcar_bringup_launch.py</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（終端 B，用 docker exec 進同一個容器；二選一）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_nav map_gmapping_app_launch.xml
+ros2 launch yahboomcar_nav map_cartographer_app_launch.xml</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（終端 C：相機畫面給 App 用）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch usb_cam camera.launch.py</code></pre>
+</div>
+<p>手機操作：</p>
+<ol>
+<li>手機連上和車同一個網路（車的熱點 <code>Micro_ros</code> 時，車子 IP 是 <code>10.42.0.1</code>）。</li>
+<li>開 <strong>ROS Robot</strong> App → 輸入車子 IP → 語言 <code>zh</code> 中文／<code>en</code> 英文 → 選 <strong>ROS2</strong> → Video Topic 選下方第一個 → 按 <strong>Connect</strong>。</li>
+<li>用畫面上的滑動轉盤慢慢開車走完區域。</li>
+<li>按儲存地圖 → 輸入地圖名稱 → <strong>Submit</strong>。地圖同樣存在 <code>/root/yahboomcar_ws/src/yahboomcar_nav/maps</code>，記得照 4.5 節備份。</li>
+</ol>
+<p><code>map_gmapping_app_launch.xml</code> 內部一次啟動了：<code>rosbridge_websocket_launch.xml</code>（橋）、<code>laserscan_to_point_publisher</code>（把光達點轉成 App 畫得出的格式）、<code>map_gmapping_launch.py</code>（建圖）、<code>robot_pose_publisher_launch.py</code>（車子位置給 App 顯示）、<code>yahboom_app_save_map.launch.py</code>（App 按鈕存圖）。</p>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>官方文件此處有幾個筆誤，不要照抄：畫面說明寫成 <code>Video Tpoic</code>（應為 Video Topic）、<code>rivz</code>（應為 rviz）。App 文件沒附下載連結，請在手機應用商店搜尋「ROS Robot」，以 Yahboom 官方影片畫面比對（需實車確認）。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-6" data-audio="audio/A1-6.mp3">
+<div class="sec-head"><h2>6. 電腦模擬練習版：Jazzy 的 slam_toolbox</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>車子還沒到、或想先在電腦上多練幾次，可以用模擬器。我們在電腦的 WSL 裡放了一台和這台車長得一樣的模擬車，配上 Jazzy 版最常用的 slam toolbox 來建圖。演算法和車上不同，但三樣材料、TF 鏈、慢慢開、存成 pgm 和 yaml 的流程完全一樣，觀念練熟了上車就很快。</p></details>
+<div class="md"><h3>6.1 安裝需要的套件（只做一次）</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">sudo apt update
+sudo apt install ros-jazzy-slam-toolbox ros-jazzy-nav2-map-server ros-jazzy-teleop-twist-keyboard</code></pre>
+</div>
+<h3>6.2 四個終端</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端 1：啟動模擬車</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cd ~/yahboom_ws &amp;&amp; source install/setup.bash &amp;&amp; ros2 launch microros_pi5_sim sim.launch.xml</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端 2：slam_toolbox 建圖</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">source /opt/ros/jazzy/setup.bash
+ros2 launch slam_toolbox online_async_launch.py use_sim_time:=true</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端 3：遙控</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">source /opt/ros/jazzy/setup.bash
+ros2 run teleop_twist_keyboard teleop_twist_keyboard</code></pre>
+</div>
+<p>模擬車是否吃 <code>/cmd_vel</code>（<code>Twist</code>）或需要 <code>TwistStamped</code>，依模擬套件設定而定；鍵盤按了車不動時，試 <code>ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -p stamped:=true</code>（需實機確認）。若模擬的 launch 已自帶 RViz 就不用再開；沒有的話：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端 4：RViz</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">source /opt/ros/jazzy/setup.bash
+rviz2</code></pre>
+</div>
+<p>RViz 設定：左上 <strong>Fixed Frame</strong> 改 <code>map</code> → 左下 <strong>Add</strong> → <code>By topic</code> → 加 <code>/map</code>（Map）與 <code>/scan</code>（LaserScan）。</p>
+<h3>6.3 存圖</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">mkdir -p ~/maps
+source /opt/ros/jazzy/setup.bash
+ros2 run nav2_map_server map_saver_cli -f ~/maps/room</code></pre>
+</div>
+<p>得到 <code>~/maps/room.pgm</code> 與 <code>~/maps/room.yaml</code>，下一課 A2 的模擬導航會用到。</p>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p><code>use_sim_time:=true</code> 的意思是「用模擬器的時鐘，不用電腦的真實時間」。模擬器可能跑得比真實慢，如果混用兩種時間，TF 會一直報時間戳太舊。模擬時每個節點都要加；<strong>上車時不要加</strong>（車上 launch 預設都是 <code>false</code>）。</p>
+</div>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>電腦模擬只用來理解觀念。真正的套件名、參數與指令以車上 Humble 容器為準：電腦 Jazzy 上<strong>不要期待有 gmapping 的 apt 套件</strong>，車上的 gmapping 是 Yahboom 自己從原始碼編在 <code>/root/gmapping_ws</code> 的。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-7" data-audio="audio/A1-7.mp3">
+<div class="sec-head"><h2>7. 出問題時怎麼辦</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>建圖出狀況時別慌，九成問題出在四個地方：陀螺儀沒初始化、底層 bringup 沒開、終端開到不同的容器、開車太快。先照下面的表一項一項對，大部分都能自己解決。真的不行，就整個重來一次，從車子斷電靜置五秒開始。</p></details>
+<div class="md"><table>
+<thead>
+<tr>
+<th>症狀</th>
+<th>最可能的原因</th>
+<th>怎麼做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>車沒動，RViz 裡的車模型卻原地轉圈或漂移</td>
+<td>IMU 沒初始化</td>
+<td>斷電、放平、開機後靜置 5 秒再重來</td>
+</tr>
+<tr>
+<td>RViz 一片空白、沒有地圖</td>
+<td>建圖節點還沒開，或 Fixed Frame 不是 <code>map</code></td>
+<td>確認終端 C 有在跑；RViz 左上 Fixed Frame 選 <code>map</code></td>
+</tr>
+<tr>
+<td>地圖沒出現，終端一直印 TF 相關錯誤</td>
+<td>沒開 bringup，缺 <code>odom → base_footprint</code></td>
+<td>先跑 <code>yahboomcar_bringup_launch.py</code>；用 <code>view_frames</code> 檢查 TF 樹</td>
+</tr>
+<tr>
+<td>第二個終端 <code>ros2 node list</code> 看不到 <code>/YB_Car_Node</code> 或看不到建圖節點</td>
+<td>開到另一個新容器</td>
+<td>用 <code>docker ps -a</code> ＋ <code>docker exec -it &lt;ID&gt; /bin/bash</code> 進同一個容器</td>
+</tr>
+<tr>
+<td><code>[mapping-4] process has died</code></td>
+<td>gmapping 單幀點數超過 1440</td>
+<td>檢查 <code>/scan</code> 的點數；換用 Cartographer</td>
+</tr>
+<tr>
+<td>地圖出現重影、兩道錯開的牆</td>
+<td>開太快、轉太急，或 Gmapping 沒迴環</td>
+<td>調低速度、轉彎更慢；大空間改 Cartographer</td>
+</tr>
+<tr>
+<td><code>/scan</code> 沒資料</td>
+<td>agent 沒連上</td>
+<td>Pi 5 主機確認 agent 視窗；按控制板 Reset；<code>ros2 topic hz /scan</code> 應約 10 Hz 上下</td>
+</tr>
+<tr>
+<td>存圖指令跑完卻找不到檔案</td>
+<td>存在容器內的 <code>/root/...</code>，不是 Pi 5 主機</td>
+<td>到容器內 <code>ls /root/yahboomcar_ws/src/yahboomcar_nav/maps</code>；照 4.5 節 <code>docker cp</code> 出來</td>
+</tr>
+<tr>
+<td>重開機後地圖不見了</td>
+<td>容器是 <code>--rm</code>，關掉就刪</td>
+<td>每次存圖後立刻 <code>docker cp</code> 備份到 <code>~/maps</code></td>
+</tr>
+<tr>
+<td>車子亂抖、不太聽鍵盤</td>
+<td>開機自動啟動的手把程式也在發 <code>/cmd_vel</code></td>
+<td>參考 B4 單元，先關掉自啟動手把行程</td>
+</tr>
+<tr>
+<td>蜂鳴器一直嗶嗶響、車不聽話</td>
+<td>電池低電壓</td>
+<td>存檔、關機、充電</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p><code>ros2_humble.sh</code> 原始碼裡有一行 <code>-v /tem/.X11-unix:/tmp/.X11-unix</code>，<code>/tem</code> 應為 <code>/tmp</code> 的筆誤。目前 RViz 仍能在 VNC 桌面顯示，推測是因為容器用了 <code>--net=host</code>（需實車確認）。如果你發現容器內開 RViz 出現 <code>could not connect to display</code>，先檢查這一行。</p>
+</div></div>
+</section>
+<section class="videos card-box"><h2>📺 官方影片</h2><div class="yt-grid"><figure class="yt" data-yt="PiPBBzjPaU0"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 1"><img src="https://i.ytimg.com/vi/PiPBBzjPaU0/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 1</figcaption></figure><figure class="yt" data-yt="V6b10a2W-G8"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 2"><img src="https://i.ytimg.com/vi/V6b10a2W-G8/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 2</figcaption></figure><figure class="yt" data-yt="pXILwOTkY00"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 3"><img src="https://i.ytimg.com/vi/pXILwOTkY00/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 3</figcaption></figure></div></section>
+<section class="quiz card-box" id="quiz"><h2>📝 小測驗</h2><div class="quiz-item" data-answer="0"><p class="q">1. SLAM 要同時解決哪兩個問題？</p><div class="opts"><button class="opt" type="button" data-i="0">定位與建圖</button><button class="opt" type="button" data-i="1">加速與煞車</button><button class="opt" type="button" data-i="2">影像辨識與語音辨識</button></div><p class="explain" hidden></p><template class="explain-text">SLAM 是 Simultaneous Localization And Mapping：一邊估自己在哪，一邊把看到的環境畫成地圖。</template></div><div class="quiz-item" data-answer="1"><p class="q">2. 為什麼建圖前要先執行 yahboomcar_bringup_launch.py？</p><div class="opts"><button class="opt" type="button" data-i="0">它會啟動光達馬達</button><button class="opt" type="button" data-i="1">它會發布 odom 到 base_footprint 的 TF 與融合後的里程計</button><button class="opt" type="button" data-i="2">它會自動存地圖</button></div><p class="explain" hidden></p><template class="explain-text">bringup 啟動 IMU 濾波與 EKF，發布 /odom 與 odom→base_footprint；光達資料其實是 ESP32 直接發的 /scan。</template></div><div class="quiz-item" data-answer="1"><p class="q">3. Gmapping 和 Cartographer 最大的差別之一是？</p><div class="opts"><button class="opt" type="button" data-i="0">Gmapping 有迴環偵測，Cartographer 沒有</button><button class="opt" type="button" data-i="1">Cartographer 有迴環偵測，Gmapping 沒有</button><button class="opt" type="button" data-i="2">兩者都不能存地圖</button></div><p class="explain" hidden></p><template class="explain-text">Gmapping 是粒子濾波、沒有迴環偵測；Cartographer 用子圖＋圖最佳化，繞回原點時能修正。</template></div><div class="quiz-item" data-answer="2"><p class="q">4. 在車上用 save_map_launch.py 存好地圖後，為什麼要立刻 docker cp 到 Pi 5 主機？</p><div class="opts"><button class="opt" type="button" data-i="0">因為地圖檔太大</button><button class="opt" type="button" data-i="1">因為 Nav2 只讀 Pi 5 主機上的檔案</button><button class="opt" type="button" data-i="2">因為容器以 --rm 啟動，關掉就刪除，地圖會跟著消失</button></div><p class="explain" hidden></p><template class="explain-text">ros2_humble.sh 用 docker run --rm 且沒有掛載 maps 資料夾，容器結束地圖就沒了。</template></div><div class="quiz-item" data-answer="1"><p class="q">5. 電腦模擬建圖時，slam_toolbox 指令後面為什麼要加 use_sim_time:=true？</p><div class="opts"><button class="opt" type="button" data-i="0">讓建圖變快</button><button class="opt" type="button" data-i="1">讓節點使用模擬器的時鐘，避免 TF 時間戳對不上</button><button class="opt" type="button" data-i="2">讓地圖變彩色</button></div><p class="explain" hidden></p><template class="explain-text">模擬器有自己的時鐘，所有節點都要用同一個時間來源；上車時則不要加。</template></div><p class="quiz-score">得分：<span class="score">0</span> / 5</p></section>
+<footer class="lesson-foot card-box">
+<button class="btn primary" id="mark-done" type="button">✔ 標記為完成</button>
+<nav class="pager"><a class="btn" href="M5.html">← M5 上一單元</a><a class="btn" href="A2.html">A2 下一單元 →</a></nav>
+</footer>
+</main>
+<audio id="player" preload="none"></audio>
+<script src="app.js"></script>
+</body>
+</html>

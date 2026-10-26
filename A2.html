@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A2 Nav2 自主導航｜Yahboom MicroROS-Pi5 × ROS 2 學習地圖</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-lesson">
+<header class="topbar"><a href="index.html">← 學習地圖</a><span>A2</span></header>
+<main class="container lesson" data-lesson-id="A2">
+
+<section class="lesson-head card-box" id="sec-0" data-audio="audio/A2-0.mp3">
+<div class="eyebrow"><span class="badge level-A">高級</span>
+<span class="unit-id">A2</span></div>
+<h1>Nav2 自主導航</h1>
+<div class="meta"><span class="badge">⏱ 2 小時</span><span class="badge car-yes">🚗 真車：是</span></div>
+<dl class="goal">
+<dt>🎯 學習目標</dt><dd>看懂 Nav2「地圖→定位→全域規劃→局部控制→行為樹」五個關卡，並在自己建的地圖上讓車自己走到指定位置、沿途避開障礙。</dd>
+<dt>✅ 完成標準</dt><dd>在 RViz 用 2D Pose Estimate 設好初始位置後，點一個 2D Goal Pose，車自己規劃路徑走過去並停在目標附近。</dd>
+</dl>
+<div class="player-bar">
+<button class="btn primary" id="play-all" type="button">▶ 全部播放</button>
+<label class="rate">播放速度
+<select id="rate">
+<option value="0.8">0.8×</option><option value="1" selected>1×</option>
+<option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+</select></label>
+<span class="now-playing" id="now-playing" aria-live="polite"></span>
+</div>
+</section>
+<section class="sec card-box" id="sec-1" data-audio="audio/A2-1.mp3">
+<div class="sec-head"><h2>1. Nav2 是什麼：把車從 A 送到 B 的團隊</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>上一課我們遙控車子畫出地圖，這一課要讓車自己走。想像你叫計程車：你先告訴司機你在哪裡，再說要去哪裡；司機先看地圖規劃大路線，開車時再一邊看路況閃開行人和機車，遇到塞車還會改道。Nav2 就是 ROS 2 裡做這件事的導航團隊，由好幾個各司其職的節點組成，最後輸出的只有一樣東西，就是給車子的速度命令。</p></details>
+<div class="md"><p><strong>Nav2（Navigation2）</strong> 是 ROS 2 的標準導航框架。本車用的是車上 Humble 容器裡的 <code>nav2_bringup</code>（路徑 <code>/opt/ros/humble/share/nav2_bringup/launch</code>），Yahboom 再用自己的 launch 檔與參數檔把它包起來。</p>
+<p>整個導航最後只輸出一個東西：<strong><code>/cmd_vel</code> 速度命令</strong>，跟你在 B5 單元手動 <code>ros2 topic pub /cmd_vel</code> 是同一個話題。差別只是現在由程式自己算。</p>
+<table>
+<thead>
+<tr>
+<th>你叫計程車</th>
+<th>Nav2 對應</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>司機手上的地圖</td>
+<td>Map Server 載入上一課存的 <code>.yaml</code>＋<code>.pgm</code></td>
+</tr>
+<tr>
+<td>告訴司機「我在這裡」</td>
+<td>在 RViz 點 <strong>2D Pose Estimate</strong>，交給 AMCL</td>
+</tr>
+<tr>
+<td>司機規劃走哪幾條大路</td>
+<td>Planner Server（全域規劃）</td>
+</tr>
+<tr>
+<td>開車時閃機車、行人</td>
+<td>Controller Server（局部控制，本車用 DWB）</td>
+</tr>
+<tr>
+<td>塞車時倒車、改道</td>
+<td>Behavior Server（恢復行為）＋行為樹</td>
+</tr>
+<tr>
+<td>總指揮</td>
+<td>BT Navigator（行為樹導航器）</td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section class="sec card-box" id="sec-2" data-audio="audio/A2-2.mp3">
+<div class="sec-head"><h2>2. 五個關卡：地圖、AMCL、全域規劃、局部控制、行為樹</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>Nav2 的流程可以想成五個關卡一關接一關。第一關地圖，把整間房子的牆告訴大家。第二關 AMCL 定位，用光達掃到的牆去和地圖比對，算出車子在地圖上的哪裡。第三關全域規劃，在整張地圖上畫一條從現在位置到目標的路線。第四關局部控制，只看車子周圍三公尺，一邊沿路線走一邊閃障礙。第五關行為樹，負責指揮前面四關，失敗時決定要重試、原地轉圈還是倒退。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">Nav2 資料流（示意）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-text">   上一課的地圖 yahboom_map.yaml
+              │
+        ┌─────▼─────┐        /scan（光達）
+        │ Map Server │──/map──┐     │
+        └───────────┘        ▼     ▼
+                         ┌──────────────┐   map→odom TF
+   2D Pose Estimate ───▶ │     AMCL      │ ───────────────┐
+   （初始位置）           └──────────────┘                 │
+                                                          ▼
+   2D Goal Pose ─▶ ┌───────────────┐  路徑  ┌─────────────────────┐  /cmd_vel
+   （目標）        │ Planner Server │──────▶ │ Controller Server   │ ─────────▶ ESP32 → 馬達
+                   │ NavfnPlanner   │        │ DWB（局部避障）      │
+                   └───────▲───────┘        └──────────▲──────────┘
+                           └──────── BT Navigator（行為樹總指揮）──┘
+                                      失敗 → Behavior Server：spin / backup / wait</code></pre>
+</div>
+<h3>2.1 每個元件一句話</h3>
+<table>
+<thead>
+<tr>
+<th>元件</th>
+<th>本車設定</th>
+<th>白話</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Map Server</td>
+<td>讀 <code>maps:=</code> 指定的 <code>.yaml</code></td>
+<td>把地圖發到 <code>/map</code></td>
+</tr>
+<tr>
+<td>AMCL</td>
+<td>粒子 <code>min_particles: 500</code>～<code>max_particles: 2000</code>，差速模型 <code>nav2_amcl::DifferentialMotionModel</code></td>
+<td>在<strong>已知地圖</strong>上用粒子濾波猜車在哪，發布 <code>map → odom</code> TF</td>
+</tr>
+<tr>
+<td>Planner Server</td>
+<td><code>nav2_navfn_planner/NavfnPlanner</code>，<code>use_astar: false</code>，<code>allow_unknown: true</code></td>
+<td>在整張地圖上畫路線</td>
+</tr>
+<tr>
+<td>Controller Server</td>
+<td><code>dwb_core::DWBLocalPlanner</code>，<code>controller_frequency: 20.0</code></td>
+<td>每秒 20 次算出速度命令</td>
+</tr>
+<tr>
+<td>BT Navigator</td>
+<td><code>navigate_to_pose_w_replanning_and_recovery.xml</code></td>
+<td>行為樹：一邊走一邊重新規劃，失敗就恢復</td>
+</tr>
+<tr>
+<td>Behavior Server</td>
+<td><code>spin</code>、<code>backup</code>、<code>drive_on_heading</code>、<code>assisted_teleop</code>、<code>wait</code></td>
+<td>卡住時的「招式」：原地轉、後退、等待</td>
+</tr>
+<tr>
+<td>Waypoint Follower</td>
+<td><code>stop_on_failure: false</code>，每點停 <code>200</code> 毫秒</td>
+<td>多點巡航</td>
+</tr>
+<tr>
+<td>Lifecycle Manager</td>
+<td>—</td>
+<td>依序把上面節點「開機」</td>
+</tr>
+</tbody>
+</table>
+<p><strong>AMCL 和上一課 SLAM 的差別</strong>：SLAM 是「沒有地圖，一邊畫一邊猜位置」；AMCL 是「地圖已經有了，只猜位置」。所以導航時不會再改動地圖。</p>
+<p><strong>行為樹（Behavior Tree）</strong>是什麼？像一張「做事流程圖」：先規劃 → 沿路走 → 如果失敗就清除代價地圖再試 → 再失敗就原地轉一圈 → 再失敗就後退一點。好處是流程寫在 XML 裡，不用改程式就能調整策略。</p>
+<h3>2.2 TF 鏈：導航時誰負責哪一段</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">TF 樹（導航時）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-text">map ──(AMCL)──▶ odom ──(bringup：EKF)──▶ base_footprint ──(URDF)──▶ base_link ──(靜態 TF)──▶ laser_frame</code></pre>
+</div>
+<p>和建圖時唯一的差別：<code>map → odom</code> 改由 <strong>AMCL</strong> 發布，不再是 SLAM 節點。</p>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>參數檔裡 AMCL 用 <code>base_frame_id: "base_footprint"</code>，但 <code>bt_navigator</code> 與 costmap 用 <code>robot_base_frame: base_link</code>。兩者能共存，是因為 URDF（bringup 裡的 <code>robot_state_publisher</code>）提供了 <code>base_footprint → base_link</code>。如果你看到「找不到 base_link」的錯誤，用 <code>ros2 run tf2_tools view_frames</code> 檢查這一段（需實車確認）。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-3" data-audio="audio/A2-3.mp3">
+<div class="sec-head"><h2>3. Costmap 代價地圖與 DWB 參數</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>規劃路線時，Nav2 不是直接看黑白地圖，而是看一張代價地圖。牆本身的代價最高，牆旁邊一圈也有代價，像牆壁四周塗了一層越靠近越貴的顏料，讓車子自然離牆遠一點。代價地圖分兩張：全域的那張蓋住整間房子，用來規劃大路線；局部的那張只有車子周圍三公尺見方，隨車移動，用來即時閃障礙。</p></details>
+<div class="md"><h3>3.1 兩張代價地圖</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>global costmap（全域）</th>
+<th>local costmap（局部）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>範圍</td>
+<td>整張地圖</td>
+<td>車子周圍 <code>width: 3</code> × <code>height: 3</code>（公尺），<code>rolling_window: true</code> 跟著車跑</td>
+</tr>
+<tr>
+<td>座標系</td>
+<td><code>global_frame: map</code></td>
+<td><code>global_frame: odom</code></td>
+</tr>
+<tr>
+<td>圖層</td>
+<td><code>["static_layer", "obstacle_layer", "inflation_layer"]</code></td>
+<td><code>["voxel_layer", "inflation_layer"]</code></td>
+</tr>
+<tr>
+<td>給誰用</td>
+<td>Planner（全域規劃）</td>
+<td>Controller（DWB 局部控制）</td>
+</tr>
+</tbody>
+</table>
+<p>三種圖層：</p>
+<ul>
+<li><strong>static_layer</strong>：上一課存的地圖（不會變的牆）。</li>
+<li><strong>obstacle_layer / voxel_layer</strong>：光達現在看到的障礙（會動的人、新放的箱子）；來源 <code>/scan</code>，<code>obstacle_max_range: 2.5</code> 公尺內才標成障礙。</li>
+<li><strong>inflation_layer</strong>：在障礙周圍「膨脹」一圈代價。<code>inflation_radius: 0.55</code>、<code>cost_scaling_factor: 3.0</code>。</li>
+</ul>
+<p>車子大小：<code>robot_radius: 0.22</code>（把車當成半徑 22 公分的圓）。</p>
+<h3>3.2 DWB：怎麼選出下一步的速度</h3>
+<p><strong>DWB（Dynamic Window approach B）</strong> 的做法：每次先「想像」很多組可能的速度（<code>vx_samples: 20</code>、<code>vtheta_samples: 20</code>），每組都模擬往前走 <code>sim_time: 1.7</code> 秒，得到一條條候選軌跡；再請一群<strong>評分員（critics）</strong>打分數，挑最高分的那組送出去。</p>
+<p>本車的評分員：<code>["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]</code></p>
+<table>
+<thead>
+<tr>
+<th>評分員</th>
+<th>在意什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>BaseObstacle</td>
+<td>會不會撞到東西</td>
+</tr>
+<tr>
+<td>PathDist / PathAlign</td>
+<td>有沒有貼著規劃好的路線走</td>
+</tr>
+<tr>
+<td>GoalDist / GoalAlign</td>
+<td>有沒有朝目標前進</td>
+</tr>
+<tr>
+<td>RotateToGoal</td>
+<td>快到終點時把車頭轉對方向</td>
+</tr>
+<tr>
+<td>Oscillation</td>
+<td>不要左右來回抖</td>
+</tr>
+</tbody>
+</table>
+<h3>3.3 最常調的 DWB 與目標參數（<code>dwb_nav_params.yaml</code> 原檔數值）</h3>
+<table>
+<thead>
+<tr>
+<th>參數</th>
+<th>原值</th>
+<th>調整方向</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max_vel_x</code></td>
+<td><code>0.30</code></td>
+<td>最高前進速度（m/s）。初學先調小到 0.2 比較安全</td>
+</tr>
+<tr>
+<td><code>min_vel_x</code></td>
+<td><code>-0.20</code></td>
+<td>允許倒退的最大速度</td>
+</tr>
+<tr>
+<td><code>max_vel_y</code></td>
+<td><code>0.0</code></td>
+<td><strong>必須是 0</strong>：差速車不能橫移</td>
+</tr>
+<tr>
+<td><code>max_vel_theta</code></td>
+<td><code>1.0</code></td>
+<td>最高旋轉速度（rad/s）</td>
+</tr>
+<tr>
+<td><code>acc_lim_x</code> / <code>acc_lim_theta</code></td>
+<td><code>2.5</code> / <code>3.2</code></td>
+<td>加速度上限</td>
+</tr>
+<tr>
+<td><code>sim_time</code></td>
+<td><code>1.7</code></td>
+<td>往前模擬幾秒；太長轉彎會鈍、太短容易撞</td>
+</tr>
+<tr>
+<td><code>xy_goal_tolerance</code></td>
+<td><code>0.25</code></td>
+<td>離目標 25 公分內就算到</td>
+</tr>
+<tr>
+<td><code>yaw_goal_tolerance</code></td>
+<td><code>0.25</code></td>
+<td>車頭方向差 0.25 弧度內就算到</td>
+</tr>
+<tr>
+<td><code>inflation_radius</code></td>
+<td><code>0.55</code></td>
+<td>膨脹半徑；窄走廊過不去時可試著調小</td>
+</tr>
+</tbody>
+</table>
+<p>另外 <code>velocity_smoother</code> 還會把速度再限制在 <code>max_velocity: [0.26, 0.0, 1.0]</code>。</p>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>想改參數，不要直接改車上原檔。先複製一份，再用 <code>params_file:=</code> 指定：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cp /root/yahboomcar_ws/src/yahboomcar_nav/params/dwb_nav_params.yaml /root/my_nav_params.yaml
+nano /root/my_nav_params.yaml
+ros2 launch yahboomcar_nav navigation_dwb_launch.py params_file:=/root/my_nav_params.yaml</code></pre>
+</div>
+<p>容器內若沒有 <code>nano</code> 就用 <code>vi</code>。記得改好的檔案也要像 A1 一樣 <code>docker cp</code> 到 Pi 5 主機備份，因為容器關掉就消失。</p>
+</div>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>官方文件裡 <code>velocity_smoother</code> 那段縮排在 <code>waypoint_follower</code> 底下，那是文件排版錯誤，實際檔案以車上為準。另外 <code>navigation_dwb_launch.py</code> 原始碼裡有個參數拼成 <code>namespece</code>（應為 namespace），單車導航用不到，不要被搞混。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-4" data-audio="audio/A2-4.mp3">
+<div class="sec-head"><h2>4. 車上實作：載入地圖、設初始位置、點目標</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>上車實作分三步。第一步，和建圖一樣開 agent、進容器、跑底層 bringup。第二步，開 RViz 再啟動導航，導航啟動後地圖才會出現。第三步最關鍵：先用 2D Pose Estimate 告訴車子它在地圖的哪裡，看光達的紅點有沒有貼齊地圖的牆；貼齊了，再用 2D Goal Pose 點目標。初始位置給錯，是導航亂跑的第一名原因。</p></details>
+<div class="md"><h3>4.1 前置</h3>
+<ol>
+<li><strong>車子斷電、放穩、開機後靜置 5 秒</strong>（IMU 初始化）。</li>
+<li>把車放在建圖時的起點附近，車頭朝向也盡量相同，等一下比較好設初始位置。</li>
+<li>開 agent 與容器（同 A1 第 4.1 節）：</li>
+</ol>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機（終端 1）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">sh ~/start_agent_rpi5.sh</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機（終端 2）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">sh ros2_humble.sh</code></pre>
+</div>
+<ol>
+<li>如果容器是新開的，上一課存的地圖已經不在容器裡，先從 Pi 5 主機放回去：</li>
+</ol>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">docker ps -a
+docker cp ~/maps/yahboom_map.yaml &lt;你的 CONTAINER ID&gt;:/root/yahboomcar_ws/src/yahboomcar_nav/maps/
+docker cp ~/maps/yahboom_map.pgm &lt;你的 CONTAINER ID&gt;:/root/yahboomcar_ws/src/yahboomcar_nav/maps/</code></pre>
+</div>
+<h3>4.2 三個終端</h3>
+<p>第 2 個以後的終端都用 <code>docker exec -it &lt;ID&gt; /bin/bash</code> 進同一個容器。</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（終端 A：底層）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_bringup yahboomcar_bringup_launch.py</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（終端 B：RViz）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_nav display_launch.py</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（終端 C：導航）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_nav navigation_dwb_launch.py</code></pre>
+</div>
+<p>預設載入 <code>/root/yahboomcar_ws/src/yahboomcar_nav/maps/yahboom_map.yaml</code>。要換地圖，用 Yahboom launch 的參數名 <strong><code>maps</code></strong>（注意有 s）並給完整路徑：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_nav navigation_dwb_launch.py maps:=/root/yahboomcar_ws/src/yahboomcar_nav/maps/living_room.yaml</code></pre>
+</div>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p><code>navigation_dwb_launch.py</code> 做了四件事：include 官方 <code>nav2_bringup</code> 的 <code>bringup_launch.py</code>（傳入地圖、<code>use_sim_time</code>、參數檔）、啟動 <code>stop_car</code> 節點、發布光達靜態 TF <code>base_link_to_base_laser</code>。<code>stop_car</code> 的用途是：你按 <strong>Ctrl+C</strong> 結束導航時，它會送一次全部為 0 的 <code>/cmd_vel</code>，避免車子帶著最後的速度繼續衝。</p>
+</div>
+<h3>4.3 在 RViz 操作</h3>
+<ol>
+<li><strong>設初始位置</strong>：工具列點 <strong>2D Pose Estimate</strong> → 在地圖上車子實際所在位置<strong>按住</strong> → 往車頭方向<strong>拖曳</strong>出箭頭 → 放開。</li>
+<li><strong>檢查</strong>：光達掃到的點（<code>/scan</code>）應該大致<strong>貼齊</strong>地圖上的黑色牆線。沒貼齊就再設一次；也可以遙控車子原地慢慢轉一圈，讓 AMCL 自己收斂。</li>
+<li><strong>單點導航</strong>：工具列點 <strong>2D Goal Pose</strong> → 在地圖空白處按住並拖出目標方向 → 放開。車會規劃路徑、出發、避障，到點停下。</li>
+<li><strong>試避障</strong>：車子行走時，在它前方放一個紙箱，看它怎麼繞過去。</li>
+</ol>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>導航時請在旁邊看著，手放在車子電源開關附近。第一次測試先把 <code>max_vel_x</code> 調小（見 3.3 的 tip）。導航中如果用手把或鍵盤搶控制，兩邊同時發 <code>/cmd_vel</code> 車子會抖動。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-5" data-audio="audio/A2-5.mp3">
+<div class="sec-head"><h2>5. 多點巡航與手機 App 導航</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>學會單點導航後，可以讓車子依序經過好幾個點，像保全巡邏一樣。做法是在 RViz 加上 Nav2 的面板，切到航點模式，一次點好幾個目標，再按開始。不想開電腦的話，手機的 ROS Robot App 也能導航，流程一樣是先設初始點、再設導航點，只是按鈕換到手機上。</p></details>
+<div class="md"><h3>5.1 多點巡航（Waypoint）</h3>
+<ol>
+<li>RViz 左上選單 <strong>Panels → Add New Panel</strong> → 加入 <strong>Navigation 2</strong> 面板（Nav2 的 RViz 外掛）。</li>
+<li>面板上點 <strong>Waypoint / Nav Through Poses Mode</strong>。</li>
+<li>用工具列的 <strong>Nav2 Goal</strong> 依序在地圖上點多個目標。</li>
+<li>按 <strong>Start Waypoint Following</strong>。車會依序到每個點，到最後一點停下，等你下一個指令。</li>
+</ol>
+<p><code>waypoint_follower</code> 設定 <code>stop_on_failure: false</code>：某一點到不了會跳過，繼續下一點。</p>
+<h3>5.2 手機 App「ROS Robot」導航</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（終端 A）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_bringup yahboomcar_bringup_launch.py</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（終端 B：App 導航，換成你自己的地圖檔名）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_nav navigation_dwb_app_launch.xml maps:=/root/yahboomcar_ws/src/yahboomcar_nav/maps/yahboom_map.yaml</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（終端 C：相機）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch usb_cam camera.launch.py</code></pre>
+</div>
+<p>手機：連線步驟同 A1 第 5.2 節 → 進入 <strong>Navigation</strong> 介面 → <strong>先</strong>按 <strong>Set Initialization Point</strong> 設初始點（雷射點與牆大致重合就是準）→ <strong>再</strong>按 <strong>Set Navigation Point</strong> 設目標。</p>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>官方文件的範例指令是 <code>maps:=/root/yahboomcar_ws/src/yahboomcar_nav/maps/test1219.yaml</code>，<code>test1219.yaml</code> 是作者自己存的地圖，你的車上用的是你自己存的檔名（例如 <code>yahboom_map.yaml</code>）。文件排版把這行折成兩行，實際要打成同一行。另外文件裡 <code>navigation_dwb_app_launch.xml</code> 的第一行寫成 <code>&lt;launch</code> 少了 <code>&gt;</code>，是排版錯字，車上的檔案是正常的。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-6" data-audio="audio/A2-6.mp3">
+<div class="sec-head"><h2>6. 電腦模擬練習版：Jazzy 的 nav2_bringup</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>電腦模擬可以讓你放心地亂點目標、故意把初始位置設錯，看看導航會怎麼出錯，不怕撞壞車。這裡有兩種玩法：第一種拿上一課存的 room 地圖，用 AMCL 定位再導航，和車上的流程一模一樣；第二種不用地圖，讓 slam toolbox 一邊建圖、Nav2 一邊導航，適合探索沒來過的地方。</p></details>
+<div class="md"><h3>6.1 安裝（只做一次）</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">sudo apt update
+sudo apt install ros-jazzy-navigation2 ros-jazzy-nav2-bringup</code></pre>
+</div>
+<h3>6.2 玩法一：用存好的地圖導航（AMCL）</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端 1：模擬車</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cd ~/yahboom_ws &amp;&amp; source install/setup.bash &amp;&amp; ros2 launch microros_pi5_sim sim.launch.xml</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端 2：Nav2（載入 A1 存的地圖）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cd ~/yahboom_ws &amp;&amp; source install/setup.bash
+ros2 launch microros_pi5_sim nav2.launch.xml map:=$HOME/maps/room.yaml
+# 不加 map:= 就用套件內附、在模擬小屋建好的地圖</code></pre>
+</div>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p><code>microros_pi5_sim nav2.launch.xml</code> 其實就是 <code>nav2_bringup bringup_launch.py</code>，只是換成為這台小車調過的參數檔 <code>config/nav2_params.yaml</code>：機器人半徑 0.12 m（官方預設 0.22 m 是給大一倍的 TurtleBot）、膨脹半徑 0.35 m、局部控制器改用 Regulated Pure Pursuit（Jazzy 預設的 MPPI 很吃 CPU，在 WSL 模擬會跟不上）。實測用官方預設參數時，車子會卡在門口，一直報「Failed to make progress」。</p>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端 3：附 Nav2 工具的 RViz</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">source /opt/ros/jazzy/setup.bash
+ros2 launch nav2_bringup rviz_launch.py</code></pre>
+</div>
+<p>在 RViz：<strong>2D Pose Estimate</strong> 設初始位置 → <strong>Nav2 Goal</strong>（或 2D Goal Pose）點目標。</p>
+<p>注意：官方 <code>nav2_bringup</code> 的參數名是 <strong><code>map</code></strong>（沒有 s），Yahboom 的 <code>navigation_dwb_launch.py</code> 則是 <strong><code>maps</code></strong>，兩者不要混用。</p>
+<h3>6.3 玩法二：邊建圖邊導航（slam_toolbox＋navigation_launch.py）</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端 2：建圖</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">source /opt/ros/jazzy/setup.bash
+ros2 launch slam_toolbox online_async_launch.py use_sim_time:=true</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端 3：只開導航，不開 AMCL 與 Map Server</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">source /opt/ros/jazzy/setup.bash
+ros2 launch nav2_bringup navigation_launch.py use_sim_time:=true params_file:=$HOME/yahboom_ws/install/microros_pi5_sim/share/microros_pi5_sim/config/nav2_params.yaml</code></pre>
+</div>
+<p>這時 <code>map → odom</code> 由 slam_toolbox 發布，所以<strong>不需要</strong> 2D Pose Estimate，直接點目標即可。</p>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>Jazzy 與車上 Humble 的 Nav2 參數格式不同：Humble 的外掛名稱寫 <code>nav2_navfn_planner/NavfnPlanner</code>、<code>nav2_behaviors/Spin</code>，新版改用 <code>::</code>（例如 <code>nav2_navfn_planner::NavfnPlanner</code>）；<code>bt_navigator</code> 的外掛清單寫法也變了。<strong>不要把車上的 <code>dwb_nav_params.yaml</code> 整份搬到 Jazzy</strong>。想讓模擬車的行為像實車，從 Jazzy 內建參數檔開始，只把數值抄過去：<code>max_vel_x: 0.30</code>、<code>robot_radius: 0.22</code>、<code>inflation_radius: 0.55</code>。Jazzy 預設的局部控制器不一定是 DWB（需實機確認），所以模擬時的閃避動作可能和車上不同。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-7" data-audio="audio/A2-7.mp3">
+<div class="sec-head"><h2>7. 出問題時怎麼辦</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>導航出錯通常有跡可循。車子一出發就亂轉，八成是初始位置沒設好；RViz 沒有地圖，多半是地圖路徑寫錯或容器裡根本沒有那個檔；車子走到一半停住原地轉，是行為樹在執行恢復動作，代表它找不到路。先看終端印出的錯誤訊息，再對照下面這張表。</p></details>
+<div class="md"><table>
+<thead>
+<tr>
+<th>症狀</th>
+<th>最可能的原因</th>
+<th>怎麼做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>車一出發就亂轉、往奇怪方向走</td>
+<td>初始位置錯誤</td>
+<td>重新 <strong>2D Pose Estimate</strong>，確認光達點貼齊牆</td>
+</tr>
+<tr>
+<td>車沒動但 RViz 車模型在漂</td>
+<td>IMU 沒初始化</td>
+<td>斷電、放平、開機靜置 5 秒，從頭重來</td>
+</tr>
+<tr>
+<td>RViz 沒有地圖</td>
+<td>地圖路徑錯、容器內沒有地圖檔（<code>--rm</code> 容器重開後就沒了）</td>
+<td><code>ls /root/yahboomcar_ws/src/yahboomcar_nav/maps</code>；用 <code>docker cp</code> 放回；確認參數名是 <code>maps:=</code></td>
+</tr>
+<tr>
+<td>地圖出現了但位置歪一大截</td>
+<td>換了地圖卻沒重設初始位置</td>
+<td>重新設 2D Pose Estimate</td>
+</tr>
+<tr>
+<td>點了目標，車子不動</td>
+<td>目標點落在膨脹區或未知區、Nav2 節點還沒全部啟動完</td>
+<td>等終端出現啟動完成的訊息；把目標點在白色空地中央</td>
+</tr>
+<tr>
+<td>走到一半停下原地轉圈、後退</td>
+<td>行為樹的恢復行為：路被擋、找不到可行路徑</td>
+<td>移開障礙；窄通道可試調小 <code>inflation_radius</code></td>
+</tr>
+<tr>
+<td>到了目標附近一直來回修正</td>
+<td>目標容許值太嚴</td>
+<td>適度放寬 <code>xy_goal_tolerance</code>、<code>yaw_goal_tolerance</code></td>
+</tr>
+<tr>
+<td>一直報 TF 錯誤、<code>transform</code> 逾時</td>
+<td>bringup 沒開，或時間戳不同步</td>
+<td>先跑 bringup；按控制板 Reset 讓車重新連 agent</td>
+</tr>
+<tr>
+<td>車子抖動、忽快忽慢</td>
+<td>自啟動的手把程式也在發 <code>/cmd_vel</code></td>
+<td>關掉自啟動手把行程（見 B4）</td>
+</tr>
+<tr>
+<td>按 Ctrl+C 後車子還在動</td>
+<td><code>stop_car</code> 沒來得及送停車</td>
+<td>手動 <code>ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"</code></td>
+</tr>
+<tr>
+<td>模擬時 Nav2 報時間相關錯誤</td>
+<td>有節點沒加 <code>use_sim_time:=true</code></td>
+<td>模擬時每個 launch 都加；實車時都不要加</td>
+</tr>
+</tbody>
+</table>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（除錯用）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run rqt_graph rqt_graph
+ros2 run tf2_tools view_frames
+ros2 topic echo /cmd_vel</code></pre>
+</div></div>
+</section>
+<section class="videos card-box"><h2>📺 官方影片</h2><div class="yt-grid"><figure class="yt" data-yt="bARf2f4_EJ8"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 1"><img src="https://i.ytimg.com/vi/bARf2f4_EJ8/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 1</figcaption></figure><figure class="yt" data-yt="WhKewkmbdT0"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 2"><img src="https://i.ytimg.com/vi/WhKewkmbdT0/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 2</figcaption></figure></div></section>
+<section class="quiz card-box" id="quiz"><h2>📝 小測驗</h2><div class="quiz-item" data-answer="1"><p class="q">1. AMCL 和上一課的 SLAM 最大的不同是？</p><div class="opts"><button class="opt" type="button" data-i="0">AMCL 會一邊建圖一邊定位</button><button class="opt" type="button" data-i="1">AMCL 在已知地圖上只負責定位</button><button class="opt" type="button" data-i="2">AMCL 負責規劃路徑</button></div><p class="explain" hidden></p><template class="explain-text">AMCL 需要一張現成的地圖，用粒子濾波比對光達與地圖，算出車在哪裡並發布 map→odom。</template></div><div class="quiz-item" data-answer="0"><p class="q">2. 為什麼要先點 2D Pose Estimate 再點 2D Goal Pose？</p><div class="opts"><button class="opt" type="button" data-i="0">因為要先告訴 AMCL 車子的初始位置，否則定位錯誤會亂走</button><button class="opt" type="button" data-i="1">因為 2D Goal Pose 要等 RViz 暖機</button><button class="opt" type="button" data-i="2">沒有差別，順序可以顛倒</button></div><p class="explain" hidden></p><template class="explain-text">AMCL 需要初始位姿才能收斂；初始位姿錯誤是導航亂跑的第一原因。</template></div><div class="quiz-item" data-answer="2"><p class="q">3. local costmap 和 global costmap 的差別？</p><div class="opts"><button class="opt" type="button" data-i="0">local 涵蓋整張地圖，global 只看車子周圍</button><button class="opt" type="button" data-i="1">兩者完全一樣</button><button class="opt" type="button" data-i="2">global 給全域規劃用、涵蓋整張地圖；local 是車子周圍 3×3 公尺的滾動視窗，給局部控制用</button></div><p class="explain" hidden></p><template class="explain-text">global costmap 以 map 為座標涵蓋全圖；local costmap 以 odom 為座標、rolling_window 跟著車跑。</template></div><div class="quiz-item" data-answer="0"><p class="q">4. DWB 參數裡 max_vel_y 為什麼是 0.0？</p><div class="opts"><button class="opt" type="button" data-i="0">因為這台是差速車，不能橫向移動</button><button class="opt" type="button" data-i="1">因為設成 0 會比較快</button><button class="opt" type="button" data-i="2">因為 Y 方向是上下</button></div><p class="explain" hidden></p><template class="explain-text">四輪差速車只能前後走與原地轉，不能側移，所以 y 方向速度上限必須是 0。</template></div><div class="quiz-item" data-answer="1"><p class="q">5. 在車上要讓 navigation_dwb_launch.py 載入別張地圖，參數要怎麼寫？</p><div class="opts"><button class="opt" type="button" data-i="0">map:=地圖.yaml</button><button class="opt" type="button" data-i="1">maps:=地圖 yaml 的完整路徑</button><button class="opt" type="button" data-i="2">world:=地圖.pgm</button></div><p class="explain" hidden></p><template class="explain-text">Yahboom 的 launch 參數名是 maps（有 s）並給 .yaml 完整路徑；官方 nav2_bringup 的才是 map。</template></div><p class="quiz-score">得分：<span class="score">0</span> / 5</p></section>
+<footer class="lesson-foot card-box">
+<button class="btn primary" id="mark-done" type="button">✔ 標記為完成</button>
+<nav class="pager"><a class="btn" href="A1.html">← A1 上一單元</a><a class="btn" href="A3.html">A3 下一單元 →</a></nav>
+</footer>
+</main>
+<audio id="player" preload="none"></audio>
+<script src="app.js"></script>
+</body>
+</html>

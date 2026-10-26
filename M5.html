@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>M5 寫自己的第一個控制節點（Python）｜Yahboom MicroROS-Pi5 × ROS 2 學習地圖</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-lesson">
+<header class="topbar"><a href="index.html">← 學習地圖</a><span>M5</span></header>
+<main class="container lesson" data-lesson-id="M5">
+
+<section class="lesson-head card-box" id="sec-0" data-audio="audio/M5-0.mp3">
+<div class="eyebrow"><span class="badge level-M">中級</span>
+<span class="unit-id">M5</span></div>
+<h1>寫自己的第一個控制節點（Python）</h1>
+<div class="meta"><span class="badge">⏱ 90 分鐘</span><span class="badge car-part">🚗 真車：部分</span></div>
+<dl class="goal">
+<dt>🎯 學習目標</dt><dd>從零建立 ament_python 套件，寫一個訂閱 /scan、發布 /cmd_vel 的節點：前方 0.3 公尺內有障礙就停、否則前進，先在模擬車測，再搬到實車容器內執行。</dd>
+<dt>✅ 完成標準</dt><dd>模擬車與實車上 ros2 run my_obstacle_stop obstacle_stop 都能做到「往前走、遇到障礙在約 0.3 公尺處停下、障礙移開後繼續走」。</dd>
+</dl>
+<div class="player-bar">
+<button class="btn primary" id="play-all" type="button">▶ 全部播放</button>
+<label class="rate">播放速度
+<select id="rate">
+<option value="0.8">0.8×</option><option value="1" selected>1×</option>
+<option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+</select></label>
+<span class="now-playing" id="now-playing" aria-live="polite"></span>
+</div>
+</section>
+<section class="sec card-box" id="sec-1" data-audio="audio/M5-1.mp3">
+<div class="sec-head"><h2>1. 我們要做什麼：感測、判斷、動作</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>前一單元你用的是官方寫好的避障程式，這一單元換你自己寫一個。目標刻意訂得很小：車子一直往前走，光達看到正前方三十公分內有東西就停下，東西移開了就繼續走。雖然簡單，但它包含了所有機器人程式的骨架：訂閱感測器、做判斷、發布動作指令。我們先在電腦上的模擬車測到沒問題，再搬到真車上，這樣撞到的只會是虛擬的牆。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title"></span><button class="copy-btn" type="button">複製</button></div>
+<pre><code>/scan（sensor_msgs/LaserScan）──▶ obstacle_stop 節點 ──▶ /cmd_vel（geometry_msgs/Twist）
+        光達一圈距離                 前方 ±15° 最近距離 &lt; 0.3 m？           linear.x = 0.1 或 0</code></pre>
+</div>
+<p><strong>設計決定</strong>（每一條都是為了避免新手常見的事故）：</p>
+<table>
+<thead>
+<tr>
+<th>決定</th>
+<th>為什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>只看正前方 ±15°</td>
+<td>側邊的牆不該讓車停下</td>
+</tr>
+<tr>
+<td>過濾 <code>inf</code>、<code>nan</code>、<code>0</code> 與超出 <code>range_min</code>～<code>range_max</code> 的值</td>
+<td>無效點不過濾，會被當成「超近的障礙」</td>
+</tr>
+<tr>
+<td>用計時器固定 10 Hz 發速度，而不是收到 <code>/scan</code> 才發</td>
+<td>速度指令穩定、好除錯</td>
+</tr>
+<tr>
+<td>超過 0.5 秒沒收到 <code>/scan</code> 就停車</td>
+<td>光達斷線時不能「瞎開」</td>
+</tr>
+<tr>
+<td>停車後要退到 0.35 m 以外才再走（遲滯）</td>
+<td>避免在 0.3 m 邊界上「走、停、走、停」抖動</td>
+</tr>
+<tr>
+<td>速度、距離都做成參數</td>
+<td>不用改程式就能用 <code>ros2 param set</code> 調整（M4 學過）</td>
+</tr>
+<tr>
+<td>按 Ctrl+C 時先送零速度</td>
+<td>程式結束不會讓車帶著最後的速度繼續衝</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>這一單元會用到 W2 的節點、話題、參數觀念，以及 M4 的 <code>/scan</code> 角度公式。忘了的話先回去看一眼「第 i 條雷射的角度 = angle_min + angle_increment × i」。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-2" data-audio="audio/M5-2.mp3">
+<div class="sec-head"><h2>2. 建立工作空間與套件</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>ROS 2 的程式不是一個個散落的檔案，而是放在「套件」裡，套件再放在「工作空間」的 src 資料夾。工作空間就像一個專案資料夾，套件像專案裡的模組。我們用 ros2 pkg create 這個指令，一次產生套件需要的所有檔案骨架，包括 setup py 和 package xml，再把裡面的內容換成我們準備好的版本。我們另外開一個新的工作空間，不要和模擬車的工作空間混在一起。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">source /opt/ros/jazzy/setup.bash
+mkdir -p ~/my_ws/src
+cd ~/my_ws/src
+ros2 pkg create my_obstacle_stop --build-type ament_python \
+  --dependencies rclpy sensor_msgs geometry_msgs --node-name obstacle_stop</code></pre>
+</div>
+<p>產生出來的結構（<code>--node-name</code> 會自動幫你建好 <code>obstacle_stop.py</code> 並登記到 <code>setup.py</code>）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title"></span><button class="copy-btn" type="button">複製</button></div>
+<pre><code>~/my_ws/
+└── src/
+    └── my_obstacle_stop/
+        ├── package.xml              ← 套件名稱、依賴
+        ├── setup.py                 ← 怎麼安裝、有哪些可執行檔（entry_points）
+        ├── setup.cfg                ← 可執行檔安裝到哪裡
+        ├── resource/my_obstacle_stop   ← 空檔案，讓 ROS 找得到這個套件
+        ├── test/                    ← 自動產生的程式風格測試（可先不管）
+        └── my_obstacle_stop/
+            ├── __init__.py
+            └── obstacle_stop.py     ← 我們要寫的節點</code></pre>
+</div>
+<p>接下來三個小節，請用編輯器把檔案內容<strong>整個換掉</strong>。在 WSL 可用 <code>nano 檔名</code>（貼上後 Ctrl+O 存檔、Ctrl+X 離開），或在 Windows 用 VS Code 開 <code>\\wsl$\Ubuntu-24.04\home\&lt;你的帳號&gt;\my_ws</code>。</p></div>
+</section>
+<section class="sec card-box" id="sec-3" data-audio="audio/M5-3.mp3">
+<div class="sec-head"><h2>3. 節點程式 obstacle_stop.py</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>這支程式分成三塊。第一塊是建構時宣告參數、建立訂閱者和發布者，還有一個每零點一秒觸發一次的計時器。第二塊是光達的回呼函式，每收到一圈資料，就挑出正前方扇形裡最近的距離存起來。第三塊是計時器的回呼函式，拿最近距離和停車距離比較，決定要送前進速度還是零速度。收資料和做決定分開，是寫控制程式很重要的習慣。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）（~/my_ws/src/my_obstacle_stop/my_obstacle_stop/obstacle_stop.py）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">&quot;&quot;&quot;前方有障礙就停車、沒有就前進的第一個控制節點。
+
+訂閱 /scan（sensor_msgs/LaserScan），發布 /cmd_vel（geometry_msgs/Twist）。
+&quot;&quot;&quot;
+import math
+
+import rclpy
+from rclpy.executors import ExternalShutdownException
+from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
+from geometry_msgs.msg import Twist
+from sensor_msgs.msg import LaserScan
+
+
+class ObstacleStop(Node):
+    def __init__(self):
+        super().__init__(&#x27;obstacle_stop&#x27;)
+
+        # 參數：執行中可用 ros2 param set 修改，每次計時器觸發都重新讀取
+        self.declare_parameter(&#x27;stop_distance&#x27;, 0.3)     # 公尺，比這近就停
+        self.declare_parameter(&#x27;resume_margin&#x27;, 0.05)    # 公尺，要退到 stop_distance + 這個值才再走
+        self.declare_parameter(&#x27;forward_speed&#x27;, 0.1)     # 公尺/秒，前進速度
+        self.declare_parameter(&#x27;front_angle_deg&#x27;, 15.0)  # 度，只看正前方左右各幾度
+        self.declare_parameter(&#x27;angle_offset_deg&#x27;, 0.0)  # 度，光達裝歪或零度不在正前方時用來修正
+        self.declare_parameter(&#x27;scan_timeout&#x27;, 0.5)      # 秒，超過這麼久沒收到 /scan 就停車
+
+        # 光達資料常用「盡力傳送」QoS，用 sensor_data 設定才收得到兩種發布者
+        self.sub_scan = self.create_subscription(
+            LaserScan, &#x27;/scan&#x27;, self.scan_callback, qos_profile_sensor_data)
+        self.pub_vel = self.create_publisher(Twist, &#x27;/cmd_vel&#x27;, 10)
+
+        self.front_min = math.inf        # 前方扇形內最近距離
+        self.last_scan_time = None       # 最後一次收到 /scan 的時間
+        self.blocked = False             # 目前是否判定「被擋住」
+        self.timer = self.create_timer(0.1, self.control_loop)  # 10 Hz 送速度
+        self.get_logger().info(&#x27;obstacle_stop 已啟動，等待 /scan ...&#x27;)
+
+    def scan_callback(self, msg):
+        &quot;&quot;&quot;從一整圈資料中，找出正前方扇形內的最近距離。&quot;&quot;&quot;
+        front_angle = math.radians(self.get_parameter(&#x27;front_angle_deg&#x27;).value)
+        offset = math.radians(self.get_parameter(&#x27;angle_offset_deg&#x27;).value)
+        nearest = math.inf
+        for i, distance in enumerate(msg.ranges):
+            # 無效值：inf、nan、0，或超出光達量測範圍，一律跳過
+            if not math.isfinite(distance) or distance &lt;= 0.0:
+                continue
+            if distance &lt; msg.range_min or distance &gt; msg.range_max:
+                continue
+            angle = msg.angle_min + msg.angle_increment * i - offset
+            # 角度壓到 -pi ~ +pi，0 代表正前方、正值在左邊
+            angle = math.atan2(math.sin(angle), math.cos(angle))
+            if abs(angle) &lt;= front_angle and distance &lt; nearest:
+                nearest = distance
+        self.front_min = nearest
+        self.last_scan_time = self.get_clock().now()
+
+    def control_loop(self):
+        &quot;&quot;&quot;每 0.1 秒決定一次要停還是要走。&quot;&quot;&quot;
+        stop_distance = self.get_parameter(&#x27;stop_distance&#x27;).value
+        resume_margin = self.get_parameter(&#x27;resume_margin&#x27;).value
+        forward_speed = self.get_parameter(&#x27;forward_speed&#x27;).value
+        scan_timeout = self.get_parameter(&#x27;scan_timeout&#x27;).value
+
+        cmd = Twist()
+        if self.last_scan_time is None:
+            self.pub_vel.publish(cmd)  # 還沒收到光達：原地不動
+            return
+        age = (self.get_clock().now() - self.last_scan_time).nanoseconds / 1e9
+        if age &gt; scan_timeout:
+            self.get_logger().warn(&#x27;超過 %.1f 秒沒收到 /scan，先停車&#x27; % age,
+                                   throttle_duration_sec=2.0)
+            self.pub_vel.publish(cmd)
+            return
+
+        # 遲滯：停下來之後，要離開到更遠一點才重新出發，避免在邊界抖動
+        if self.blocked:
+            if self.front_min &gt; stop_distance + resume_margin:
+                self.blocked = False
+                self.get_logger().info(&#x27;前方淨空 %.2f m，繼續前進&#x27; % self.front_min)
+        elif self.front_min &lt; stop_distance:
+            self.blocked = True
+            self.get_logger().info(&#x27;前方 %.2f m 有障礙，停車&#x27; % self.front_min)
+
+        if not self.blocked:
+            cmd.linear.x = float(forward_speed)
+        self.pub_vel.publish(cmd)
+
+    def stop_robot(self):
+        &quot;&quot;&quot;結束前送一個零速度，讓車停下來。&quot;&quot;&quot;
+        self.pub_vel.publish(Twist())
+
+
+def init_ros(args):
+    &quot;&quot;&quot;關掉 rclpy 自帶的 Ctrl+C 處理，按 Ctrl+C 時才來得及送出停車指令。&quot;&quot;&quot;
+    try:
+        from rclpy.signals import SignalHandlerOptions
+        rclpy.init(args=args, signal_handler_options=SignalHandlerOptions.NO)
+    except ImportError:
+        rclpy.init(args=args)
+
+
+def main(args=None):
+    init_ros(args)
+    node = ObstacleStop()
+    try:
+        rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
+    finally:
+        if rclpy.ok():
+            node.stop_robot()
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+if __name__ == &#x27;__main__&#x27;:
+    main()</code></pre>
+</div>
+<p><strong>逐段重點</strong>：</p>
+<ul>
+<li><strong><code>qos_profile_sensor_data</code></strong>：QoS（Quality of Service，服務品質）決定訊息「一定要送到」還是「盡力就好」。感測器資料常用「盡力傳送」（best effort），訂閱端若要求「一定送到」（reliable）會配對失敗、一筆都收不到。訂閱端設成 sensor_data（盡力），對兩種發布者都收得到。</li>
+<li><strong>角度換算</strong>：<code>angle_min + angle_increment * i</code> 後用 <code>atan2(sin, cos)</code> 壓到 -π～+π，不管光達的 <code>angle_min</code> 是 0 還是 -π 都適用。</li>
+<li><strong><code>angle_offset_deg</code></strong>：如果實車光達的 0° 不是正前方（例如裝反了 180°），改這個參數就好，不用改程式。</li>
+<li><strong>遲滯</strong>：<code>blocked</code> 這個布林值記住「我現在是停著的」，要大於 <code>stop_distance + resume_margin</code> 才放行。</li>
+<li><strong><code>init_ros()</code></strong>：把 rclpy 內建的 Ctrl+C 處理關掉，讓 <code>KeyboardInterrupt</code> 正常拋出，<code>finally</code> 裡才來得及送零速度；<code>try/except ImportError</code> 讓同一份程式在 Humble 與 Jazzy 都能跑。</li>
+</ul></div>
+</section>
+<section class="sec card-box" id="sec-4" data-audio="audio/M5-4.mp3">
+<div class="sec-head"><h2>4. setup.py、package.xml、setup.cfg</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>程式寫好了，還要告訴 ROS 兩件事：這個套件依賴哪些其他套件，以及要把哪個 Python 函式變成可以 ros2 run 的指令。前者寫在 package xml，後者寫在 setup py 的 entry points。entry points 裡那一行的意思是：指令名稱叫 obstacle stop，執行的是套件裡 obstacle stop 這個檔案的 main 函式。指令名稱打錯一個字，ros2 run 就會說找不到可執行檔。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）（~/my_ws/src/my_obstacle_stop/setup.py）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">from setuptools import find_packages, setup
+
+package_name = &#x27;my_obstacle_stop&#x27;
+
+setup(
+    name=package_name,
+    version=&#x27;0.1.0&#x27;,
+    packages=find_packages(exclude=[&#x27;test&#x27;]),
+    data_files=[
+        (&#x27;share/ament_index/resource_index/packages&#x27;,
+            [&#x27;resource/&#x27; + package_name]),
+        (&#x27;share/&#x27; + package_name, [&#x27;package.xml&#x27;]),
+    ],
+    install_requires=[&#x27;setuptools&#x27;],
+    zip_safe=True,
+    maintainer=&#x27;student&#x27;,
+    maintainer_email=&#x27;student@example.com&#x27;,
+    description=&#x27;My first ROS 2 node: stop when an obstacle is within 0.3 m.&#x27;,
+    license=&#x27;Apache-2.0&#x27;,
+    entry_points={
+        &#x27;console_scripts&#x27;: [
+            &#x27;obstacle_stop = my_obstacle_stop.obstacle_stop:main&#x27;,
+        ],
+    },
+)</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）（~/my_ws/src/my_obstacle_stop/package.xml）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot;?&gt;
+&lt;?xml-model href=&quot;http://download.ros.org/schema/package_format3.xsd&quot; schematypens=&quot;http://www.w3.org/2001/XMLSchema&quot;?&gt;
+&lt;package format=&quot;3&quot;&gt;
+  &lt;name&gt;my_obstacle_stop&lt;/name&gt;
+  &lt;version&gt;0.1.0&lt;/version&gt;
+  &lt;description&gt;My first ROS 2 node: stop when an obstacle is within 0.3 m.&lt;/description&gt;
+  &lt;maintainer email=&quot;student@example.com&quot;&gt;student&lt;/maintainer&gt;
+  &lt;license&gt;Apache-2.0&lt;/license&gt;
+
+  &lt;exec_depend&gt;rclpy&lt;/exec_depend&gt;
+  &lt;exec_depend&gt;sensor_msgs&lt;/exec_depend&gt;
+  &lt;exec_depend&gt;geometry_msgs&lt;/exec_depend&gt;
+
+  &lt;export&gt;
+    &lt;build_type&gt;ament_python&lt;/build_type&gt;
+  &lt;/export&gt;
+&lt;/package&gt;</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）（~/my_ws/src/my_obstacle_stop/setup.cfg，自動產生的通常已經一樣）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-ini">[develop]
+script_dir=$base/lib/my_obstacle_stop
+[install]
+install_scripts=$base/lib/my_obstacle_stop</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>對應關係</th>
+<th>必須一致的地方</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>套件名 <code>my_obstacle_stop</code></td>
+<td><code>package.xml</code> 的 <code>&lt;name&gt;</code>、<code>setup.py</code> 的 <code>package_name</code>、<code>resource/</code> 底下的空檔名、內層資料夾名、<code>setup.cfg</code> 路徑</td>
+</tr>
+<tr>
+<td>指令名 <code>obstacle_stop</code></td>
+<td><code>entry_points</code> 等號左邊；<code>ros2 run my_obstacle_stop obstacle_stop</code> 的第二個字</td>
+</tr>
+<tr>
+<td>模組路徑 <code>my_obstacle_stop.obstacle_stop:main</code></td>
+<td>內層資料夾 / 檔名 / <code>def main</code></td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>這份 <code>setup.py</code> 拿掉了自動產生版本中的 <code>tests_require</code>，避免 Jazzy 較新的 setuptools 一直印棄用警告。測試資料夾 <code>test/</code> 留著沒關係，<code>colcon build</code> 不會執行它。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-5" data-audio="audio/M5-5.mp3">
+<div class="sec-head"><h2>5. 編譯與在模擬車上測試</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>現在開四個終端。第一個開模擬車，第二個編譯並執行你的節點，第三個觀察速度話題，第四個用來即時改參數。編譯用 colcon build，編譯完一定要 source 一次 install 底下的 setup bash，這個終端才認得你的新套件。每次改了程式都要重新編譯，除非你用 symlink install 的方式編譯。看到模擬車往前走、在牆前停下，就成功了一半。</p></details>
+<div class="md"><p><strong>終端 1：模擬車</strong>（模擬環境由講義另外提供，會發布 <code>/scan</code>、<code>/odom</code>、<code>/imu</code>、<code>/tf</code>，接收 <code>/cmd_vel</code>）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cd ~/yahboom_ws &amp;&amp; source install/setup.bash &amp;&amp; ros2 launch microros_pi5_sim sim.launch.xml</code></pre>
+</div>
+<p><strong>終端 2：編譯並執行</strong>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">source /opt/ros/jazzy/setup.bash
+cd ~/my_ws
+colcon build --symlink-install --packages-select my_obstacle_stop
+source install/setup.bash
+ros2 run my_obstacle_stop obstacle_stop</code></pre>
+</div>
+<p><code>--symlink-install</code> 讓 Python 檔用「捷徑」安裝，之後只改 <code>.py</code> 不用重新編譯（改 <code>setup.py</code> 或新增檔案仍要重編）。</p>
+<p><strong>終端 3：觀察</strong>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">source /opt/ros/jazzy/setup.bash
+ros2 node list                         # 看到 /obstacle_stop
+ros2 topic info /scan -v               # 看發布者與訂閱者的 QoS
+ros2 topic echo /cmd_vel               # 前進時 linear.x: 0.1，停車時 0.0
+ros2 run rqt_graph rqt_graph           # /scan → /obstacle_stop → /cmd_vel</code></pre>
+</div>
+<p><strong>終端 4：即時調參數</strong>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">source /opt/ros/jazzy/setup.bash
+ros2 param list /obstacle_stop
+ros2 param set /obstacle_stop stop_distance 0.5      # 改成 0.5 m 就停
+ros2 param set /obstacle_stop forward_speed 0.2
+# 也可以啟動時直接帶參數：
+# ros2 run my_obstacle_stop obstacle_stop --ros-args -p stop_distance:=0.4 -p forward_speed:=0.15</code></pre>
+</div>
+<p><strong>驗收</strong>（模擬車）：</p>
+<ol>
+<li>終端 2 先印 <code>obstacle_stop 已啟動，等待 /scan ...</code>。</li>
+<li>車往前走；靠近牆時印 <code>前方 0.29 m 有障礙，停車</code>，<code>/cmd_vel</code> 變成 0。</li>
+<li>在模擬器裡把車拖開或轉個方向，印 <code>前方淨空 ... m，繼續前進</code>。</li>
+<li>終端 2 按 Ctrl+C，車立刻停下、沒有錯誤訊息。</li>
+<li>關掉終端 1 的模擬車，約 0.5 秒後終端 2 印 <code>超過 ... 秒沒收到 /scan，先停車</code>。</li>
+</ol></div>
+</section>
+<section class="sec card-box" id="sec-6" data-audio="audio/M5-6.mp3">
+<div class="sec-head"><h2>6. 搬到實車：在 Docker 容器內編譯執行</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>程式在模擬車上沒問題，就可以搬到真車。要注意車上的 ROS 是裝在 Docker 容器裡的 Humble，而容器是「暫時的」，關掉後在裡面建的檔案可能就不見了。所以我們把原始碼放在 Pi 5 主機上，再複製進容器編譯；編譯好之後，可以用 docker commit 把容器存成新的映像。第一次在實車上跑，一定要把車架高讓輪子懸空，用手在光達前面晃，確認會停再放到地上。</p></details>
+<div class="md"><p><strong>步驟 1：把套件從電腦複製到 Pi 5 主機</strong>（車子 IP 以熱點模式 <code>10.42.0.1</code> 為例）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cd ~/my_ws/src
+tar czf my_obstacle_stop.tgz --exclude=__pycache__ my_obstacle_stop
+scp my_obstacle_stop.tgz pi@10.42.0.1:~/        # 密碼 yahboom</code></pre>
+</div>
+<p><strong>步驟 2：在 Pi 5 主機解開，再複製進容器</strong>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">mkdir -p ~/my_ws/src &amp;&amp; tar xzf ~/my_obstacle_stop.tgz -C ~/my_ws/src
+sh ~/start_agent_rpi5.sh                         # 終端 A：agent，按控制板 reset
+sh ros2_humble.sh                                # 終端 B：進容器
+# 終端 C（主機）：找到容器 ID，把工作空間複製進去
+docker ps -a
+docker cp ~/my_ws ef0e1b7da319:/root/            # ef0e1b7da319 換成你看到的 ID</code></pre>
+</div>
+<p><strong>步驟 3：在容器內編譯並執行</strong>（Humble 與 Jazzy 的指令完全一樣）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cd /root/my_ws
+colcon build --packages-select my_obstacle_stop
+source install/setup.bash
+ros2 topic hz /scan                              # 先確認有光達資料
+ros2 run my_obstacle_stop obstacle_stop</code></pre>
+</div>
+<p><strong>步驟 4：架高測試 → 落地測試</strong>：</p>
+<ol>
+<li>車架高，用手或紙板放在光達<strong>正前方</strong> 20 公分，應印 <code>前方 0.2x m 有障礙，停車</code>，輪子停。</li>
+<li>若手放在<strong>車後方</strong>才停，代表光達 0° 不在正前方：Ctrl+C 後改用 <code>ros2 run my_obstacle_stop obstacle_stop --ros-args -p angle_offset_deg:=180.0</code> 再試（需實車確認 MS200 的安裝方向）。</li>
+<li>放到空曠地面，速度維持 0.1 m/s，前方放紙箱，確認在約 30 公分處停下。</li>
+</ol>
+<p><strong>步驟 5（選做）：保存容器</strong>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">docker commit -m=&quot;add my_obstacle_stop&quot; ef0e1b7da319 my_humble:with_obstacle_stop
+docker images</code></pre>
+</div>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<ul>
+<li>不要在第二個終端再跑一次 <code>sh ros2_humble.sh</code>，那會開出<strong>另一個新容器</strong>，裡面沒有你剛複製的 <code>/root/my_ws</code>。多開終端一律 <code>docker exec -it &lt;ID&gt; /bin/bash</code>。</li>
+<li><code>docker commit</code> 之後，要讓 <code>ros2_humble.sh</code> 改用新映像，得編輯腳本裡的映像名稱（腳本內容需實車 <code>cat ~/ros2_humble.sh</code> 確認）。不想改腳本的話，每次重新 <code>docker cp</code> 也可以。</li>
+<li>官方第 6 課範例把 <code>while rclpy.ok()</code> 迴圈寫在節點建構式裡，那樣 <code>rclpy.spin()</code> 永遠執行不到、回呼函式也不會被呼叫。控制程式請照本單元用 <code>create_timer</code>。</li>
+</ul>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-7" data-audio="audio/M5-7.mp3">
+<div class="sec-head"><h2>7. 出問題時怎麼辦</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>自己寫的第一個節點，出問題是正常的。大部分錯誤都落在四類：找不到套件或可執行檔、收不到光達資料、收到了但判斷不對、還有參數型別打錯。先看終端機印了什麼，再用 node list、topic info、topic echo 三個指令一路往下查，很快就能找到是哪一段沒接上。</p></details>
+<div class="md"><table>
+<thead>
+<tr>
+<th>症狀</th>
+<th>原因</th>
+<th>怎麼做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Package 'my_obstacle_stop' not found</code></td>
+<td>沒在這個終端 <code>source install/setup.bash</code>，或編譯失敗</td>
+<td><code>cd ~/my_ws &amp;&amp; colcon build ... &amp;&amp; source install/setup.bash</code></td>
+</tr>
+<tr>
+<td><code>No executable found</code></td>
+<td><code>entry_points</code> 指令名或模組路徑打錯；<code>setup.cfg</code> 路徑不對</td>
+<td>對照第 4 小節的對應表；刪掉 <code>build/ install/ log/</code> 重編</td>
+</tr>
+<tr>
+<td>一直印「等待 /scan」，車不動</td>
+<td>沒有光達資料、QoS 不相容、Domain ID 不同</td>
+<td><code>ros2 topic hz /scan</code>；<code>ros2 topic info /scan -v</code> 看 QoS；<code>echo $ROS_DOMAIN_ID</code> 兩邊一致</td>
+</tr>
+<tr>
+<td>一直印「超過 … 秒沒收到 /scan」</td>
+<td>光達頻率太低或斷線</td>
+<td>先查 <code>ros2 topic hz /scan</code>；必要時 <code>ros2 param set /obstacle_stop scan_timeout 1.0</code></td>
+</tr>
+<tr>
+<td>前方明明沒東西也停</td>
+<td>車身零件或線材被掃到、光達方向偏</td>
+<td>把 <code>front_angle_deg</code> 調小（如 10.0）；確認 <code>angle_offset_deg</code></td>
+</tr>
+<tr>
+<td>在 0.3 m 附近一直走走停停</td>
+<td>遲滯太小</td>
+<td><code>ros2 param set /obstacle_stop resume_margin 0.1</code></td>
+</tr>
+<tr>
+<td><code>ros2 param set</code> 回 <code>Setting parameter failed</code></td>
+<td>型別不符，浮點數參數給了整數</td>
+<td>寫 <code>0.5</code>、<code>1.0</code>，不要寫 <code>1</code></td>
+</tr>
+<tr>
+<td>模擬車不動但 <code>/cmd_vel</code> 有值</td>
+<td>模擬沒在跑或被暫停</td>
+<td>確認終端 1 的模擬器在執行（Gazebo 左下角播放鍵）</td>
+</tr>
+<tr>
+<td><code>colcon build</code> 出現 <code>SetuptoolsDeprecationWarning</code></td>
+<td>Jazzy 較新的 setuptools</td>
+<td>警告可忽略，只要最後是 <code>Finished</code></td>
+</tr>
+<tr>
+<td>Ctrl+C 後車還在動</td>
+<td>程式異常結束沒送出零速度</td>
+<td><code>ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{}"</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>進階挑戰</strong>：</p>
+<ol>
+<li>把「停車」改成「原地左轉直到前方淨空」，就做出了自己的簡易避障。</li>
+<li>加一個發布者，太近時對 <code>/beep</code>（<code>std_msgs/UInt16</code>，<code>data: 1</code>）叫一聲（只有實車有蜂鳴器）。</li>
+<li>寫一個 launch 檔，一次啟動節點並帶入參數 YAML。</li>
+</ol></div>
+</section>
+
+<section class="quiz card-box" id="quiz"><h2>📝 小測驗</h2><div class="quiz-item" data-answer="1"><p class="q">1. ros2 run my_obstacle_stop obstacle_stop 的第二個字 obstacle_stop 是在哪裡定義的？</p><div class="opts"><button class="opt" type="button" data-i="0">package.xml 的 name</button><button class="opt" type="button" data-i="1">setup.py 的 entry_points 等號左邊</button><button class="opt" type="button" data-i="2">節點建構式的 super().__init__</button></div><p class="explain" hidden></p><template class="explain-text">entry_points 的 &#x27;obstacle_stop = my_obstacle_stop.obstacle_stop:main&#x27; 定義了可執行檔名稱；super().__init__ 定義的是節點名。</template></div><div class="quiz-item" data-answer="1"><p class="q">2. 為什麼訂閱 /scan 時要用 qos_profile_sensor_data？</p><div class="opts"><button class="opt" type="button" data-i="0">讓資料變得更準</button><button class="opt" type="button" data-i="1">盡力傳送的訂閱端可以同時配對 best effort 與 reliable 的發布者</button><button class="opt" type="button" data-i="2">可以加快光達轉速</button></div><p class="explain" hidden></p><template class="explain-text">訂閱端要求 reliable 時，遇到 best effort 的感測器發布者會配對失敗，一筆都收不到。</template></div><div class="quiz-item" data-answer="0"><p class="q">3. 停車距離 0.3 m、resume_margin 0.05 m，車停下後前方距離變成 0.33 m，車會？</p><div class="opts"><button class="opt" type="button" data-i="0">繼續停著</button><button class="opt" type="button" data-i="1">立刻前進</button><button class="opt" type="button" data-i="2">後退</button></div><p class="explain" hidden></p><template class="explain-text">遲滯設計：要大於 0.35 m 才重新出發，避免在邊界抖動。</template></div><div class="quiz-item" data-answer="0"><p class="q">4. 編譯成功後，新開的終端執行 ros2 run 卻說找不到套件，最可能少了哪一步？</p><div class="opts"><button class="opt" type="button" data-i="0">source install/setup.bash</button><button class="opt" type="button" data-i="1">重新開機</button><button class="opt" type="button" data-i="2">pip install rclpy</button></div><p class="explain" hidden></p><template class="explain-text">每個新終端都要 source 一次工作空間的 install/setup.bash，才認得你的套件。</template></div><div class="quiz-item" data-answer="1"><p class="q">5. 實車容器內編譯好套件後，又執行一次 sh ros2_humble.sh，發現套件不見了，為什麼？</p><div class="opts"><button class="opt" type="button" data-i="0">Humble 不支援 Python</button><button class="opt" type="button" data-i="1">那是另一個新容器，檔案在前一個容器裡</button><button class="opt" type="button" data-i="2">colcon 會自動刪除</button></div><p class="explain" hidden></p><template class="explain-text">多開終端要用 docker exec 進同一個容器；要永久保存可用 docker commit 或每次 docker cp。</template></div><p class="quiz-score">得分：<span class="score">0</span> / 5</p></section>
+<footer class="lesson-foot card-box">
+<button class="btn primary" id="mark-done" type="button">✔ 標記為完成</button>
+<nav class="pager"><a class="btn" href="M4.html">← M4 上一單元</a><a class="btn" href="A1.html">A1 下一單元 →</a></nav>
+</footer>
+</main>
+<audio id="player" preload="none"></audio>
+<script src="app.js"></script>
+</body>
+</html>

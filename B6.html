@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B6 狀態估測與校準：EKF、線速度與角速度校準、URDF｜Yahboom MicroROS-Pi5 × ROS 2 學習地圖</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-lesson">
+<header class="topbar"><a href="index.html">← 學習地圖</a><span>B6</span></header>
+<main class="container lesson" data-lesson-id="B6">
+
+<section class="lesson-head card-box" id="sec-0" data-audio="audio/B6-0.mp3">
+<div class="eyebrow"><span class="badge level-B">初級</span>
+<span class="unit-id">B6</span></div>
+<h1>狀態估測與校準：EKF、線速度與角速度校準、URDF</h1>
+<div class="meta"><span class="badge">⏱ 1 小時</span><span class="badge car-yes">🚗 真車：是</span></div>
+<dl class="goal">
+<dt>🎯 學習目標</dt><dd>啟動底層資料處理，理解 EKF 如何把 /imu 與 /odom_raw 融合成 /odom；用 rqt_reconfigure 完成線速度與角速度校準；在 rviz2 看到車子的 URDF 模型</dd>
+<dt>✅ 完成標準</dt><dd>用 calibrate_linear 調好 odom_linear_scale_correction 後，車子實際走 1 公尺、捲尺量誤差在 5 公分內；角速度測試轉 360 度誤差在 10 度內；rviz2 顯示車子模型並能用滑桿轉動輪子與雲台</dd>
+</dl>
+<div class="player-bar">
+<button class="btn primary" id="play-all" type="button">▶ 全部播放</button>
+<label class="rate">播放速度
+<select id="rate">
+<option value="0.8">0.8×</option><option value="1" selected>1×</option>
+<option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+</select></label>
+<span class="now-playing" id="now-playing" aria-live="polite"></span>
+</div>
+</section>
+<section class="sec card-box" id="sec-1" data-audio="audio/B6-1.mp3">
+<div class="sec-head"><h2>1. 為什麼要「融合」：輪子和陀螺儀各有盲點</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>上一課我們看到兩個會報告「車子在哪裡」的話題。odom 底線 raw 是數輪子轉了幾圈推算的，就像閉著眼睛數步數走路，走越久越偏，輪子一打滑它也不知道。imu 是陀螺儀，轉了多少角度它很敏感，但它算不出自己往前走了多遠。所以 ROS 用一個叫擴展卡爾曼濾波器的方法，簡稱 EKF，把兩邊的資料「加權平均」：位置主要相信輪子，轉向角度多相信陀螺儀，得到一個比較準的 odom。之後的建圖和導航，用的都是這個融合後的結果。</p></details>
+<div class="md"><table>
+<thead>
+<tr>
+<th>感測器</th>
+<th>擅長</th>
+<th>弱點</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>輪式里程計 <code>/odom_raw</code></td>
+<td>走了多遠、速度</td>
+<td>打滑、輪徑誤差會累積；轉彎角度容易不準</td>
+</tr>
+<tr>
+<td>IMU <code>/imu</code></td>
+<td>轉了多少角度（角速度）</td>
+<td>不知道位移；會慢慢漂移</td>
+</tr>
+<tr>
+<td>EKF 融合 <code>/odom</code></td>
+<td>兩者互補</td>
+<td>仍然會累積誤差，只是慢很多</td>
+</tr>
+</tbody>
+</table>
+<p>本課的資料流（依官方 05-4 與原始碼）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">示意圖（不用執行）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-text"> /imu ──► IMU 濾波節點 ──► /imu/data ──┐
+                                       ├──► /ekf_filter_node ──► /odom ＋ TF：odom → base_footprint
+ /odom_raw ────────────────────────────┘
+ robot_state_publisher（URDF）──► TF：base_footprint → base_link → 各輪子、雲台…</code></pre>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-2" data-audio="audio/B6-2.mp3">
+<div class="sec-head"><h2>2. 啟動底層：yahboomcar_bringup_launch.py</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>照之前的流程啟動 agent、進入容器之後，執行一行 ros2 launch，把底層資料處理一次全部打開。launch 檔就像一份開機清單，一次幫你啟動好幾個節點。這份清單裡有四樣東西：IMU 濾波、EKF 融合、一個描述陀螺儀裝在車上哪裡的靜態座標轉換，以及載入車子的 URDF 模型。啟動時畫面最上面會印出 robot type 等於 x3，那是沿用別款車的程式留下的字，不用理它。</p></details>
+<div class="md"><p>準備（同 B5）：關自動終端機 → <code>sh ~/start_agent_rpi5.sh</code>（按 Reset）→ <code>sh ros2_humble.sh</code> → 容器內暫時關掉手把。然後：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_bringup yahboomcar_bringup_launch.py</code></pre>
+</div>
+<p>這個終端機會一直被占著。開新的 Pi 5 終端機，<code>docker ps -a</code> 查 ID，<code>docker exec -it &lt;ID&gt; /bin/bash</code> 進<strong>同一個容器</strong>，然後檢查：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 node list
+ros2 node info /ekf_filter_node
+ros2 topic list | grep -E &quot;odom|imu&quot;</code></pre>
+</div>
+<p>預期 <code>/ekf_filter_node</code> 訂閱 <code>/imu/data</code> 與 <code>/odom_raw</code>，發布 <code>/odom</code>。在 VNC 桌面的終端機看關係圖：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run rqt_graph rqt_graph</code></pre>
+</div>
+<p>（沒顯示就選 <strong>Nodes/Topics (all)</strong> 再按左上角重新整理。）</p>
+<p><strong>launch 檔啟動了什麼</strong>（容器內路徑 <code>/root/yahboomcar_ws/src/yahboomcar_bringup/launch/yahboomcar_bringup_launch.py</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>內容</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IMU 濾波</td>
+<td>把 <code>/imu</code> 濾波成 <code>/imu/data</code></td>
+<td>去雜訊、估姿態</td>
+</tr>
+<tr>
+<td><code>robot_localization</code> 的 <code>ekf.launch.py</code></td>
+<td>節點 <code>ekf_filter_node</code></td>
+<td>融合，輸出 <code>/odom</code></td>
+</tr>
+<tr>
+<td><code>static_transform_publisher</code>（名稱 <code>base_link_to_base_imu</code>）</td>
+<td><code>-0.002999 -0.0030001 0.031701 0 0 0 base_link imu_frame</code></td>
+<td>告訴 ROS 陀螺儀裝在車身中心偏哪裡</td>
+</tr>
+<tr>
+<td><code>yahboomcar_description</code> 的 <code>description_launch.py</code></td>
+<td><code>robot_state_publisher</code>＋<code>joint_state_publisher</code>＋靜態 TF <code>base_footprint → base_link</code>（高 0.05 公尺）</td>
+<td>載入 URDF</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>IMU 濾波用哪個套件，文件與原始碼不一致：官方 05-4 文件寫的是 <code>imu_filter_madgwick</code> 的 <code>imu_filter.launch.py</code>；但官方原始碼包裡的 <code>yahboomcar_bringup_launch.py</code> 改成了 <code>imu_complementary_filter</code> 的 <code>complementary_filter.launch.py</code>（節點名 <code>complementary_filter_gain_node</code>）。兩者都把 <code>/imu</code> 轉成 <code>/imu/data</code>，功能相同；你的車是哪一個，用 <code>ros2 node list</code> 看（需實車確認）。另外文件寫「launch 檔位置以配套虛擬機為例」，但列的是容器內路徑 <code>/root/yahboomcar_ws/...</code>，在車上請以容器內為準。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-3" data-audio="audio/B6-3.mp3">
+<div class="sec-head"><h2>3. EKF 的設定檔讀懂三件事</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>EKF 的設定檔很長，有一大片矩陣，初學者只要看懂三件事就夠了。第一，它是二維模式，因為車子在地板上跑，不會飛起來。第二，它從哪裡拿資料：輪子里程提供位置、速度和轉向，陀螺儀只提供轉向角和轉向速度。第三，它輸出的話題被改名成 odom，並且負責發布 odom 到 base footprint 的座標轉換。有了這個座標轉換，任何程式都能問「車子現在離出發點多遠」，下一節的校準程式就是這樣算距離的。</p></details>
+<div class="md"><p>原始碼包 <code>robot_localization/params/ekf.yaml</code> 的重點（<code>ekf.launch.py</code> 把 <code>/odometry/filtered</code> 改名為 <code>/odom</code>）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-yaml">ekf_filter_node:
+    ros__parameters:
+        frequency: 30.0
+        two_d_mode: true
+        publish_tf: true
+        odom_frame: odom
+        base_link_frame: base_footprint
+        world_frame: odom
+        odom0: /odom_raw
+        odom0_config: [true, true, false,
+                       false, false, true,
+                       true, true, false,
+                       false, false, true,
+                       false, false, false]
+        imu0: /imu/data
+        imu0_config: [false, false, false,
+                      false, false, true,
+                      false, false, false,
+                      false, false, true,
+                      false, false, false]
+        imu0_relative: true</code></pre>
+</div>
+<p><code>*_config</code> 的 15 個 true／false 依序是：<code>x y z</code>、<code>roll pitch yaw</code>、<code>vx vy vz</code>、<code>vroll vpitch vyaw</code>、<code>ax ay az</code>。</p>
+<table>
+<thead>
+<tr>
+<th>來源</th>
+<th>採用的量</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/odom_raw</code></td>
+<td>x、y 位置；yaw 角；vx、vy 速度；yaw 角速度</td>
+</tr>
+<tr>
+<td><code>/imu/data</code></td>
+<td>yaw 角；yaw 角速度</td>
+</tr>
+</tbody>
+</table>
+<p>用 TF 工具直接問「車子在哪」（車子靜止時數字應該幾乎不動）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run tf2_ros tf2_echo odom base_footprint</code></pre>
+</div>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>官方 Lidar 課提醒：建圖、導航前要把車放平、靜止約 5 秒，讓 IMU 完成初始化，否則 rviz 裡的模型會自己慢慢旋轉。校準前也一樣，先靜置再開始。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-4" data-audio="audio/B6-4.mp3">
+<div class="sec-head"><h2>4. 線速度校準：叫它走 1 公尺，量量看</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>校準的想法很簡單：叫車子走一公尺，再拿捲尺量它真的走了多少。程式靠剛才的座標轉換算出「自己以為走了多遠」，乘上一個比例係數，等到它以為走滿一公尺就停車。如果捲尺量出來不是一公尺，就調整那個比例係數。調整工具叫 rqt reconfigure，是一個可以邊跑邊改參數的視窗。改完數字一定要用滑鼠點一下旁邊空白處，數字才會真的寫進去，這是官方特別提醒、很多人會漏掉的步驟。</p></details>
+<div class="md"><p><strong>場地</strong>：平坦地面，車子<strong>前後都留 1.5 公尺以上</strong>空間，旁邊放捲尺；在車輪旁地上貼一段膠帶當起點。</p>
+<p>需要三個容器終端機（第二、三個都用 <code>docker exec</code> 進同一容器）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_bringup yahboomcar_bringup_launch.py</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run yahboomcar_bringup calibrate_linear</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run rqt_reconfigure rqt_reconfigure</code></pre>
+</div>
+<p><strong>操作</strong>（官方 05-5、影片 UZIGEVnOjmY）：</p>
+<ol>
+<li>rqt_reconfigure 剛開時可能是空的，按 <strong>Refresh</strong> 才看得到節點。</li>
+<li>左邊點選 <strong><code>calibrate_linear</code></strong>。</li>
+<li>勾選 <strong><code>start_test</code></strong> → 車子開始移動，到達後自動停車，<code>start_test</code> 會自己取消勾選。</li>
+<li>用捲尺量實際移動距離。</li>
+<li>不是 1 公尺 → 修改 <strong><code>odom_linear_scale_correction</code></strong> → <strong>點一下空白處</strong> → 再勾 <code>start_test</code> 測一次。</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>參數</th>
+<th>原始碼預設</th>
+<th>意義</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_distance</code></td>
+<td><code>1.0</code></td>
+<td>測試距離（公尺）</td>
+</tr>
+<tr>
+<td><code>speed</code></td>
+<td><code>0.5</code></td>
+<td>測試時的線速度（公尺／秒）</td>
+</tr>
+<tr>
+<td><code>tolerance</code></td>
+<td><code>0.03</code></td>
+<td>容許誤差（公尺）</td>
+</tr>
+<tr>
+<td><code>odom_linear_scale_correction</code></td>
+<td><code>1.5</code></td>
+<td>比例係數：里程距離 × 係數 ＝ 程式認定的距離</td>
+</tr>
+<tr>
+<td><code>start_test</code></td>
+<td><code>False</code></td>
+<td>開始開關</td>
+</tr>
+<tr>
+<td><code>direction</code></td>
+<td><code>True</code></td>
+<td>給麥克納姆輪車測左右平移用，<strong>本車忽略</strong></td>
+</tr>
+<tr>
+<td><code>base_frame</code>／<code>odom_frame</code></td>
+<td><code>base_footprint</code>／<code>odom</code></td>
+<td>用哪兩個座標系算距離</td>
+</tr>
+</tbody>
+</table>
+<p><strong>怎麼調係數</strong>：程式在「里程 × 係數 ＝ 1 公尺」時停車。所以</p>
+<ul>
+<li>車子<strong>走太短</strong>（例如 0.8 公尺）→ 係數太大 → <strong>調小</strong>：新係數 ≈ 舊係數 × 實際距離 ÷ 1。</li>
+<li>車子<strong>走太長</strong>（例如 1.2 公尺）→ 係數太小 → <strong>調大</strong>，同一個公式。</li>
+</ul>
+<p>例：舊係數 1.5、實際走 0.8 公尺 → 新係數 ≈ 1.5 × 0.8 ＝ 1.2。</p>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>以下是讀原始碼 <code>calibrate_linear.py</code> 得到的推論，請在實車上留意（需實車確認）：</p>
+<ol>
+<li>程式把起點固定當成 <code>(0, 0)</code>，不是按下 <code>start_test</code> 當下的位置。所以<strong>每次測試前</strong>最好依序：按擴展板 Reset 讓里程歸零、重新啟動 bringup、重新啟動 <code>calibrate_linear</code>；否則第二次測試會從上一次停下的地方「接著算」。</li>
+<li>程式用 <code>copysign(speed, error)</code> 決定方向，起點時誤差是負的，<strong>車子可能是往後倒退 1 公尺</strong>而不是往前。所以前後都要留空間。</li>
+<li>這個係數只存在校準節點裡，原始碼沒有把它寫回 ESP32 或 EKF。它的用途是「量出你這台車的里程偏差有多大」，請把最後的數字抄下來，之後自己寫控制程式（M5）時可以用。</li>
+</ol>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-5" data-audio="audio/B6-5.mp3">
+<div class="sec-head"><h2>5. 角速度校準：叫它轉 360 度</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>角速度校準和線速度一模一樣，只是把「走一公尺」換成「轉一圈」。程式累加車子轉過的角度，乘上比例係數，等到它以為轉滿三百六十度就停。你要觀察車頭最後有沒有回到原本的方向。可以在地上貼一條膠帶對齊車頭，轉完看看差了幾度。轉太多或太少，就調 odom angular scale correction，一樣改完要點一下空白處。</p></details>
+<div class="md"><p>先在地上貼膠帶對齊車頭方向。三個容器終端機（同一容器）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_bringup yahboomcar_bringup_launch.py</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run yahboomcar_bringup calibrate_angular</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run rqt_reconfigure rqt_reconfigure</code></pre>
+</div>
+<p>操作同線速度：<strong>Refresh</strong> → 選 <strong><code>calibrate_angular</code></strong> → 勾 <strong><code>start_test</code></strong> → 看車頭轉完是否對齊膠帶 → 調整 <strong><code>odom_angular_scale_correction</code></strong> → 點空白處 → 再測。</p>
+<table>
+<thead>
+<tr>
+<th>參數</th>
+<th>原始碼預設</th>
+<th>意義</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_angle</code></td>
+<td><code>360.0</code></td>
+<td>測試角度（度，程式內轉成弧度）</td>
+</tr>
+<tr>
+<td><code>speed</code></td>
+<td><code>2.0</code></td>
+<td>測試時的角速度（弧度／秒）</td>
+</tr>
+<tr>
+<td><code>tolerance</code></td>
+<td><code>1.5</code></td>
+<td>容許誤差（與弧度比較）</td>
+</tr>
+<tr>
+<td><code>odom_angular_scale_correction</code></td>
+<td><code>0.75</code></td>
+<td>比例係數：里程角度 × 係數 ＝ 程式認定的角度</td>
+</tr>
+<tr>
+<td><code>start_test</code></td>
+<td><code>False</code></td>
+<td>開始開關</td>
+</tr>
+<tr>
+<td><code>base_frame</code>／<code>odom_frame</code></td>
+<td><code>base_footprint</code>／<code>odom</code></td>
+<td>用哪兩個座標系算角度</td>
+</tr>
+</tbody>
+</table>
+<p>調法同上：轉<strong>不到</strong>一圈 → 係數調小；轉<strong>超過</strong>一圈 → 係數調大；新係數 ≈ 舊係數 × 實際轉的角度 ÷ 360。</p>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>官方 05-6 文件把 <code>odom_angular_scale_correction</code> 寫成「線速度比例係數」，那是複製貼上的筆誤，它是<strong>角速度</strong>比例係數。另外依原始碼推論（需實車確認）：<code>tolerance</code> 預設 1.5 是直接和<strong>弧度</strong>比較，1.5 弧度約 86 度，車子可能提早停下；若轉不到一圈很多，可以先把 <code>tolerance</code> 改成 <code>0.05</code> 再測。程式每測一次會<strong>自動反轉方向</strong>（這次逆時針、下次順時針），而且起始角度固定當成 0，建議每次測試前也照線速度那樣重設里程。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-6" data-audio="audio/B6-6.mp3">
+<div class="sec-head"><h2>6. URDF：在 rviz2 看到車子的 3D 模型</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>最後來看車子的「數位分身」。URDF 是一種用 XML 寫的機器人說明書，記錄車子由哪些零件組成，叫做連桿，零件之間怎麼接，叫做關節，像輪子是可以一直轉的關節，雲台是有角度限制的關節。啟動 display launch 會跳出一個滑桿視窗，再開 rviz2 加入機器人模型，拖動滑桿，就能看到畫面裡的輪子和雲台跟著轉。這和暖身課 W4 在電腦上做的一樣，只是這次是在真車上。注意樹莓派跑 rviz2 會比較卡，耐心等一下。</p></details>
+<div class="md"><p><strong>先關掉第 2 節的 bringup</strong>（Ctrl+C），因為兩個 launch 都會啟動 <code>robot_state_publisher</code>，同時開會重複。然後：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_description display_launch.py</code></pre>
+</div>
+<p>另一個容器終端機（<code>docker exec</code> 進同一容器，在 VNC 桌面執行）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">rviz2</code></pre>
+</div>
+<p>rviz2 操作（官方 05-7、影片 AAI_SxInfI4）：</p>
+<ol>
+<li>左下 <strong>Add</strong> → 選 <strong>RobotModel</strong> → OK。</li>
+<li>展開 RobotModel → <strong>Description Topic</strong> 選 <strong><code>/robot_description</code></strong>。</li>
+<li>左上 Global Options → <strong>Fixed Frame</strong> 改成 <strong><code>base_link</code></strong>。</li>
+<li>用滑鼠調整視角，拖動 Joint State Publisher 視窗的滑桿。</li>
+</ol>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>官方文件寫「Fixed Frame 改為 <code>base_linke</code>」，多打了一個 e，正確是 <strong><code>base_link</code></strong>。</p>
+</div>
+<p><strong>滑桿對應的關節</strong>（URDF 檔 <code>urdf/MicroROS.urdf</code>，<code>&lt;robot name="micro4.0"&gt;</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>關節</th>
+<th>控制</th>
+<th>類型</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>zq_Joint</code></td>
+<td>左前輪（左前＝zuo qian）</td>
+<td><code>continuous</code>（無限轉動）</td>
+</tr>
+<tr>
+<td><code>yq_Joint</code></td>
+<td>右前輪</td>
+<td><code>continuous</code></td>
+</tr>
+<tr>
+<td><code>yh_Joint</code></td>
+<td>右後輪</td>
+<td><code>continuous</code></td>
+</tr>
+<tr>
+<td><code>zh_Joint</code></td>
+<td>左後輪</td>
+<td><code>continuous</code></td>
+</tr>
+<tr>
+<td><code>jq1_Joint</code></td>
+<td>雲台 1</td>
+<td>有限位，約 ±1.57 弧度（±90 度）</td>
+</tr>
+<tr>
+<td><code>jq2_Joint</code></td>
+<td>雲台 2</td>
+<td>有限位，約 ±1.57 弧度</td>
+</tr>
+<tr>
+<td>Randomize</td>
+<td>每個關節隨機給值</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Center</td>
+<td>全部回中</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><code>display_launch.py</code> 啟動三樣東西：<code>joint_state_publisher_gui</code>（滑桿視窗）、<code>robot_state_publisher</code>（把 URDF ＋ 關節角度轉成 TF 與 <code>/robot_description</code>）、靜態 TF <code>base_footprint → base_link</code>（<code>0 0 0.05 0 0 0</code>）。它和 bringup 用的 <code>description_launch.py</code> 唯一差別是滑桿版的 <code>joint_state_publisher_gui</code>。</p>
+<p>URDF 片段範例（左前輪關節，原始碼）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-xml">&lt;joint name=&quot;zq_Joint&quot; type=&quot;continuous&quot;&gt;
+  &lt;origin xyz=&quot;0.0455 0.0675 -0.02125&quot; rpy=&quot;0 0 0&quot; /&gt;
+  &lt;parent link=&quot;base_link&quot; /&gt;
+  &lt;child link=&quot;zq_Link&quot; /&gt;
+  &lt;axis xyz=&quot;0 1 0&quot; /&gt;
+&lt;/joint&gt;</code></pre>
+</div>
+<p>讀法：輪子接在 <code>base_link</code> 上，位置在車身中心前方 4.55 公分、左邊 6.75 公分、下方約 2.1 公分，繞 Y 軸（左右方向的軸）無限旋轉。</p>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>rviz2 在 Pi 5 上很吃效能。之後 A5 單元會教你在自己的電腦開 rviz2，透過網路看車上的資料，會順暢很多。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-7" data-audio="audio/B6-7.mp3">
+<div class="sec-head"><h2>7. 出問題時怎麼辦</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>這一課最常見的問題有三類。第一類是校準程式印出 transform not ready，意思是它問不到車子在哪，通常是忘了先開 bringup，或 bringup 開在另一個容器裡。第二類是 rqt reconfigure 視窗空空的，按一下 Refresh 就好。第三類是校準結果每次都不一樣，這多半跟地面打滑、電量不足、或里程沒歸零有關。換一塊不滑的地面、充飽電、每次重設里程，再取三次平均，會穩定很多。</p></details>
+<div class="md"><table>
+<thead>
+<tr>
+<th>症狀</th>
+<th>可能原因</th>
+<th>解法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>開頭印 <code>robot_type = x3</code></td>
+<td>沿用其他車型的程式</td>
+<td>正常，忽略</td>
+</tr>
+<tr>
+<td><code>ros2 node info /ekf_filter_node</code> 找不到節點</td>
+<td>bringup 沒啟動或啟動失敗</td>
+<td>看 bringup 終端機的錯誤；確認在同一個容器</td>
+</tr>
+<tr>
+<td><code>/odom</code> 一直沒資料</td>
+<td><code>/odom_raw</code> 或 <code>/imu/data</code> 沒進來</td>
+<td><code>ros2 topic hz /odom_raw</code>、<code>ros2 topic hz /imu/data</code> 逐一檢查；agent 是否連上</td>
+</tr>
+<tr>
+<td>校準程式印 <code>transform not ready</code> 後就結束了</td>
+<td>TF <code>odom → base_footprint</code> 不存在；原始碼在查不到 TF 時會丟出例外讓節點退出</td>
+<td>先啟動 bringup、等幾秒，再重新執行 <code>calibrate_linear</code>／<code>calibrate_angular</code>；確認兩者在同一容器</td>
+</tr>
+<tr>
+<td>rqt_reconfigure 視窗是空的</td>
+<td>還沒刷新</td>
+<td>按 <strong>Refresh</strong></td>
+</tr>
+<tr>
+<td>改了參數沒效果</td>
+<td>沒有點空白處寫入</td>
+<td>改完數字點一下旁邊空白處，再重勾 <code>start_test</code></td>
+</tr>
+<tr>
+<td>勾了 <code>start_test</code> 車子沒動</td>
+<td>手把節點或其他程式也在發 <code>/cmd_vel</code>；電量低</td>
+<td>關掉手把；<code>ros2 topic info /cmd_vel -v</code> 查發布者；充電</td>
+</tr>
+<tr>
+<td>車子往後退</td>
+<td>原始碼的方向判斷方式（第 4 節推論）</td>
+<td>預留後方空間；量「移動距離」即可，方向不影響係數</td>
+</tr>
+<tr>
+<td>第二次測試只走一點點就停</td>
+<td>起點固定為 (0,0)，從上次位置接著算</td>
+<td>每次測試前按 Reset、重啟 bringup 與校準節點</td>
+</tr>
+<tr>
+<td>角速度測試轉不到一圈就停</td>
+<td><code>tolerance</code> 1.5 弧度太大（推論）</td>
+<td>把 <code>tolerance</code> 改成 0.05</td>
+</tr>
+<tr>
+<td>每次結果差很多</td>
+<td>地面打滑、電量不足、IMU 沒靜置</td>
+<td>換不滑的地面、充飽電、開始前靜置 5 秒、取三次平均</td>
+</tr>
+<tr>
+<td>建圖或導航時說拿不到即時 TF</td>
+<td>時間不同步</td>
+<td>官方 FAQ 第 8 題：按 Reset 重新連 agent</td>
+</tr>
+<tr>
+<td>rviz2 看不到車子模型</td>
+<td>Description Topic 沒選、Fixed Frame 錯</td>
+<td>選 <code>/robot_description</code>；Fixed Frame 用 <code>base_link</code>（不是 <code>base_linke</code>）</td>
+</tr>
+<tr>
+<td>rviz2 模型一片白或缺零件</td>
+<td>mesh 檔載入慢或路徑問題</td>
+<td>等一下；確認 <code>display_launch.py</code> 沒有報錯</td>
+</tr>
+<tr>
+<td>rviz2／rqt 視窗打不開</td>
+<td>在 SSH 終端機執行</td>
+<td>改在 VNC 桌面的終端機</td>
+</tr>
+<tr>
+<td>滑桿拖動但模型不動</td>
+<td>同時開了 bringup，兩份 <code>robot_state_publisher</code> 打架</td>
+<td>關掉 bringup，只留 <code>display_launch.py</code></td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section class="videos card-box"><h2>📺 官方影片</h2><div class="yt-grid"><figure class="yt" data-yt="N8yGIIZQ2MM"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 1"><img src="https://i.ytimg.com/vi/N8yGIIZQ2MM/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 1</figcaption></figure><figure class="yt" data-yt="UZIGEVnOjmY"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 2"><img src="https://i.ytimg.com/vi/UZIGEVnOjmY/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 2</figcaption></figure><figure class="yt" data-yt="nTrdtKT-Rh8"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 3"><img src="https://i.ytimg.com/vi/nTrdtKT-Rh8/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 3</figcaption></figure><figure class="yt" data-yt="AAI_SxInfI4"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 4"><img src="https://i.ytimg.com/vi/AAI_SxInfI4/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 4</figcaption></figure></div></section>
+<section class="quiz card-box" id="quiz"><h2>📝 小測驗</h2><div class="quiz-item" data-answer="1"><p class="q">1. /ekf_filter_node 訂閱哪兩個話題、發布哪一個？</p><div class="opts"><button class="opt" type="button" data-i="0">訂閱 /scan 與 /cmd_vel，發布 /odom_raw</button><button class="opt" type="button" data-i="1">訂閱 /imu/data 與 /odom_raw，發布 /odom</button><button class="opt" type="button" data-i="2">訂閱 /odom 與 /imu，發布 /imu/data</button></div><p class="explain" hidden></p><template class="explain-text">官方 05-4：融合節點訂閱濾波後的 /imu/data 與輪速 /odom_raw，輸出融合後的 /odom。</template></div><div class="quiz-item" data-answer="1"><p class="q">2. 線速度校準時，車子實際只走了 0.8 公尺，odom_linear_scale_correction 應該怎麼調？</p><div class="opts"><button class="opt" type="button" data-i="0">調大</button><button class="opt" type="button" data-i="1">調小</button><button class="opt" type="button" data-i="2">不用調，換一個 test_distance</button></div><p class="explain" hidden></p><template class="explain-text">程式在「里程 × 係數 = 1 公尺」時停車；走太短代表係數太大，新係數約為舊係數 × 0.8。</template></div><div class="quiz-item" data-answer="1"><p class="q">3. 在 rqt_reconfigure 改完參數後，官方特別提醒要做什麼才會寫入？</p><div class="opts"><button class="opt" type="button" data-i="0">重開機</button><button class="opt" type="button" data-i="1">用滑鼠點一下空白處</button><button class="opt" type="button" data-i="2">按 Ctrl+S</button></div><p class="explain" hidden></p><template class="explain-text">官方 05-5、05-6 都寫：修改後點一下空白處才會把參數寫進節點，再重新勾 start_test。</template></div><div class="quiz-item" data-answer="1"><p class="q">4. rviz2 顯示車子模型時，Fixed Frame 應該填什麼？</p><div class="opts"><button class="opt" type="button" data-i="0">base_linke</button><button class="opt" type="button" data-i="1">base_link</button><button class="opt" type="button" data-i="2">map</button></div><p class="explain" hidden></p><template class="explain-text">官方文件把 base_link 誤打成 base_linke，正確是 base_link。</template></div><div class="quiz-item" data-answer="0"><p class="q">5. calibrate_linear 印出 transform not ready，最可能的原因是？</p><div class="opts"><button class="opt" type="button" data-i="0">沒有先啟動 yahboomcar_bringup_launch.py，或它在另一個容器</button><button class="opt" type="button" data-i="1">光達沒轉</button><button class="opt" type="button" data-i="2">手把沒電</button></div><p class="explain" hidden></p><template class="explain-text">校準程式靠 bringup 發布的 odom → base_footprint TF 計算距離，沒有這個 TF 就算不出距離。</template></div><p class="quiz-score">得分：<span class="score">0</span> / 5</p></section>
+<footer class="lesson-foot card-box">
+<button class="btn primary" id="mark-done" type="button">✔ 標記為完成</button>
+<nav class="pager"><a class="btn" href="B5.html">← B5 上一單元</a><a class="btn" href="M1.html">M1 下一單元 →</a></nav>
+</footer>
+</main>
+<audio id="player" preload="none"></audio>
+<script src="app.js"></script>
+</body>
+</html>
