@@ -1,5 +1,17 @@
 [
   {
+    "group": "實車演練",
+    "title": "實車演練 Part 1：指令與輸出紀錄（網頁簡報）",
+    "url": "https://chenghyang2001.github.io/yahboom-microros-pi5/real-part1.html",
+    "desc": "每個指令在哪執行、完整輸出、教練解說；另有 PDF 版 real-part1.pdf"
+  },
+  {
+    "group": "實車演練",
+    "title": "實車演練 Part 1 精華影片（7 支，YouTube 私人）",
+    "url": "https://www.youtube.com/playlist?list=PLQKoi68bwHw4",
+    "desc": "連線、agent、話題、手把遙控、OpenCV、MediaPipe、自己的避障節點"
+  },
+  {
     "group": "NotebookLM 產物",
     "title": "NotebookLM 產物總覽頁（語音、影片、簡報、資訊圖表、心智圖）",
     "url": "https://187-127-109-145.sslip.io/yahboom-microros-pi5/",
