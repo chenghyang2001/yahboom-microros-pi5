@@ -1,0 +1,11 @@
+export XDG_RUNTIME_DIR=/run/user/1000
+C=$(docker ps -q | head -1)
+echo "[bridge] 監聽 /beep（容器 $C），收到就在藍牙耳機播同樣長度的嗶聲"
+docker exec $C bash -c 'source /opt/ros/humble/setup.bash; export ROS_DOMAIN_ID=20; exec ros2 topic echo /beep --field data' |
+while read ms; do
+  case "$ms" in ''|*[!0-9]*) continue;; esac
+  [ "$ms" -eq 0 ] && continue
+  sec=$(awk "BEGIN{print $ms/1000}")
+  echo "[bridge] $(date +%T) /beep $ms ms → 耳機嗶 $sec 秒"
+  timeout "$sec" speaker-test -D pulse -t sine -f 2000 -c 2 >/dev/null 2>&1
+done

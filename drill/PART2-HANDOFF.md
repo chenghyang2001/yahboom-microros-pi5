@@ -49,6 +49,8 @@ python ycar.py host "export WAYLAND_DISPLAY=wayland-1 XDG_RUNTIME_DIR=/run/user/
 ```
 
 - 視窗擺放（DPI-aware 實際像素）：螢幕 2 = x 2880～4800，教練 `2880,0,960,1040`、車況 `3840,0,960,1040`；螢幕 3 = x -1920～0。
+  - ⚠️ 2026-10-27 在 DESKTOP-6LST1BR 實測螢幕 2 是 x 1920～3840：教練 `1920,0,960,1040`、車況 `2880,0,960,1040`。擺放前先列視窗座標確認。
+- 藍牙耳機聽蜂鳴器：K200 Pro 已和 Pi 5 配對信任（A2DP，音量 50%）。背景跑 `python ycar.py host "$(cat beep-bridge.txt)" --timeout 7200`，每次 `/beep` 耳機會播同長度 2000 Hz 嗶聲（模擬音，延遲約 0.5～1 秒）。
 - ffmpeg 錄影用 gdigrab 座標（另一套）：螢幕 2 `-offset_x 1920 -video_size 1920x1080`、螢幕 3 `-offset_x -1280 -video_size 1280x720`。
 - 車況儀表板：`python ycar.py rospy monitor.py --timeout 7200`（在 WT 視窗「YB 車況」）。
 - 教練視窗：`claude --dangerously-skip-permissions --remote-control "YB 教練"`，環境變數帶 `YCAR_PASS`、`DISABLE_WRITER_QA_HOOK=1`，工作目錄 `drill/`。
