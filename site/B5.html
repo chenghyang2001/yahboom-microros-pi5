@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B5 讀懂車的話題：手動發 /cmd_vel、聽 /imu、/odom_raw、/scan｜Yahboom MicroROS-Pi5 × ROS 2 學習地圖</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-lesson">
+<header class="topbar"><a href="index.html">← 學習地圖</a><span>B5</span></header>
+<main class="container lesson" data-lesson-id="B5">
+
+<section class="lesson-head card-box" id="sec-0" data-audio="audio/B5-0.mp3">
+<div class="eyebrow"><span class="badge level-B">初級</span>
+<span class="unit-id">B5</span></div>
+<h1>讀懂車的話題：手動發 /cmd_vel、聽 /imu、/odom_raw、/scan</h1>
+<div class="meta"><span class="badge">⏱ 1 小時</span><span class="badge car-yes">🚗 真車：是</span></div>
+<dl class="goal">
+<dt>🎯 學習目標</dt><dd>用 ros2 node／topic 系列指令看懂車子「說什麼、聽什麼」，親手發布指令讓車轉圈、蜂鳴器響、雲台轉動，並分辨 /odom_raw 與 /odom</dd>
+<dt>✅ 完成標準</dt><dd>用 ros2 topic pub /cmd_vel 讓車原地轉一圈並停下、用 /beep 讓蜂鳴器叫一聲、用 /servo_s1 與 /servo_s2 轉動雲台，並用 ros2 topic hz 量出 /scan、/imu、/odom_raw 的頻率</dd>
+</dl>
+<div class="player-bar">
+<button class="btn primary" id="play-all" type="button">▶ 全部播放</button>
+<label class="rate">播放速度
+<select id="rate">
+<option value="0.8">0.8×</option><option value="1" selected>1×</option>
+<option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+</select></label>
+<span class="now-playing" id="now-playing" aria-live="polite"></span>
+</div>
+</section>
+<section class="sec card-box" id="sec-1" data-audio="audio/B5-1.mp3">
+<div class="sec-head"><h2>1. 節點與話題：車子的「嘴巴」和「耳朵」</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>上一課我們用三種方式開車，但都是別人寫好的程式。這一課要拿掉中間人，直接跟車子對話。在 ROS 2 裡，每個會做事的程式叫節點，節點之間用話題傳訊息。話題像是廣播電台的頻道：發布者對著頻道說話，訂閱者打開收音機收聽。車上的 ESP32 是一個叫 YB 底線 Car 底線 Node 的節點，它有幾個「耳朵」，聽速度、蜂鳴器、雲台的指令；也有幾個「嘴巴」，不停播報陀螺儀、輪子里程和光達的資料。</p></details>
+<div class="md"><p>先照 B3 的流程準備好（之後每一課都一樣，不再重複）：</p>
+<ol>
+<li>VNC 桌面：關掉自動開的 agent 與 Docker 終端機。</li>
+<li><code>sh ~/start_agent_rpi5.sh</code>，按 Reset 等連上。</li>
+<li>新終端機 <code>sh ros2_humble.sh</code> 進容器。</li>
+<li>容器內暫時關掉手把（B4 第 3.1 節），避免它也在發速度。</li>
+</ol>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 node list
+ros2 node info /YB_Car_Node</code></pre>
+</div>
+<p><code>ros2 node info</code> 會列出這個節點的 Subscribers（耳朵）和 Publishers（嘴巴）。依官方文件整理：</p>
+<table>
+<thead>
+<tr>
+<th>方向</th>
+<th>話題</th>
+<th>訊息型別</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>訂閱（車聽）</td>
+<td><code>/cmd_vel</code></td>
+<td><code>geometry_msgs/msg/Twist</code></td>
+<td>車速</td>
+</tr>
+<tr>
+<td>訂閱（車聽）</td>
+<td><code>/beep</code></td>
+<td><code>std_msgs/msg/UInt16</code></td>
+<td>蜂鳴器</td>
+</tr>
+<tr>
+<td>訂閱（車聽）</td>
+<td><code>/servo_s1</code></td>
+<td><code>std_msgs/msg/Int32</code></td>
+<td>下方舵機（左右），範圍 [−90, 90]</td>
+</tr>
+<tr>
+<td>訂閱（車聽）</td>
+<td><code>/servo_s2</code></td>
+<td><code>std_msgs/msg/Int32</code></td>
+<td>上方舵機（上下），範圍 [−90, 20]</td>
+</tr>
+<tr>
+<td>發布（車說）</td>
+<td><code>/imu</code></td>
+<td><code>sensor_msgs/msg/Imu</code></td>
+<td>六軸慣性測量單元</td>
+</tr>
+<tr>
+<td>發布（車說）</td>
+<td><code>/odom_raw</code></td>
+<td><code>nav_msgs/msg/Odometry</code></td>
+<td>輪子算出來的原始里程</td>
+</tr>
+<tr>
+<td>發布（車說）</td>
+<td><code>/scan</code></td>
+<td><code>sensor_msgs/msg/LaserScan</code></td>
+<td>MS200 光達</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>官方 05-1 文件列「發布話題」時寫的是 <code>/odom</code>，但同一頁查資料用的指令是 <code>ros2 topic echo /odom_raw</code>，而 05-4 也說 <code>/odom</code> 是 EKF 融合後才產生的。<strong>車本體發布的應該是 <code>/odom_raw</code></strong>，請用 <code>ros2 node info /YB_Car_Node</code> 的實際輸出為準（需實車確認）。另外 <code>/imu</code>、<code>/odom_raw</code>、<code>/scan</code> 的型別是依 ROS 慣例補上，文件只明寫了 <code>/beep</code>、<code>/cmd_vel</code>、<code>/servo_s1</code>、<code>/servo_s2</code> 的型別。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-2" data-audio="audio/B5-2.mp3">
+<div class="sec-head"><h2>2. 五個必學的 topic 指令</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>ROS 2 有一組以 ros2 topic 開頭的指令，就像收音機上的旋鈕。list 列出所有頻道；info 看某個頻道的訊息型別和有幾個人在收聽；echo 把頻道內容印出來；hz 量它每秒播幾次；pub 則是自己拿起麥克風對頻道說話。前四個只是「聽」，完全安全，可以隨便試。最後一個 pub 會真的讓車動起來，所以下一節會特別小心地用。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 topic list
+ros2 topic list -t
+ros2 topic info /cmd_vel
+ros2 interface show geometry_msgs/msg/Twist</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>指令</th>
+<th>做什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2 topic list</code></td>
+<td>列出所有話題；<code>-t</code> 同時顯示型別</td>
+</tr>
+<tr>
+<td><code>ros2 topic info &lt;話題&gt;</code></td>
+<td>型別、發布者數量、訂閱者數量；加 <code>-v</code> 看是哪些節點</td>
+</tr>
+<tr>
+<td><code>ros2 topic echo &lt;話題&gt;</code></td>
+<td>持續印出內容，Ctrl+C 停止</td>
+</tr>
+<tr>
+<td><code>ros2 topic hz &lt;話題&gt;</code></td>
+<td>量每秒幾筆，Ctrl+C 停止</td>
+</tr>
+<tr>
+<td><code>ros2 topic pub &lt;話題&gt; &lt;型別&gt; &lt;內容&gt;</code></td>
+<td>自己發布訊息</td>
+</tr>
+<tr>
+<td><code>ros2 interface show &lt;型別&gt;</code></td>
+<td>看訊息有哪些欄位</td>
+</tr>
+</tbody>
+</table>
+<p><code>ros2 interface show</code> 的輸出（簡化示意，實際還會展開每個 <code>Vector3</code> 的 <code>x</code>、<code>y</code>、<code>z</code>）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（輸出範例）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-text">Vector3  linear     # 線速度 x, y, z（公尺／秒）
+Vector3  angular    # 角速度 x, y, z（弧度／秒）</code></pre>
+</div>
+<p>這台四輪車只用得到兩個數字：<code>linear.x</code>（前正後負）和 <code>angular.z</code>（左轉為正、右轉為負）。</p>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p><code>ros2 topic info /cmd_vel -v</code> 可以看到有誰在發布 <code>/cmd_vel</code>。如果發布者不只一個，就代表有兩個程式在搶方向盤，這是 B4 那張問題表的「正式查法」。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-3" data-audio="audio/B5-3.mp3">
+<div class="sec-head"><h2>3. 聽車子說話：echo 與 hz</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>先來聽聽車子在說什麼。光達的資料量很大，一次會印出幾百個數字，所以我們先只看一筆。再來看陀螺儀：把車子拿起來轉一轉，你會看到角速度的數字跟著變。最後看輪子里程：用手推車子往前一點，位置 x 會變大。用 hz 量一下每個話題的頻率，就知道車子每秒回報幾次，這個數字之後寫程式時很重要。</p></details>
+<div class="md"><p><strong>光達 <code>/scan</code></strong>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 topic echo /scan --once --no-arr
+ros2 topic echo /scan --once</code></pre>
+</div>
+<ul>
+<li><code>--once</code> 只印一筆就結束；<code>--no-arr</code> 把長陣列省略，先看結構。</li>
+<li>重點欄位：<code>angle_min</code>／<code>angle_max</code>（掃描角度範圍，弧度）、<code>range_min</code>／<code>range_max</code>（量得到的最近／最遠距離，公尺）、<code>ranges</code>（每個角度的距離陣列）。</li>
+<li>用手掌靠近光達，再印一次，<code>ranges</code> 裡會出現比較小的數字。</li>
+</ul>
+<p><strong>陀螺儀 <code>/imu</code></strong>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 topic echo /imu</code></pre>
+</div>
+<ul>
+<li><code>angular_velocity.z</code>：繞垂直軸旋轉的速度，原地轉車時會變。</li>
+<li><code>linear_acceleration.z</code>：靜止時約 9.8（重力加速度）。</li>
+<li><code>orientation</code>：姿態四元數（W4 學過的旋轉表示法）。</li>
+</ul>
+<p><strong>輪子里程 <code>/odom_raw</code></strong>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 topic echo /odom_raw</code></pre>
+</div>
+<ul>
+<li><code>pose.pose.position.x</code>／<code>y</code>：從開機到現在，輪子「以為」自己走到哪。</li>
+<li><code>twist.twist.linear.x</code>／<code>angular.z</code>：目前速度。</li>
+<li>用手把車往前推 10 公分，<code>position.x</code> 應該增加約 0.1。</li>
+</ul>
+<p><strong>量頻率</strong>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 topic hz /scan
+ros2 topic hz /imu
+ros2 topic hz /odom_raw</code></pre>
+</div>
+<p>把結果記在下表（官方沒有寫出廠頻率，以下參考值來自 ESP32 練習範例與光達規格，<strong>以你量到的為準</strong>）：</p>
+<table>
+<thead>
+<tr>
+<th>話題</th>
+<th>參考頻率</th>
+<th>你量到</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/scan</code></td>
+<td>約 10 Hz（MS200 掃描頻率 10 Hz）</td>
+<td>____ Hz</td>
+</tr>
+<tr>
+<td><code>/imu</code></td>
+<td>約 20 Hz（練習範例值）</td>
+<td>____ Hz</td>
+</tr>
+<tr>
+<td><code>/odom_raw</code></td>
+<td>約 20 Hz（練習範例值）</td>
+<td>____ Hz</td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section class="sec card-box" id="sec-4" data-audio="audio/B5-4.mp3">
+<div class="sec-head"><h2>4. 對車子說話：/cmd_vel 讓車原地轉一圈</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>現在拿起麥克風。原地轉圈只要給角速度、線速度給零。角速度的單位是弧度每秒，轉一整圈是兩個派，大約六點二八弧度，所以如果用每秒零點五弧度，大約十二點六秒會轉一圈。有一件事一定要記住：ros2 topic pub 會一直重複發送，按 Ctrl 加 C 才會停止發送，但車子可能還記得最後一個速度繼續轉。所以每次都要再發一筆全部是零的指令，確定車子停下來。官方範例用的零點五公尺每秒在室內偏快，我們先用小一點的數字。</p></details>
+<div class="md"><p><strong>安全準備</strong>：車放地上、周圍淨空 1 公尺；另一隻手隨時準備按 Ctrl+C；記住停車指令放在哪。</p>
+<p><strong>官方範例</strong>（線速度 0.5、角速度 0.2，會一邊前進一邊左轉，<strong>室內偏快</strong>）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 topic pub /cmd_vel geometry_msgs/msg/Twist &quot;{linear: {x: 0.5, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.2}}&quot;</code></pre>
+</div>
+<p><strong>原地左轉一圈</strong>（本課作業，數值是建議值）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist &quot;{linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.5}}&quot;</code></pre>
+</div>
+<ul>
+<li><code>-r 10</code>：每秒發 10 次（預設是每秒 1 次）。</li>
+<li>看著車頭，轉回原本方向時（約 12～13 秒）按 <strong>Ctrl+C</strong>。</li>
+</ul>
+<p><strong>停車</strong>（每次都要發）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist &quot;{linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}&quot;</code></pre>
+</div>
+<p>官方文件的停車寫法是不加 <code>--once</code>（持續每秒發 0，按 Ctrl+C 結束），兩種都可以。</p>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>車子 Ctrl+C 之後會不會自己停，取決於 ESP32 韌體有沒有「逾時自動停車」的設計，官方文件沒寫（需實車確認）。在確認之前，<strong>一律當成不會自己停</strong>，每次都補發停車指令。</p>
+</div>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>實際轉的角度可能不剛好一圈：命令是 0.5 rad/s，不代表輪子真的轉出 0.5 rad/s（打滑、地面材質）。這個誤差正是 B6 角速度校準要處理的問題。可以再開一個終端機 <code>ros2 topic echo /odom_raw</code> 對照車子「以為」自己轉了多少。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-5" data-audio="audio/B5-5.mp3">
+<div class="sec-head"><h2>5. 蜂鳴器與雲台舵機</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>接著玩兩個比較安全的「耳朵」。蜂鳴器聽的是 beep 話題，型別是無號十六位元整數，送一就開始響，送零就停。雲台有兩顆舵機，S1 在下面管左右，範圍負九十到九十度；S2 在上面管上下，範圍負九十到二十度。超出範圍時舵機不會報錯，只是不轉，所以如果你送了一百度發現沒反應，先檢查數字有沒有超過範圍。</p></details>
+<div class="md"><p><strong>蜂鳴器 <code>/beep</code></strong>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 topic info /beep
+ros2 topic pub /beep std_msgs/msg/UInt16 &quot;data: 1&quot;</code></pre>
+</div>
+<p>聽到響聲後 Ctrl+C，再關掉：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 topic pub /beep std_msgs/msg/UInt16 &quot;data: 0&quot;</code></pre>
+</div>
+<p>「叫一聲就停」的小技巧：用 <code>--once</code> 先送 1、馬上再送 0。</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 topic pub --once /beep std_msgs/msg/UInt16 &quot;data: 1&quot;
+ros2 topic pub --once /beep std_msgs/msg/UInt16 &quot;data: 0&quot;</code></pre>
+</div>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>ESP32 練習範例裡，<code>/beep</code> 的值大於等於 10 時代表「響幾毫秒後自動停」，例如 <code>data: 100</code> 響 0.1 秒。出廠韌體是否相同官方沒寫（需實車確認），可以試試 <code>ros2 topic pub --once /beep std_msgs/msg/UInt16 "data: 100"</code>。</p>
+</div>
+<p><strong>雲台舵機</strong>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 topic pub /servo_s1 std_msgs/msg/Int32 &quot;data: 30&quot;
+ros2 topic pub /servo_s2 std_msgs/msg/Int32 &quot;data: -30&quot;</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>舵機</th>
+<th>位置</th>
+<th>範圍（度）</th>
+<th>試試看</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S1</td>
+<td>下方，左右轉</td>
+<td>−90～90</td>
+<td><code>0</code>、<code>30</code>、<code>-60</code></td>
+</tr>
+<tr>
+<td>S2</td>
+<td>上方，上下轉</td>
+<td>−90～20</td>
+<td><code>0</code>、<code>-30</code>、<code>20</code></td>
+</tr>
+</tbody>
+</table>
+<p>把兩顆都轉到 <code>0</code>，就是 B1 說的「中間位置」，可以趁這時候把攝影機支架鎖正。</p>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>手把節點啟動時會先把 S1 設成 0、S2 設成 −60（原始碼 <code>yahboom_joy.py</code> 的初始值），所以開機後鏡頭常是朝下的，這是正常的。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-6" data-audio="audio/B5-6.mp3">
+<div class="sec-head"><h2>6. /imu、/odom_raw、/odom 與 rqt_graph</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>最後釐清三個很像的名字。斜線 imu 是陀螺儀的原始資料；斜線 odom 底線 raw 是只靠輪子算的里程，輪子打滑它也不知道，會越走越偏；斜線 odom 則是把前兩者融合以後比較準的里程，要等下一課啟動底層程式才會出現。用 rqt graph 可以把節點和話題畫成一張圖，誰對誰說話一目了然。這是圖形程式，要在 VNC 桌面的終端機執行。</p></details>
+<div class="md"><table>
+<thead>
+<tr>
+<th>話題</th>
+<th>誰發布</th>
+<th>內容</th>
+<th>什麼時候有</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/imu</code></td>
+<td><code>/YB_Car_Node</code>（ESP32）</td>
+<td>原始角速度、加速度</td>
+<td>agent 連上就有</td>
+</tr>
+<tr>
+<td><code>/odom_raw</code></td>
+<td><code>/YB_Car_Node</code>（ESP32）</td>
+<td>純輪速里程，會累積誤差</td>
+<td>agent 連上就有</td>
+</tr>
+<tr>
+<td><code>/imu/data</code></td>
+<td>IMU 濾波節點（Pi 5）</td>
+<td>濾波後的 IMU</td>
+<td>啟動 <code>yahboomcar_bringup_launch.py</code> 後</td>
+</tr>
+<tr>
+<td><code>/odom</code></td>
+<td><code>/ekf_filter_node</code>（Pi 5）</td>
+<td>融合 <code>/imu/data</code> ＋ <code>/odom_raw</code></td>
+<td>同上（B6 主題）</td>
+</tr>
+</tbody>
+</table>
+<p>現在（還沒啟動 bringup）檢查一下：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 topic list | grep odom</code></pre>
+</div>
+<p>應該只看到 <code>/odom_raw</code>；若也看到 <code>/odom</code>，表示有其他程式在跑（例如 B4 留下的 bringup）。</p>
+<p><strong>節點關係圖</strong>（在 VNC 桌面的終端機，用 <code>docker exec</code> 進同一容器後執行）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run rqt_graph rqt_graph</code></pre>
+</div>
+<p>一開始沒顯示的話，左上角下拉選 <strong>Nodes/Topics (all)</strong>，再按左上角的重新整理鈕。你會看到 <code>/YB_Car_Node</code> 和它連出去的話題；如果手把節點還在，也會看到 <code>joy_node → /joy → yahboom_joy → /cmd_vel → /YB_Car_Node</code> 這條線。</p>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>這台車的 <code>/scan</code> 也是 ESP32 發布的：光達接在擴展板上，由 ESP32 讀資料再轉成 ROS 話題，所以光達沒資料時要先查 agent，不是查 Pi 5 的 USB。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-7" data-audio="audio/B5-7.mp3">
+<div class="sec-head"><h2>7. 出問題時怎麼辦</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>這一課的問題多半跟「型別打錯」或「格式打錯」有關。ROS 2 對大小寫和空格很挑剔，例如 data 冒號後面一定要有空格，型別名稱中間要有 msg。如果指令沒報錯、車卻沒反應，就用 topic info 看訂閱者數量，零就代表車子根本沒在聽，回去檢查 agent。發完速度車子停不下來，馬上補發全零的停車指令，必要時直接關擴展板電源。</p></details>
+<div class="md"><table>
+<thead>
+<tr>
+<th>症狀</th>
+<th>可能原因</th>
+<th>解法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2 topic list</code> 只有 <code>/parameter_events</code>、<code>/rosout</code></td>
+<td>agent 沒連上或 ID 不一致</td>
+<td>回 B3 第 7 節</td>
+</tr>
+<tr>
+<td><code>The passed message type is invalid</code></td>
+<td>型別打錯</td>
+<td>要寫完整：<code>geometry_msgs/msg/Twist</code>、<code>std_msgs/msg/UInt16</code>、<code>std_msgs/msg/Int32</code></td>
+</tr>
+<tr>
+<td><code>Failed to populate field</code> 或 YAML 錯誤</td>
+<td>格式打錯</td>
+<td><code>"data: 1"</code> 冒號後有空格；Twist 的大括號、逗號成對；整段用雙引號包起來</td>
+</tr>
+<tr>
+<td>pub 沒報錯但車不動</td>
+<td>車沒訂閱（Subscription count: 0）；電量低</td>
+<td><code>ros2 topic info /cmd_vel</code> 看訂閱者；檢查 agent 與電池</td>
+</tr>
+<tr>
+<td>車子忽轉忽停、抖動</td>
+<td>手把或鍵盤節點也在發 <code>/cmd_vel</code></td>
+<td><code>ros2 topic info /cmd_vel -v</code> 看發布者；關掉多的那個</td>
+</tr>
+<tr>
+<td>Ctrl+C 後車子繼續轉</td>
+<td>最後一筆速度還有效</td>
+<td>立刻發 <code>--once</code> 全零停車指令；緊急時關擴展板電源</td>
+</tr>
+<tr>
+<td>舵機不轉</td>
+<td>數值超出範圍</td>
+<td>S1：−90～90；S2：−90～20</td>
+</tr>
+<tr>
+<td>蜂鳴器一直響</td>
+<td>送了 1 沒送 0</td>
+<td><code>ros2 topic pub --once /beep std_msgs/msg/UInt16 "data: 0"</code></td>
+</tr>
+<tr>
+<td><code>ros2 topic echo /scan</code> 洗版看不清楚</td>
+<td>陣列太長</td>
+<td>加 <code>--once --no-arr</code></td>
+</tr>
+<tr>
+<td><code>ros2 topic hz</code> 一直沒有數字</td>
+<td>該話題沒人發布</td>
+<td><code>ros2 topic info</code> 確認 Publisher count</td>
+</tr>
+<tr>
+<td>rqt_graph 視窗打不開</td>
+<td>在 SSH 終端機執行（沒有圖形）</td>
+<td>改在 VNC 桌面的終端機執行</td>
+</tr>
+<tr>
+<td>找不到 <code>/odom</code></td>
+<td>還沒啟動 bringup</td>
+<td>正常；B6 會啟動</td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section class="videos card-box"><h2>📺 官方影片</h2><div class="yt-grid"><figure class="yt" data-yt="cxN5gvPufYY"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 1"><img src="https://i.ytimg.com/vi/cxN5gvPufYY/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 1</figcaption></figure></div></section>
+<section class="quiz card-box" id="quiz"><h2>📝 小測驗</h2><div class="quiz-item" data-answer="2"><p class="q">1. 想讓車原地左轉，/cmd_vel 的哪個欄位要給正值？</p><div class="opts"><button class="opt" type="button" data-i="0">linear.x</button><button class="opt" type="button" data-i="1">linear.y</button><button class="opt" type="button" data-i="2">angular.z</button></div><p class="explain" hidden></p><template class="explain-text">原地轉只需要角速度 angular.z，左轉為正、右轉為負；linear.x 給 0。</template></div><div class="quiz-item" data-answer="1"><p class="q">2. 用 ros2 topic pub 發完速度、按 Ctrl+C 之後，安全的作法是？</p><div class="opts"><button class="opt" type="button" data-i="0">什麼都不用做，車一定會停</button><button class="opt" type="button" data-i="1">再發一筆全部為 0 的 /cmd_vel 停車指令</button><button class="opt" type="button" data-i="2">重開機</button></div><p class="explain" hidden></p><template class="explain-text">Ctrl+C 只是停止發送；在確認韌體有逾時停車前，一律補發停車指令。</template></div><div class="quiz-item" data-answer="0"><p class="q">3. 送 ros2 topic pub /servo_s2 std_msgs/msg/Int32 &quot;data: 45&quot; 舵機沒動，原因是？</p><div class="opts"><button class="opt" type="button" data-i="0">S2 的範圍是 -90 到 20，45 超出範圍</button><button class="opt" type="button" data-i="1">型別應該是 UInt16</button><button class="opt" type="button" data-i="2">S2 要先按 R1</button></div><p class="explain" hidden></p><template class="explain-text">官方文件明寫 S2 範圍 [-90,20]，超出範圍舵機不會轉。</template></div><div class="quiz-item" data-answer="1"><p class="q">4. /odom_raw 和 /odom 的差別是？</p><div class="opts"><button class="opt" type="button" data-i="0">兩者完全一樣</button><button class="opt" type="button" data-i="1">/odom_raw 是 ESP32 用輪速算的原始里程；/odom 是 Pi 5 上 EKF 融合 IMU 後的結果</button><button class="opt" type="button" data-i="2">/odom 是光達資料</button></div><p class="explain" hidden></p><template class="explain-text">05-4 說明 /ekf_filter_node 訂閱 /imu/data 與 /odom_raw，發布融合後的 /odom。</template></div><div class="quiz-item" data-answer="0"><p class="q">5. 想知道光達每秒送幾筆資料，用哪個指令？</p><div class="opts"><button class="opt" type="button" data-i="0">ros2 topic hz /scan</button><button class="opt" type="button" data-i="1">ros2 topic info /scan</button><button class="opt" type="button" data-i="2">ros2 node list</button></div><p class="explain" hidden></p><template class="explain-text">ros2 topic hz 量測話題的發布頻率。</template></div><p class="quiz-score">得分：<span class="score">0</span> / 5</p></section>
+<footer class="lesson-foot card-box">
+<button class="btn primary" id="mark-done" type="button">✔ 標記為完成</button>
+<nav class="pager"><a class="btn" href="B4.html">← B4 上一單元</a><a class="btn" href="B6.html">B6 下一單元 →</a></nav>
+</footer>
+</main>
+<audio id="player" preload="none"></audio>
+<script src="app.js"></script>
+</body>
+</html>

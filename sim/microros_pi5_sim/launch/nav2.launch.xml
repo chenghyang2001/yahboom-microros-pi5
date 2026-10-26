@@ -1,0 +1,12 @@
+<!-- 導航：Nav2（map_server＋AMCL＋規劃＋控制），先開 sim.launch.xml 再開這個
+     用法：ros2 launch microros_pi5_sim nav2.launch.xml [map:=$HOME/maps/house.yaml]
+     預設用套件內附、在模擬小屋建好的地圖；參數是為這台小車調過的 config/nav2_params.yaml -->
+<launch>
+  <arg name="map" default="$(find-pkg-share microros_pi5_sim)/maps/house.yaml"/>
+  <arg name="params_file" default="$(find-pkg-share microros_pi5_sim)/config/nav2_params.yaml"/>
+  <include file="$(find-pkg-share nav2_bringup)/launch/bringup_launch.py">
+    <arg name="use_sim_time" value="true"/>
+    <arg name="map" value="$(var map)"/>
+    <arg name="params_file" value="$(var params_file)"/>
+  </include>
+</launch>

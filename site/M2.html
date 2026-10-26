@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>M2 MediaPipe：手、臉、姿態偵測｜Yahboom MicroROS-Pi5 × ROS 2 學習地圖</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-lesson">
+<header class="topbar"><a href="index.html">← 學習地圖</a><span>M2</span></header>
+<main class="container lesson" data-lesson-id="M2">
+
+<section class="lesson-head card-box" id="sec-0" data-audio="audio/M2-0.mp3">
+<div class="eyebrow"><span class="badge level-M">中級</span>
+<span class="unit-id">M2</span></div>
+<h1>MediaPipe：手、臉、姿態偵測</h1>
+<div class="meta"><span class="badge">⏱ 1 小時</span><span class="badge car-no">🚗 真車：否</span></div>
+<dl class="goal">
+<dt>🎯 學習目標</dt><dd>理解 MediaPipe「丟一張 RGB 影像、拿回關鍵點」的用法，看懂手部 21 點與規則式手勢判斷，為 M3 的手勢控車打底。</dd>
+<dt>✅ 完成標準</dt><dd>筆電 webcam 跑起 hand_gesture.py，比出 0、1、2、5 時畫面正確顯示手勢名稱與對應的 cmd_vel。</dd>
+</dl>
+<div class="player-bar">
+<button class="btn primary" id="play-all" type="button">▶ 全部播放</button>
+<label class="rate">播放速度
+<select id="rate">
+<option value="0.8">0.8×</option><option value="1" selected>1×</option>
+<option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+</select></label>
+<span class="now-playing" id="now-playing" aria-live="polite"></span>
+</div>
+</section>
+<section class="sec card-box" id="sec-1" data-audio="audio/M2-1.mp3">
+<div class="sec-head"><h2>1. MediaPipe 是什麼：一張影像進去，一串關鍵點出來</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>MediaPipe 是 Google 開源的機器學習工具組，裡面已經訓練好手、身體、臉的模型，連樹莓派這種小電腦都跑得動。用法非常單純：你把一張 RGB 影像交給它，它回給你一串「關鍵點」，每個點有 x、y 座標，數值是零到一之間的比例，乘上影像寬高才是像素位置。你不用懂神經網路，只要會讀這串點，就能判斷手指有沒有伸直、人站在畫面哪裡。</p></details>
+<div class="md"><table>
+<thead>
+<tr>
+<th>模型</th>
+<th>官方程式</th>
+<th>關鍵點數</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hands 手部</td>
+<td><code>01_HandDetector</code></td>
+<td><strong>21 點</strong>／每隻手</td>
+<td>手勢、手指控制</td>
+</tr>
+<tr>
+<td>Pose 姿態</td>
+<td><code>02_PoseDetector</code></td>
+<td><strong>33 點</strong></td>
+<td>全身骨架</td>
+</tr>
+<tr>
+<td>Holistic 整體</td>
+<td><code>03_Holistic</code></td>
+<td>臉＋身體＋雙手</td>
+<td>一次全抓，最吃運算</td>
+</tr>
+<tr>
+<td>FaceMesh 臉部網格</td>
+<td><code>04_FaceMesh</code></td>
+<td>468 點</td>
+<td>臉部輪廓</td>
+</tr>
+<tr>
+<td>Haar 級聯（不是 MediaPipe）</td>
+<td><code>05_FaceEyeDetection</code></td>
+<td>臉框、眼框</td>
+<td>老派但快的「偵測」</td>
+</tr>
+</tbody>
+</table>
+<p>共同的三步驟：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Windows（概念示意）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">img_RGB = cv.cvtColor(frame, cv.COLOR_BGR2RGB)   # 1. OpenCV 是 BGR，MediaPipe 要 RGB
+results = hands.process(img_RGB)                 # 2. 丟進模型
+for lm in results.multi_hand_landmarks[0].landmark:
+    cx, cy = int(lm.x * w), int(lm.y * h)        # 3. 0~1 比例 → 像素座標</code></pre>
+</div>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>「偵測（detection）」和「辨認（recognition）」不一樣：偵測只回答「畫面裡有沒有臉、在哪裡」，辨認才回答「這是誰」。官方 7.5 叫 Face recognition，實際做的是偵測。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-2" data-audio="audio/M2-2.mp3">
+<div class="sec-head"><h2>2. 手部 21 個關鍵點與「手指伸直」的判斷規則</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>手部模型會給你二十一個點：零號是手腕，每根手指各有四個點，從指根一路編到指尖。五根手指的指尖分別是四、八、十二、十六、二十號。判斷手指有沒有伸直，官方用的是很樸素的規則：食指到小指，只要指尖比往下數第二個關節更高，就算伸直；拇指是橫著動的，所以改看三個關節排起來是不是接近一直線。之後所有手勢都是用這五個零或一組合出來的。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title"></span><button class="copy-btn" type="button">複製</button></div>
+<pre><code>          8   12  16  20      ← 指尖 TIP
+          7   11  15  19      ← DIP
+    4     6   10  14  18      ← PIP（指尖編號 - 2）
+    3     5    9  13  17      ← MCP 指根（9 = 中指根，M3 拿它當「手掌中心」）
+     2
+      1
+         0  ← 手腕 WRIST</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>手指</th>
+<th>編號</th>
+<th>伸直的判斷</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>拇指</td>
+<td>1、2、3、4</td>
+<td>4-3-2 與 3-2-1 兩個夾角都 <strong>&gt; 150°</strong>（接近一直線）</td>
+</tr>
+<tr>
+<td>食指</td>
+<td>5、6、7、8</td>
+<td>指尖 8 的 y <strong>小於</strong> 6 的 y（影像 y 往下變大，所以「小」= 比較高）</td>
+</tr>
+<tr>
+<td>中指</td>
+<td>9～12</td>
+<td>12 的 y &lt; 10 的 y</td>
+</tr>
+<tr>
+<td>無名指</td>
+<td>13～16</td>
+<td>16 的 y &lt; 14 的 y</td>
+</tr>
+<tr>
+<td>小指</td>
+<td>17～20</td>
+<td>20 的 y &lt; 18 的 y</td>
+</tr>
+</tbody>
+</table>
+<p>結果是一個串列，例如 <code>[0, 1, 1, 0, 0]</code> 代表食指和中指伸直，也就是手勢「2」。</p>
+<p><strong>規則式手勢</strong>（官方 <code>11_GestureRecognition.py</code> 的 <code>get_gesture()</code>，共 14 種：<code>Zero, One, Two, Three, Four, Five, Six, Seven, Eight, Ok, Rock, Thumb_up, Thumb_down, Heart_single</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>伸直根數</th>
+<th>判斷</th>
+<th>手勢</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>—</td>
+<td>Zero</td>
+</tr>
+<tr>
+<td>1</td>
+<td>—</td>
+<td>One</td>
+</tr>
+<tr>
+<td>2</td>
+<td>拇指＋小指</td>
+<td>Six</td>
+</tr>
+<tr>
+<td>2</td>
+<td>拇指＋食指且夾角 &gt; 90°</td>
+<td>Eight</td>
+</tr>
+<tr>
+<td>2</td>
+<td>拇指、食指指尖距離 &lt; 50 像素</td>
+<td>Heart_single</td>
+</tr>
+<tr>
+<td>2</td>
+<td>其他</td>
+<td>Two</td>
+</tr>
+<tr>
+<td>3～4</td>
+<td>拇指伸直且拇指尖到食指尖比到食指根近</td>
+<td>OK</td>
+</tr>
+<tr>
+<td>3～4</td>
+<td>中指、無名指都彎</td>
+<td>Rock</td>
+</tr>
+<tr>
+<td>5</td>
+<td>—</td>
+<td>Five</td>
+</tr>
+<tr>
+<td>—</td>
+<td>拇指尖比其他四指尖都低／都高</td>
+<td>Thumb_down／Thumb_up</td>
+</tr>
+<tr>
+<td>—</td>
+<td>拇指尖到其他四指尖都 &lt; 60 像素</td>
+<td>Seven</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>這是「規則」不是「學習」，所以手轉個角度、離鏡頭太遠（距離門檻是像素）、或手背對鏡頭都會誤判。官方也說這套規則是照<strong>右手</strong>設計的。比手勢時手心朝鏡頭、手指朝上最穩。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-3" data-audio="audio/M2-3.mp3">
+<div class="sec-head"><h2>3. 在筆電上安裝 MediaPipe（注意 Python 版本）</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>這裡有一個很容易卡住的版本問題。車上容器裡的程式用的是 MediaPipe 舊版的寫法，叫做 solutions。可是最新版的 MediaPipe 已經把這套舊寫法拿掉了，而且最新版的 Python 也只能裝到新版。所以筆電練習要刻意裝一個 Python 三點一二，再在獨立的虛擬環境裡裝指定版本的 MediaPipe，這樣你寫的程式才會和車上的寫法一樣。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在 Windows（Git Bash）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash"># 1. 裝 Python 3.12（已經有的話跳過；py -0 可列出已安裝的版本）
+winget install -e --id Python.Python.3.12
+py -0
+# 2. 建一個專門給 MediaPipe 用的虛擬環境，並安裝指定版本
+py -3.12 -m venv ~/mp-venv
+~/mp-venv/Scripts/python -m pip install mediapipe==0.10.21 opencv-python
+# 3. 確認舊版 solutions 寫法可用，印出 True 才算成功
+~/mp-venv/Scripts/python -c &quot;import mediapipe as mp; print(mp.__version__, hasattr(mp, &#x27;solutions&#x27;))&quot;</code></pre>
+</div>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<ul>
+<li>2026 年實測：在 Python 3.14 上 <code>pip install mediapipe</code> 只能裝到 0.10.30 以後的版本，這些版本<strong>已經沒有 <code>mp.solutions</code></strong>，官方範例會直接噴 <code>AttributeError: module 'mediapipe' has no attribute 'solutions'</code>。一定要用 Python 3.12 ＋ <code>mediapipe==0.10.21</code>。</li>
+<li>不要裝在 WSL 裡練這一課：筆電鏡頭要轉進 WSL 很麻煩（要另外設定 usbipd），Windows 原生最省事。</li>
+</ul>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-4" data-audio="audio/M2-4.mp3">
+<div class="sec-head"><h2>4. 動手：21 點＋手勢＋「如果是車會怎麼動」</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>這支練習程式把官方兩支程式濃縮在一起：前半段是手勢辨識，後半段是第三單元手勢控車的對應表。畫面會標出二十一個點的編號、五根手指的伸直狀態、判斷出來的手勢，以及如果這是車子，它會送出什麼樣的速度指令。先別急著上車，在筆電把每個手勢都比到穩定為止，上車後就只剩下車子本身的問題。</p></details>
+<div class="md"><p>把下面存成 <code>hand_gesture.py</code>，用 <code>~/mp-venv/Scripts/python hand_gesture.py</code> 執行：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Windows（hand_gesture.py）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">&quot;&quot;&quot;筆電 webcam：MediaPipe 21 點手部偵測 + 規則式手勢判斷（仿官方 11_GestureRecognition 與 HandCtrl）。按 q 離開。&quot;&quot;&quot;
+import math
+import sys
+import time
+import cv2 as cv
+import mediapipe as mp
+
+TIP_IDS = [4, 8, 12, 16, 20]   # 拇指、食指、中指、無名指、小指的指尖編號
+
+
+def get_dist(p1, p2):
+    return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
+
+
+def calc_angle(p1, p2, p3):
+    &quot;&quot;&quot;以 p2 為頂點的夾角（度），用餘弦定理。&quot;&quot;&quot;
+    a, b, c = get_dist(p1, p2), get_dist(p2, p3), get_dist(p1, p3)
+    try:
+        return math.degrees(math.acos((a * a + b * b - c * c) / (2 * a * b)))
+    except (ValueError, ZeroDivisionError):
+        return 0.0
+
+
+def fingers_up(lm):
+    &quot;&quot;&quot;回傳五個 0/1：[拇指, 食指, 中指, 無名指, 小指]，1 代表伸直。&quot;&quot;&quot;
+    fingers = []
+    # 拇指：4-3-2 與 3-2-1 兩個夾角都接近一直線（&gt; 150 度）才算伸直
+    thumb_straight = calc_angle(lm[4], lm[3], lm[2]) &gt; 150 and calc_angle(lm[3], lm[2], lm[1]) &gt; 150
+    fingers.append(1 if thumb_straight else 0)
+    # 其他四指：指尖比 PIP 關節（指尖編號 - 2）更「上面」就算伸直；畫面 y 往下變大
+    for tip in TIP_IDS[1:]:
+        fingers.append(1 if lm[tip][1] &lt; lm[tip - 2][1] else 0)
+    return fingers
+
+
+def get_gesture(lm, fingers):
+    &quot;&quot;&quot;官方規則的精簡版：只判斷幾種最穩定的手勢。&quot;&quot;&quot;
+    n = sum(fingers)
+    if n == 0:
+        return &quot;Zero&quot;
+    if n == 5:
+        return &quot;Five&quot;
+    if n == 1 and fingers[1] == 1:
+        return &quot;One&quot;
+    if n == 2 and fingers[1] == fingers[2] == 1:
+        return &quot;Two&quot;
+    if n == 2 and fingers[0] == fingers[4] == 1:
+        return &quot;Six&quot;
+    if n in (3, 4) and fingers[0] == 1 and get_dist(lm[4], lm[8]) &lt; get_dist(lm[4], lm[5]):
+        return &quot;OK&quot;
+    return &quot;?&quot;
+
+
+# 官方 HandCtrl 的對應：手勢 → (linear.x, angular.z)
+HANDCTRL_TABLE = {&quot;Five&quot;: (0.3, 0.0), &quot;Zero&quot;: (-0.3, 0.0), &quot;One&quot;: (0.0, 0.5), &quot;Two&quot;: (0.0, -0.5)}
+
+
+def main():
+    cap = cv.VideoCapture(0)
+    if not cap.isOpened():
+        sys.exit(&quot;錯誤：打不開鏡頭，請關掉其他占用鏡頭的程式&quot;)
+    cap.set(cv.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv.CAP_PROP_FRAME_HEIGHT, 480)
+    hands = mp.solutions.hands.Hands(max_num_hands=1, min_detection_confidence=0.75,
+                                     min_tracking_confidence=0.5)
+    draw = mp.solutions.drawing_utils
+    p_time = time.time()
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frame = cv.flip(frame, 1)                      # 鏡像，像照鏡子比較好操作
+        h, w = frame.shape[:2]
+        results = hands.process(cv.cvtColor(frame, cv.COLOR_BGR2RGB))   # MediaPipe 要 RGB
+        if results.multi_hand_landmarks:
+            hand = results.multi_hand_landmarks[0]
+            draw.draw_landmarks(frame, hand, mp.solutions.hands.HAND_CONNECTIONS)
+            lm = [(int(p.x * w), int(p.y * h)) for p in hand.landmark]   # 0~1 比例 → 像素
+            for i, (x, y) in enumerate(lm):
+                cv.putText(frame, str(i), (x + 4, y - 4), cv.FONT_HERSHEY_PLAIN, 0.9, (255, 255, 0), 1)
+            fingers = fingers_up(lm)
+            gesture = get_gesture(lm, fingers)
+            vel = HANDCTRL_TABLE.get(gesture, (0.0, 0.0))
+            cv.rectangle(frame, (0, 400), (640, 480), (0, 0, 0), cv.FILLED)
+            cv.putText(frame, f&quot;{fingers} {gesture}&quot;, (10, 430), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+            cv.putText(frame, f&quot;cmd_vel: x={vel[0]} z={vel[1]}&quot;, (10, 470), cv.FONT_HERSHEY_SIMPLEX, 0.8, (0, 200, 255), 2)
+        c_time = time.time()
+        cv.putText(frame, f&quot;FPS: {int(1 / max(c_time - p_time, 1e-6))}&quot;, (10, 30),
+                   cv.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+        p_time = c_time
+        cv.imshow(&#x27;hand&#x27;, frame)
+        if cv.waitKey(1) &amp; 0xFF == ord(&#x27;q&#x27;):
+            break
+    cap.release()
+    cv.destroyAllWindows()
+
+
+if __name__ == &quot;__main__&quot;:
+    main()</code></pre>
+</div>
+<p><strong>練習清單</strong>：</p>
+<ol>
+<li>比 5、拳頭、1、2，看下方是否顯示 <code>Five</code>、<code>Zero</code>、<code>One</code>、<code>Two</code>，以及 <code>cmd_vel</code> 的數值（這就是 M3 <code>HandCtrl</code> 的前進、後退、左轉、右轉）。</li>
+<li>把手慢慢轉成側面，觀察 <code>fingers</code> 什麼時候開始判斷錯——這就是規則式方法的極限。</li>
+<li>進階：仿照 7.9 Finger control，用 <code>calc_angle(lm[4], lm[0], lm[8])</code>（拇指尖、手腕、食指尖的夾角）配 <code>np.interp(angle, [0, 70], [0, 255])</code> 做一個「手指滑桿」。M3 控車速也是同樣的線性映射觀念。</li>
+</ol></div>
+</section>
+<section class="sec card-box" id="sec-5" data-audio="audio/M2-5.mp3">
+<div class="sec-head"><h2>5. 姿態 33 點與臉部網格</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>手部以外，姿態模型會給你全身三十三個點，零號是鼻子，肩膀、手肘、膝蓋都有編號；臉部網格則有四百六十八個點，能描出整張臉的輪廓。這兩個模型的用法和手部一模一樣，只是換一個模型名稱、換一種畫線方式。下面這支小程式按 f 就能在兩者之間切換，你可以觀察鼻子座標怎麼隨你左右移動而變化，這就是「追人」的基礎。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在 Windows（pose_face.py）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">&quot;&quot;&quot;筆電 webcam：按 f 在 姿態 33 點 / 臉部網格 468 點 之間切換，按 q 離開。&quot;&quot;&quot;
+import sys
+import cv2 as cv
+import mediapipe as mp
+
+mp_pose, mp_face, draw = mp.solutions.pose, mp.solutions.face_mesh, mp.solutions.drawing_utils
+
+
+def main():
+    cap = cv.VideoCapture(0)
+    if not cap.isOpened():
+        sys.exit(&quot;錯誤：打不開鏡頭&quot;)
+    pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
+    face = mp_face.FaceMesh(max_num_faces=1, min_detection_confidence=0.5)
+    mode = &quot;pose&quot;
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
+        if mode == &quot;pose&quot;:
+            res = pose.process(rgb)
+            if res.pose_landmarks:
+                draw.draw_landmarks(frame, res.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+                nose = res.pose_landmarks.landmark[0]          # 0 號點是鼻子
+                cv.putText(frame, f&quot;nose x={nose.x:.2f} y={nose.y:.2f}&quot;, (10, 60),
+                           cv.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+        else:
+            res = face.process(rgb)
+            if res.multi_face_landmarks:
+                for lms in res.multi_face_landmarks:
+                    draw.draw_landmarks(frame, lms, mp_face.FACEMESH_CONTOURS)
+        cv.putText(frame, f&quot;mode: {mode} (f=switch, q=quit)&quot;, (10, 30),
+                   cv.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+        cv.imshow(&#x27;pose_face&#x27;, frame)
+        key = cv.waitKey(1) &amp; 0xFF
+        if key == ord(&#x27;q&#x27;):
+            break
+        if key == ord(&#x27;f&#x27;):
+            mode = &quot;face&quot; if mode == &quot;pose&quot; else &quot;pose&quot;
+    cap.release()
+    cv.destroyAllWindows()
+
+
+if __name__ == &quot;__main__&quot;:
+    main()</code></pre>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-6" data-audio="audio/M2-6.mp3">
+<div class="sec-head"><h2>6. 車上的官方程式：ros2 run 與 python3 兩種跑法</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>回到車上，官方的 MediaPipe 程式分成兩類。前五支是正式登記在套件裡的 ROS 節點，用 ros2 run 啟動，會把關鍵點發布到 mediapipe points 話題；後面幾支只是普通 Python 腳本，要先切換到程式所在的資料夾，再用 python3 直接執行。另外要注意，文件的課號和檔名編號對不起來，照著下面的對照表找檔案就不會迷路。</p></details>
+<div class="md"><p><strong>ROS 節點（會發布 <code>/mediapipe/points</code>，型別 <code>yahboomcar_msgs/PointArray</code>，內容是 <code>geometry_msgs/Point[] points</code>，座標為 0～1 比例）</strong>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run yahboomcar_mediapipe 01_HandDetector       # 7.1 手部 21 點
+ros2 run yahboomcar_mediapipe 02_PoseDetector       # 7.2 姿態 33 點
+ros2 run yahboomcar_mediapipe 03_Holistic           # 7.3 整體（Pi 5 上 FPS 最低）
+ros2 run yahboomcar_mediapipe 04_FaceMesh           # 7.4 臉部網格
+ros2 run yahboomcar_mediapipe 05_FaceEyeDetection   # 7.5 Haar 臉與眼；f 切換 face/eye/face_eye，發布 /FaceEyeDetection/image
+# 另一個終端觀察：
+ros2 topic echo /mediapipe/points</code></pre>
+</div>
+<p><strong>直接執行的腳本</strong>（一定要先 <code>cd</code>，因為 7.6 用相對路徑 <code>./file/shape_predictor_68_face_landmarks.dat</code> 讀 dlib 模型）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cd ~/yahboomcar_ws/src/yahboomcar_mediapipe/yahboomcar_mediapipe
+python3 06_FaceLandmarks.py       # 7.6 臉部特效（dlib 68 點）
+python3 08_Objectron.py           # 7.7 3D 物體：f 切換 Shoe/Chair/Cup/Camera
+python3 09_VirtualPaint.py        # 7.8 空中畫筆
+python3 10_HandCtrl.py            # 7.9 手指控制特效：f 切換 color/thresh/blur/hue/enhance
+python3 11_GestureRecognition.py  # 7.10 手勢辨識</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>PDF 課號</th>
+<th>實際檔名</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>7.6 Face effects</td>
+<td><code>06_FaceLandmarks.py</code></td>
+</tr>
+<tr>
+<td>7.7 3D object recognition</td>
+<td><code>08_Objectron.py</code>（<strong>沒有 07 這個課號的檔</strong>；<code>07_FaceDetection.py</code> 是另一支）</td>
+</tr>
+<tr>
+<td>7.8 Brush</td>
+<td><code>09_VirtualPaint.py</code></td>
+</tr>
+<tr>
+<td>7.9 Finger control</td>
+<td><code>10_HandCtrl.py</code></td>
+</tr>
+<tr>
+<td>7.10 Gesture recognition</td>
+<td><code>11_GestureRecognition.py</code></td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<ul>
+<li>PDF 貼的 7.1 範例是 <code>import rospy</code>、<code>rospy.Publisher</code>（ROS 1 寫法）配 <code>ros2 run</code>，前後矛盾。車上原始碼實際是 <code>rclpy</code>（ROS 2），<strong>以車上檔案為準</strong>，不要照 PDF 抄。</li>
+<li>PDF 寫 7.1、7.9 用 <code>VideoCapture(4)</code>；原始碼全部是 <code>VideoCapture(0)</code>。若畫面全黑，主機上 <code>ls /dev/video*</code> 確認編號。</li>
+<li>7.5 的 PDF 程式碼有 <code>rospkg.RosPack().get_path("dofbot_mediapipe")</code>，是從機械手臂 dofbot 課程複製來的 ROS 1 殘留。</li>
+<li>7.7 切換物件時要下載模型，<strong>Pi 5 必須能上網</strong>；熱點模式下沒有網路會卡住。</li>
+<li>7.8 的文字把手指寫成「right and middle fingers」「middle and middle fingers」，正確規則是：食指＋中指伸直＝選色模式、只有食指＝畫畫模式。</li>
+<li>套件裡的 <code>mediapipe_points.launch.py</code> 引用了不存在的 <code>yahboomcar_point</code> 套件與 <code>/home/nx-ros2/...</code> 路徑（從其他產品複製），不要用它。</li>
+</ul>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-7" data-audio="audio/M2-7.mp3">
+<div class="sec-head"><h2>7. 出問題時怎麼辦</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>MediaPipe 的問題大多出在安裝版本和執行環境，不太會是你的程式邏輯。如果一跑就說找不到 solutions，幾乎都是 MediaPipe 版本太新；如果畫面很卡，先降低解析度或換成比較輕的模型。手勢判斷不穩的時候，先確認手心朝鏡頭、光線充足、背景不要太花，再回頭看規則本身。</p></details>
+<div class="md"><table>
+<thead>
+<tr>
+<th>症狀</th>
+<th>可能原因</th>
+<th>怎麼做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AttributeError: module 'mediapipe' has no attribute 'solutions'</code></td>
+<td>MediaPipe 太新（0.10.30 起移除舊 API）</td>
+<td>用第 3 小節的 Python 3.12 虛擬環境＋<code>mediapipe==0.10.21</code></td>
+</tr>
+<tr>
+<td><code>pip install mediapipe==0.10.21</code> 說找不到版本</td>
+<td>用到 Python 3.13／3.14</td>
+<td>確認是用 <code>~/mp-venv/Scripts/python</code>（<code>py -3.12</code> 建的）</td>
+</tr>
+<tr>
+<td>鏡頭打不開</td>
+<td>被其他程式占用、隱私權未允許</td>
+<td>關掉 Teams／LINE；Windows 設定開放相機給桌面應用程式</td>
+</tr>
+<tr>
+<td>FPS 很低（車上 Holistic 尤其明顯）</td>
+<td>模型太重、解析度太高</td>
+<td>改用單一模型（Hands 或 Pose）；保持 640x480；官方用 MJPG <code>capture.set(6, cv.VideoWriter.fourcc('M','J','P','G'))</code> 提速</td>
+</tr>
+<tr>
+<td>手勢一直跳來跳去</td>
+<td>規則式判斷對角度敏感</td>
+<td>手心朝鏡頭、手指朝上、距離約一個手臂；<code>min_detection_confidence</code> 提高到 0.75</td>
+</tr>
+<tr>
+<td>06_FaceLandmarks 說找不到 .dat</td>
+<td>沒先 <code>cd</code> 到腳本資料夾</td>
+<td>照第 6 小節先 <code>cd</code> 再執行</td>
+</tr>
+<tr>
+<td>啟動時印一堆 <code>absl::InitializeLog</code>、<code>inference_feedback_manager</code> 警告</td>
+<td>MediaPipe 內部的 TensorFlow Lite 日誌</td>
+<td>正常現象，可忽略（2026 年在 Python 3.12＋0.10.21 實測會出現，不影響偵測）</td>
+</tr>
+<tr>
+<td>車上 <code>ros2 run ... 01_HandDetector</code> 沒有視窗</td>
+<td>在 SSH 文字終端執行</td>
+<td>改在 VNC 桌面的終端執行</td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section class="videos card-box"><h2>📺 官方影片</h2><div class="yt-grid"><figure class="yt" data-yt="nU_dqnUFpVA"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 1"><img src="https://i.ytimg.com/vi/nU_dqnUFpVA/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 1</figcaption></figure><figure class="yt" data-yt="qOnUNZFiu78"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 2"><img src="https://i.ytimg.com/vi/qOnUNZFiu78/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 2</figcaption></figure><figure class="yt" data-yt="A_Xs83L08gw"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 3"><img src="https://i.ytimg.com/vi/A_Xs83L08gw/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 3</figcaption></figure><figure class="yt" data-yt="d-hsVLPjCFM"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 4"><img src="https://i.ytimg.com/vi/d-hsVLPjCFM/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 4</figcaption></figure><figure class="yt" data-yt="fql2KpIWh88"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 5"><img src="https://i.ytimg.com/vi/fql2KpIWh88/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 5</figcaption></figure><figure class="yt" data-yt="HKdIRD278vk"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 6"><img src="https://i.ytimg.com/vi/HKdIRD278vk/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 6</figcaption></figure></div></section>
+<section class="quiz card-box" id="quiz"><h2>📝 小測驗</h2><div class="quiz-item" data-answer="1"><p class="q">1. MediaPipe Hands 每隻手會回傳幾個關鍵點？</p><div class="opts"><button class="opt" type="button" data-i="0">5 個</button><button class="opt" type="button" data-i="1">21 個</button><button class="opt" type="button" data-i="2">33 個</button></div><p class="explain" hidden></p><template class="explain-text">手部 21 點：0 號手腕，每根手指 4 點；33 點是 Pose 姿態模型。</template></div><div class="quiz-item" data-answer="1"><p class="q">2. 五根手指的指尖編號是？</p><div class="opts"><button class="opt" type="button" data-i="0">0, 1, 2, 3, 4</button><button class="opt" type="button" data-i="1">4, 8, 12, 16, 20</button><button class="opt" type="button" data-i="2">5, 9, 13, 17, 21</button></div><p class="explain" hidden></p><template class="explain-text">tipIds = [4, 8, 12, 16, 20]，判斷伸直時拿指尖和「指尖編號 - 2」的關節比 y 座標。</template></div><div class="quiz-item" data-answer="0"><p class="q">3. 官方判斷食指伸直的規則是？</p><div class="opts"><button class="opt" type="button" data-i="0">指尖 8 的 y 小於 6 的 y</button><button class="opt" type="button" data-i="1">指尖 8 的 x 大於 0 的 x</button><button class="opt" type="button" data-i="2">8 到 0 的距離大於 100 像素</button></div><p class="explain" hidden></p><template class="explain-text">影像座標 y 往下變大，所以指尖 y 比 PIP 關節小，代表指尖在上面、手指伸直。</template></div><div class="quiz-item" data-answer="1"><p class="q">4. 在筆電跑官方 mp.solutions 寫法，最穩的環境是？</p><div class="opts"><button class="opt" type="button" data-i="0">最新版 Python 加最新版 mediapipe</button><button class="opt" type="button" data-i="1">Python 3.12 加 mediapipe==0.10.21</button><button class="opt" type="button" data-i="2">WSL 加 usb_cam</button></div><p class="explain" hidden></p><template class="explain-text">0.10.30 之後的 mediapipe 已移除 solutions，而 Python 3.13 以上只能裝到新版。</template></div><div class="quiz-item" data-answer="1"><p class="q">5. PDF 的 7.1 範例寫 import rospy，這代表？</p><div class="opts"><button class="opt" type="button" data-i="0">車上要改裝 ROS 1</button><button class="opt" type="button" data-i="1">PDF 貼了舊版程式，車上實際是 rclpy，以車上檔案為準</button><button class="opt" type="button" data-i="2">要先執行 roscore</button></div><p class="explain" hidden></p><template class="explain-text">車上原始碼 01_HandDetector.py 用的是 rclpy，PDF 是 ROS 1 殘留。</template></div><p class="quiz-score">得分：<span class="score">0</span> / 5</p></section>
+<footer class="lesson-foot card-box">
+<button class="btn primary" id="mark-done" type="button">✔ 標記為完成</button>
+<nav class="pager"><a class="btn" href="M1.html">← M1 上一單元</a><a class="btn" href="M3.html">M3 下一單元 →</a></nav>
+</footer>
+</main>
+<audio id="player" preload="none"></audio>
+<script src="app.js"></script>
+</body>
+</html>

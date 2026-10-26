@@ -1,0 +1,11 @@
+<!-- 只看模型：robot_state_publisher＋關節滑桿＋RViz（不需要 Gazebo）
+     用法：ros2 launch microros_pi5_sim display.launch.xml -->
+<launch>
+  <arg name="rviz" default="true"/>
+  <arg name="camera" default="false"/>
+  <node pkg="robot_state_publisher" exec="robot_state_publisher" name="robot_state_publisher">
+    <param name="robot_description" value="$(command 'xacro $(find-pkg-share microros_pi5_sim)/urdf/microros_pi5.urdf.xacro camera:=$(var camera)')" type="str"/>
+  </node>
+  <node pkg="joint_state_publisher_gui" exec="joint_state_publisher_gui" name="joint_state_publisher_gui"/>
+  <node pkg="rviz2" exec="rviz2" name="rviz2" args="-d $(find-pkg-share microros_pi5_sim)/config/display.rviz" if="$(var rviz)"/>
+</launch>

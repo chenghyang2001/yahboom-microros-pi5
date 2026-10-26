@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B1 開箱、組裝與電池安全｜Yahboom MicroROS-Pi5 × ROS 2 學習地圖</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-lesson">
+<header class="topbar"><a href="index.html">← 學習地圖</a><span>B1</span></header>
+<main class="container lesson" data-lesson-id="B1">
+
+<section class="lesson-head card-box" id="sec-0" data-audio="audio/B1-0.mp3">
+<div class="eyebrow"><span class="badge level-B">初級</span>
+<span class="unit-id">B1</span></div>
+<h1>開箱、組裝與電池安全</h1>
+<div class="meta"><span class="badge">⏱ 2 小時</span><span class="badge car-yes">🚗 真車：是</span></div>
+<dl class="goal">
+<dt>🎯 學習目標</dt><dd>清點零件、照順序把車組好、接對每一條線，並學會正確充電與保管鋰電池</dd>
+<dt>✅ 完成標準</dt><dd>車組裝完成、所有線依接線圖接妥、電池充飽（充電器亮綠燈），能說出至少五條電池安全規則，開機後 MCU 指示燈與蜂鳴器表現正常</dd>
+</dl>
+<div class="player-bar">
+<button class="btn primary" id="play-all" type="button">▶ 全部播放</button>
+<label class="rate">播放速度
+<select id="rate">
+<option value="0.8">0.8×</option><option value="1" selected>1×</option>
+<option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+</select></label>
+<span class="now-playing" id="now-playing" aria-live="polite"></span>
+</div>
+</section>
+<section class="sec card-box" id="sec-1" data-audio="audio/B1-1.mp3">
+<div class="sec-head"><h2>1. 開箱：先清點，再動手</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>歡迎來到初級第一課。拿到一台機器人車，最忍不住的就是馬上開機，但我們先忍一下，花十分鐘把盒子裡的東西一樣一樣對照清單擺出來。這就像組樂高之前先把零件分好堆，後面每一步要找螺絲時，你就不會在一堆小袋子裡翻來翻去。清點時也順便確認有沒有零件在運送中壓壞，有問題現在就聯絡賣家，比組到一半才發現好太多了。</p></details>
+<div class="md"><p>這台車在官方文件叫 <strong>MicroROS-Pi5 Robot Car</strong>，製造商是亞博智能（Yahboom）。官方說明書第一頁的物品清單如下（中英對照，依說明書原文整理）：</p>
+<table>
+<thead>
+<tr>
+<th>零件</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>底盤</td>
+<td>已裝好四顆馬達與線材，不用自己接馬達</td>
+</tr>
+<tr>
+<td>二自由度攝影機雲台</td>
+<td>兩顆舵機（servo，可以轉到指定角度的小馬達）＋ USB 攝影機</td>
+</tr>
+<tr>
+<td>Raspberry Pi 5</td>
+<td>樹莓派 5，車子的「大腦」（部分套裝是選購）</td>
+</tr>
+<tr>
+<td>冷酷派主動式散熱器（Cool cooler Pi 50）</td>
+<td>給 Pi 5 用的風扇散熱片</td>
+</tr>
+<tr>
+<td>EVA 防撞棉、防撞棉延伸板</td>
+<td>車頭的黑色緩衝條</td>
+</tr>
+<tr>
+<td>前蓋、後蓋（頂蓋）</td>
+<td>外殼</td>
+</tr>
+<tr>
+<td>MS200 雷射雷達＋轉接板</td>
+<td>光達（LiDAR，用雷射量距離的感測器）</td>
+</tr>
+<tr>
+<td>擴展板</td>
+<td>藍色那塊 ESP32-S3 控制板，車子的「小腦」</td>
+</tr>
+<tr>
+<td>7.4V 電源</td>
+<td>兩顆 18650 鋰電池組成的電池包</td>
+</tr>
+<tr>
+<td>電池壓克力板</td>
+<td>固定電池用</td>
+</tr>
+<tr>
+<td>天線</td>
+<td>接在擴展板上的 ESP32</td>
+</tr>
+<tr>
+<td>配件包 1、2、3</td>
+<td>三包螺絲、銅柱、墊片</td>
+</tr>
+<tr>
+<td>電源充電器</td>
+<td>原廠 8.4V 充電器</td>
+</tr>
+<tr>
+<td>USB 無線手把＋7 號電池</td>
+<td>手把與 USB 接收器</td>
+</tr>
+<tr>
+<td>說明書、保固卡</td>
+<td>—</td>
+</tr>
+<tr>
+<td>螺絲起子</td>
+<td>十字起子</td>
+</tr>
+<tr>
+<td>TF 卡＋讀卡機</td>
+<td>TF 卡就是 microSD 卡，<strong>出廠已燒好系統</strong></td>
+</tr>
+<tr>
+<td>線材</td>
+<td>Type-C 傳輸線等</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>三個配件包上有 1、2、3 的編號，組裝說明裡每顆螺絲旁邊的圈圈數字（例如「M2.5×5mm 圓頭螺絲②」）就是指「從第 2 包拿」。先把三包分開放在三個小碗裡，最省時間。</p>
+</div>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>官方組裝 PDF 和說明書都只有圖片、沒有文字；本課的組裝步驟是照說明書圖片上的中文標註，加上 Happy DIY Tech 的組裝影片口述整理而成。官方安裝影片 LKdZUSuHCHI 和開箱影片 BuvS9U3kKLE 只有配樂沒有旁白，建議邊看影片邊對照本課文字。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-2" data-audio="audio/B1-2.mp3">
+<div class="sec-head"><h2>2. 認識兩塊板子：大腦與小腦</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>組裝之前，先認識車上最重要的兩塊電路板，因為後面每條線要插哪裡，都跟它們有關。綠色的樹莓派五是大腦，跑 Linux 和 ROS 2，負責想事情，例如建地圖、看影像。藍黑色的擴展板上面有一顆 ESP32，是小腦，負責反應快的動作，例如每十毫秒調一次馬達轉速、讀陀螺儀、讀光達。兩者之間用一條 USB 線講話。記住大腦小腦這個比喻，後面的課程都會一直用到。</p></details>
+<div class="md"><p><strong>擴展板（MicroROS 控制板）上的介面</strong>，依說明書「擴展板介面說明」圖：</p>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>電池供電接口（紅色 T 型頭）</td>
+<td>接 7.4V 電池</td>
+</tr>
+<tr>
+<td>電池充電接口</td>
+<td>插充電器</td>
+</tr>
+<tr>
+<td>電源開關</td>
+<td><strong>整台車的總開關</strong></td>
+</tr>
+<tr>
+<td>復位按鍵（Reset）</td>
+<td>重新啟動 ESP32，之後會常常按</td>
+</tr>
+<tr>
+<td>BOOT 按鍵、自定義按鍵</td>
+<td>燒韌體與自訂用途</td>
+</tr>
+<tr>
+<td>雷達接口</td>
+<td>接 MS200 光達</td>
+</tr>
+<tr>
+<td>Type-C 串口（標 Serial）</td>
+<td>和 Pi 5 通訊、設定參數、燒韌體</td>
+</tr>
+<tr>
+<td>Type-C 供電接口（標 5V OUT）</td>
+<td><strong>給 Pi 5 供電</strong></td>
+</tr>
+<tr>
+<td>電機接口 ×4</td>
+<td>Motor 1～4</td>
+</tr>
+<tr>
+<td>PWM 舵機接口</td>
+<td>S1、S2 兩顆雲台舵機</td>
+</tr>
+<tr>
+<td>蜂鳴器</td>
+<td>低電量警報、手把提示音</td>
+</tr>
+<tr>
+<td>電源指示燈、MCU 指示燈</td>
+<td>判斷狀態用（第 6 節與 B3 會教怎麼看）</td>
+</tr>
+<tr>
+<td>天線接口</td>
+<td>ESP32 的 WiFi 天線</td>
+</tr>
+<tr>
+<td>自定義 GPIO×2</td>
+<td>擴充用</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>兩個 Type-C 口長得一樣，但用途完全不同：<strong>Serial</strong> 是資料線，接到 Pi 5 的 USB 孔；<strong>5V OUT</strong> 是電源線，接到 Pi 5 的 Type-C 供電孔。插反了 Pi 5 不會開機，車也連不上。</p>
+</div>
+<p>Pi 5 這邊會用到的孔：Type-C 供電孔（電源從擴展板來）、USB 2.0／3.0 孔（接擴展板 Serial 線、USB 攝影機、手把接收器）、microSD 卡槽（在板子背面）、風扇接口（接散熱器）。</p></div>
+</section>
+<section class="sec card-box" id="sec-3" data-audio="audio/B1-3.mp3">
+<div class="sec-head"><h2>3. 組裝步驟一～四：防撞棉、雲台、散熱器</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>現在開始組裝。整個流程照說明書分成九步，我們由前往後、由下往上裝。第一個要提醒的是雲台舵機。舵機裡面有齒輪，拆裝的時候千萬不要用手硬扭舵機的轉軸，齒輪很容易崩掉，崩了之後攝影機就會抖或轉不準。第二個提醒是散熱器，樹莓派五跑 ROS 會很燙，散熱器一定要裝，而且 microSD 卡最好在裝散熱器之前先插好，免得之後被擋住不好插。</p></details>
+<div class="md"><p><strong>步驟 1：EVA 防撞棉組裝</strong>（配件包 ③）</p>
+<ul>
+<li>材料：EVA 防撞棉、防撞棉延伸板、M3×25mm 圓頭螺絲 ×3、墊片 ×3、M3 防鬆螺母 ×3。</li>
+<li>螺絲由上往下穿過防撞棉、墊片，再穿過延伸板，底下鎖防鬆螺母。</li>
+</ul>
+<p><strong>步驟 2：防撞棉與前蓋連接</strong>（配件包 ②）</p>
+<ul>
+<li>用 M2.5×5mm 圓頭螺絲把剛才的防撞棉組件鎖到前蓋（白色 ㄇ 字型金屬片）上。</li>
+</ul>
+<p><strong>步驟 3：二自由度攝影機雲台</strong></p>
+<ol>
+<li><strong>3.1 拆下精巧攝影機</strong>：把攝影機支架和下方舵機分開。說明書紅字警告：<strong>拆卸舵機時請勿扭動舵機</strong>。</li>
+<li><strong>3.2 安裝舵機到底盤</strong>：用 M2×6mm 圓頭螺絲（雲台包內附）把舵機鎖在底盤前端。</li>
+<li><strong>3.3 安裝 MicroROS 前蓋</strong>：用 M2.5×5mm 沉頭十字螺絲②與 M2.5×5mm 圓頭螺絲②，把步驟 2 的前蓋組件鎖到底盤前方。</li>
+<li><strong>3.4 裝回攝影機</strong>：把攝影機支架裝回舵機上方。</li>
+</ol>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>裝回攝影機前，可以先讓舵機在「中間位置」：車子開機後雲台會轉到程式設定的初始角度，如果你裝的時候角度歪了，鏡頭會一直斜一邊。最保險的作法是先別鎖死攝影機支架的固定螺絲，等 B5 用指令把舵機轉到 0 度後再微調（這是經驗建議，官方文件沒寫）。</p>
+</div>
+<p><strong>步驟 4：冷酷派主動式散熱器</strong>（配件包 ②）</p>
+<ol>
+<li>先把 <strong>TF 卡（microSD）插進 Pi 5 背面的卡槽</strong>（金屬接點朝板子）。</li>
+<li>把散熱器貼到 Pi 5 上，用 M2.5×5mm 尼龍螺絲 ×2 固定，散熱器的風扇線插到 Pi 5 的風扇接口。</li>
+<li>在 Pi 5 上鎖 M2.5×25+6mm 單通銅柱（說明書標 ②），再把 Pi 5 放到底盤上固定。</li>
+</ol></div>
+</section>
+<section class="sec card-box" id="sec-4" data-audio="audio/B1-4.mp3">
+<div class="sec-head"><h2>4. 組裝步驟五～九：擴展板、光達、天線、頂蓋、電池</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>接下來裝小腦，也就是擴展板，然後是光達、天線、頂蓋和電池。這一段最重要的是光達的方向和線怎麼穿。光達有一個「正前方」，裝反了的話，之後光達看到的障礙物會跟實際方向相反，避障和建圖都會錯。另外電池線要從底盤穿到上面再接，電池最後才接，接之前確認總開關是關的。</p></details>
+<div class="md"><p><strong>步驟 5：MicroROS 擴展板</strong>（配件包 ②）</p>
+<ul>
+<li>用 M2.5×5mm 圓頭螺絲 ×4，把擴展板鎖在 Pi 5 上方的銅柱上。</li>
+<li>說明書提醒：<strong>安裝完成後，把 Type-C 轉 Type-C 線接好</strong>（擴展板 5V OUT → Pi 5 Type-C 供電孔）。</li>
+<li>擴展板裝好後，<strong>把天線的小接頭扣到 ESP32 模組旁的天線座</strong>。</li>
+</ul>
+<p><strong>步驟 6：雷射雷達</strong>（配件包 ①）</p>
+<ul>
+<li>材料：M2×10+4mm 單通銅柱 ×2、M2×8mm 圓頭螺絲 ×2。</li>
+<li>先把光達的排線從頂蓋的「雷達進線口」穿進去，再從「雷達出線口」穿出來，然後才把光達鎖上。</li>
+<li>說明書在光達旁畫了一個紅色箭頭「雷達方向」，<strong>箭頭要朝車頭</strong>。</li>
+</ul>
+<p><strong>步驟 7：天線</strong></p>
+<ul>
+<li>把天線鎖到車身側面的天線座（說明書圖中的兩個小螺帽與墊片）。</li>
+</ul>
+<p><strong>步驟 8：頂蓋</strong></p>
+<ul>
+<li>蓋上頂蓋（光達已裝在頂蓋上），翻到車底用 M2.5×5mm 圓頭螺絲②固定。</li>
+</ul>
+<p><strong>步驟 9：電源（電池）</strong></p>
+<ul>
+<li>把 7.4V 電池放進底盤下方的電池位置，蓋上電池壓克力板，用 M2.5×5mm 圓頭螺絲②鎖好。</li>
+<li>說明書紅字：<strong>電源線穿過底盤和上蓋過線孔後，接入擴展板的「電池供電接口」</strong>（紅色 T 型頭）。</li>
+</ul>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>T 型頭有方向性，只能一個方向插入。插不進去就換方向，<strong>絕對不要硬塞</strong>；鋰電池正負極接反，輕則燒板子，重則起火。插電池前先確認擴展板的電源開關在「關」。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-5" data-audio="audio/B1-5.mp3">
+<div class="sec-head"><h2>5. 接線總檢查：照接線示意圖逐條核對</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>裝完外殼以後，最容易出事的不是螺絲，而是線。我們照說明書的接線示意圖，一條一條核對。你可以把它想成搬家後檢查水電：馬達四條、舵機兩條、光達一條、電池一條，接在擴展板上；擴展板再用兩條 Type-C 線跟樹莓派連，一條送電、一條傳資料；最後攝影機和手把接收器直接插樹莓派的 USB。每檢查一條就打一個勾，十分鐘就能確定沒有漏接。</p></details>
+<div class="md"><p>依說明書「接線示意圖」整理：</p>
+<table>
+<thead>
+<tr>
+<th>線</th>
+<th>從</th>
+<th>到</th>
+<th>備註</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>左前馬達</td>
+<td>M1</td>
+<td>擴展板 Motor 1</td>
+<td>底盤出廠已接</td>
+</tr>
+<tr>
+<td>左後馬達</td>
+<td>M2</td>
+<td>擴展板 Motor 2</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>右前馬達</td>
+<td>M3</td>
+<td>擴展板 Motor 3</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>右後馬達</td>
+<td>M4</td>
+<td>擴展板 Motor 4</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>雲台下方舵機</td>
+<td>S1</td>
+<td>擴展板 PWM 舵機接口 S1</td>
+<td>說明書：S1（紅色標記）接下方</td>
+</tr>
+<tr>
+<td>雲台上方舵機</td>
+<td>S2</td>
+<td>擴展板 PWM 舵機接口 S2</td>
+<td>S2（藍色標記）接上方</td>
+</tr>
+<tr>
+<td>舵機線色</td>
+<td>—</td>
+<td>—</td>
+<td>棕色＝GND、紅色＝VCC、黃色＝信號</td>
+</tr>
+<tr>
+<td>光達</td>
+<td>MS200 轉接板</td>
+<td>擴展板雷達接口</td>
+<td></td>
+</tr>
+<tr>
+<td>電池</td>
+<td>7.4V 電池</td>
+<td>擴展板電池供電接口</td>
+<td>T 型頭</td>
+</tr>
+<tr>
+<td>供電線</td>
+<td>擴展板 <strong>5V OUT</strong></td>
+<td>Pi 5 Type-C 供電孔</td>
+<td>Type-C 轉 Type-C</td>
+</tr>
+<tr>
+<td>資料線（串口線）</td>
+<td>擴展板 <strong>Serial</strong></td>
+<td>Pi 5 USB 孔</td>
+<td>開機後在 Pi 5 上會變成 <code>/dev/ttyUSB0</code></td>
+</tr>
+<tr>
+<td>USB 攝影機</td>
+<td>攝影機</td>
+<td>Pi 5 USB 孔</td>
+<td></td>
+</tr>
+<tr>
+<td>手把接收器</td>
+<td>USB 小接收器</td>
+<td>Pi 5 USB 孔</td>
+<td></td>
+</tr>
+<tr>
+<td>天線</td>
+<td>天線</td>
+<td>擴展板天線接口</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>說明書「快速上手使用」那頁的照片是：<strong>手把接收器、USB 攝影機線、串口資料線三條都插在 Pi 5 的 USB 口上</strong>。</p>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>官方文件寫馬達是「310 編碼馬達」，也有資料寫 370；以你手上實物的標示為準。這台車是四輪普通輪胎（不是麥克納姆輪），<strong>不能橫向平移</strong>，後面鍵盤控制的 <code>t</code> 鍵（切換 X／Y 軸）對它沒有意義。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-6" data-audio="audio/B1-6.mp3">
+<div class="sec-head"><h2>6. 充電與電池安全</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>這一節請一定要看完。車上的電池是兩顆十八六五鋰電池，電量大、放電電流也大，用錯方法真的會冒煙起火。記住三件事就好：第一，充電時一定要把車的總開關關掉，不可以邊充邊玩。第二，只能用原廠電池和原廠充電器。第三，充電時要有人在旁邊，燈變綠就拔掉。另外，車子蜂鳴器開始連續「嗶嗶嗶」，代表沒電了，這時候車子是不聽指令的，先存檔、關機、充電，不要以為是程式壞掉。</p></details>
+<div class="md"><p><strong>電池規格</strong>（官方文件 01.Introduction/5）：</p>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>數值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>標稱電壓</td>
+<td>7.4V</td>
+</tr>
+<tr>
+<td>供電電壓</td>
+<td>5.6V～8.4V</td>
+</tr>
+<tr>
+<td>容量</td>
+<td>2000mAh</td>
+</tr>
+<tr>
+<td>電芯</td>
+<td>18650 ×2</td>
+</tr>
+<tr>
+<td>額定電流</td>
+<td>15A（7.5C）</td>
+</tr>
+<tr>
+<td>最大放電電流</td>
+<td>20A（10C）</td>
+</tr>
+<tr>
+<td>保護</td>
+<td>過充、過放、過流、短路保護</td>
+</tr>
+<tr>
+<td>重量／尺寸</td>
+<td>約 115g；67×37×22mm</td>
+</tr>
+<tr>
+<td>放電線／充電線長度</td>
+<td>15cm（AWG14）／10cm</td>
+</tr>
+</tbody>
+</table>
+<p><strong>充電步驟</strong>（官方原文）：</p>
+<ol>
+<li>把原廠充電器插上插座，充電器指示燈亮<strong>綠燈</strong>。</li>
+<li><strong>關閉機器人的總電源開關</strong>。</li>
+<li>在擴展板找到充電接口，插入充電器接頭，指示燈變<strong>紅燈</strong>＝充電中。</li>
+<li>燈變回<strong>綠燈</strong>＝充飽，拔下充電接頭與充電器，充電器放安全處。</li>
+</ol>
+<p><strong>安全規則（15 條濃縮成 8 條）</strong>：</p>
+<ol>
+<li>嚴禁接超過產品負載的設備；嚴禁使用非原廠電池或充電器。</li>
+<li>蜂鳴器低電量警報（每 100 毫秒響一次）時，先關電源再充電；此時<strong>車子無法控制</strong>。</li>
+<li>充電時關閉擴展板總開關，<strong>不可邊充邊用</strong>，以免充電器或電池爆炸。</li>
+<li>充電要有人看著，充飽儘快拔掉，避免過充。</li>
+<li>用完關總開關；<strong>長時間不用</strong>時，保持電池電壓在約 7V，拆下底部電池倉、拔掉電池線，把電池放在安全區域，不要和金屬物混放，<strong>外層絕緣膜不可撕</strong>。</li>
+<li>遠離熱源、火源、任何液體，不在潮濕或雨中使用；不在強靜電、強磁場環境使用。</li>
+<li>嚴禁刺破、短路、反接、擅自焊接、撞擊、擠壓、拋擲電池或充電器；嚴禁擅自改裝電路板。</li>
+<li>電池或充電器<strong>冒煙、發燙</strong>：立刻斷開插座或總開關、拔掉充電器、把電池拿到空曠處；<strong>起火用沙或乾粉滅火器</strong>，然後撤離。外觀破損、變形、變色、有異味的電池不可再用。兒童需成人監督。</li>
+</ol>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>官方中英文版本有兩處數字不一致：英文版寫長期保存電壓「約 7V」、使用溫度「0℃～35℃」；中文說明書寫「7.0V～7.8V 之間」、「0℃～45℃」。<strong>請用比較保守的版本</strong>：保存在 7V 左右、只在 0℃～35℃ 使用與充電。</p>
+</div>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>鋰電池起火不要用水潑。家裡沒有乾粉滅火器的話，充電時把車放在磁磚地板或金屬盤上，遠離窗簾、紙箱與床鋪，是最便宜的保險。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-7" data-audio="audio/B1-7.mp3">
+<div class="sec-head"><h2>7. 開機前檢查與第一次通電</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>最後一步是第一次通電。插電之前我們做一個三十秒的開機前檢查，像飛機起飛前的清單一樣。確認卡有插、線有接對、輪子懸空。為什麼要懸空？因為出廠系統開機後會自動啟動手把控制，萬一有人碰到手把，車子會直接衝出去。通電後觀察擴展板上的指示燈和蜂鳴器，大約三十秒樹莓派開機完成，再按手把的開始鍵，聽到嗶一聲，就代表整條路都通了。</p></details>
+<div class="md"><p><strong>開機前檢查清單</strong>：</p>
+<ul>
+<li>[ ] microSD 卡已插入 Pi 5（出廠已燒好系統，<strong>不需要自己燒映像檔</strong>）。</li>
+<li>[ ] 第 5 節的接線表逐條打勾，特別是兩條 Type-C 沒有插反。</li>
+<li>[ ] 電池已充飽（充電器綠燈）、T 型頭插緊。</li>
+<li>[ ] 天線已接；光達箭頭朝前。</li>
+<li>[ ] 車子<strong>架空</strong>（放在盒子或書上，輪子不碰桌面）。</li>
+<li>[ ] 手把裝好 7 號電池，接收器已插在 Pi 5。</li>
+</ul>
+<p><strong>第一次通電</strong>（依官方 First Trial 與手把影片 TDdD7tqdnZs）：</p>
+<ol>
+<li>打開擴展板的電源開關，等<strong>約 30 秒</strong>讓 Pi 5 開機。</li>
+<li>打開手把電源，手把上亮綠燈代表與接收器配對成功。</li>
+<li>按手把 <strong>START</strong>，車子蜂鳴器「嗶」一聲＝手把可用。</li>
+<li>按一次 <strong>R1</strong>（開啟手把速度控制），輕推左搖桿，架空的輪子會轉；確認四輪都會轉後再放到地上。</li>
+</ol>
+<p><strong>看懂 MCU 指示燈</strong>（擴展板上，官方 FAQ 第 6 題）：</p>
+<table>
+<thead>
+<tr>
+<th>指示燈</th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>每 300 毫秒閃一次（開機後約 5 秒）</td>
+<td>設定狀態</td>
+</tr>
+<tr>
+<td>每 1 秒慢閃一次</td>
+<td>正在等 agent 連線</td>
+</tr>
+<tr>
+<td>每 3 秒快閃 2 次</td>
+<td><strong>正常</strong>，已連上</td>
+</tr>
+<tr>
+<td>每 50 毫秒快閃</td>
+<td>micro-ROS 錯誤</td>
+</tr>
+<tr>
+<td>每 100 毫秒快閃（加蜂鳴器嗶嗶）</td>
+<td>低電壓</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>「agent」是什麼？它是 Pi 5 上幫 ESP32 翻譯的程式，下一課 B3 會詳細講。現在只要知道：<strong>正常狀態是每 3 秒快閃兩次</strong>，一直慢閃就是還沒連上。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-8" data-audio="audio/B1-8.mp3">
+<div class="sec-head"><h2>8. 出問題時怎麼辦</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>第一次組裝難免卡關，這一節把最常見的狀況列成表，從症狀查原因。原則是先查電、再查線、最後才懷疑程式。大部分「車子壞了」其實是電池沒電、線鬆了或兩條 Type-C 插反。真的查不出來，下一課學會用遠端桌面進樹莓派之後，就能看到更詳細的錯誤訊息。</p></details>
+<div class="md"><table>
+<thead>
+<tr>
+<th>症狀</th>
+<th>可能原因</th>
+<th>解法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>打開開關完全沒反應，電源燈不亮</td>
+<td>電池沒電、T 型頭沒插緊、電池保護板進入保護</td>
+<td>充電；重新插緊 T 型頭；若剛短路過，接上充電器一下可解除保護（電池保護板的一般行為，需實車確認）</td>
+</tr>
+<tr>
+<td>擴展板燈亮但 Pi 5 不開機</td>
+<td>5V OUT 線沒接或插到 Serial 口</td>
+<td>擴展板 <strong>5V OUT</strong> → Pi 5 <strong>Type-C 供電孔</strong></td>
+</tr>
+<tr>
+<td>Pi 5 開機但按 START 沒有嗶聲</td>
+<td>agent 沒連上、Serial 線沒接、韌體不對</td>
+<td>按擴展板 <strong>Reset</strong>，等 10～30 秒再按 START；確認 Serial 線接在 Pi 5 USB 孔；仍不行就進 B2 用 VNC 看兩個自動啟動的終端機，或到 B3 的「出問題時」重燒韌體</td>
+</tr>
+<tr>
+<td>蜂鳴器一直嗶嗶響、車不聽指令</td>
+<td>電量低</td>
+<td>存檔、關機、充電</td>
+</tr>
+<tr>
+<td>推搖桿車子不動</td>
+<td>沒按 R1</td>
+<td>先按一次 R1；再按一次會關掉速度控制</td>
+</tr>
+<tr>
+<td>有一顆輪子不轉或反轉</td>
+<td>馬達線鬆脫或接錯 Motor 編號</td>
+<td>對照接線表 M1 左前、M2 左後、M3 右前、M4 右後</td>
+</tr>
+<tr>
+<td>雲台不動或只動一軸</td>
+<td>S1／S2 插反或沒插</td>
+<td>S1 接下方舵機、S2 接上方舵機；棕色線是 GND</td>
+</tr>
+<tr>
+<td>攝影機一直斜一邊</td>
+<td>裝攝影機時舵機不在中間位置</td>
+<td>鬆開支架螺絲，等 B5 把舵機轉到 0 度後再鎖</td>
+</tr>
+<tr>
+<td>充電器一直紅燈不轉綠</td>
+<td>電池老化或充電器異常</td>
+<td>不要放著過夜；超過正常時間（官方未給，需實車確認）仍未轉綠就停止並聯絡賣家</td>
+</tr>
+<tr>
+<td>電池或充電器發燙、冒煙、有異味</td>
+<td>異常</td>
+<td>立刻斷電、拔充電器、移到空曠處，不再使用</td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section class="videos card-box"><h2>📺 官方影片</h2><div class="yt-grid"><figure class="yt" data-yt="LKdZUSuHCHI"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 1"><img src="https://i.ytimg.com/vi/LKdZUSuHCHI/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 1</figcaption></figure><figure class="yt" data-yt="rkfFmIpZ6HE"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 2"><img src="https://i.ytimg.com/vi/rkfFmIpZ6HE/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 2</figcaption></figure><figure class="yt" data-yt="BuvS9U3kKLE"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 3"><img src="https://i.ytimg.com/vi/BuvS9U3kKLE/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 3</figcaption></figure></div></section>
+<section class="quiz card-box" id="quiz"><h2>📝 小測驗</h2><div class="quiz-item" data-answer="1"><p class="q">1. 擴展板上標「5V OUT」的 Type-C 孔應該接到哪裡？</p><div class="opts"><button class="opt" type="button" data-i="0">Pi 5 的 USB 孔，用來傳資料</button><button class="opt" type="button" data-i="1">Pi 5 的 Type-C 供電孔，用來給 Pi 5 供電</button><button class="opt" type="button" data-i="2">電腦，用來燒韌體</button></div><p class="explain" hidden></p><template class="explain-text">5V OUT 是電源輸出，給 Pi 5 供電；標 Serial 的那個才是資料線，接 Pi 5 的 USB 孔。</template></div><div class="quiz-item" data-answer="1"><p class="q">2. 充電時正確的作法是？</p><div class="opts"><button class="opt" type="button" data-i="0">一邊充電一邊用手把玩，比較省時間</button><button class="opt" type="button" data-i="1">先關閉擴展板總電源開關再插充電器，有人看著，綠燈就拔</button><button class="opt" type="button" data-i="2">插著充電器放一整晚最保險</button></div><p class="explain" hidden></p><template class="explain-text">官方規定充電時必須關總開關、不可邊充邊用，並且要有人看著，充飽儘快拔掉避免過充。</template></div><div class="quiz-item" data-answer="1"><p class="q">3. 蜂鳴器每 100 毫秒「嗶」一次、車子不聽指令，最可能是？</p><div class="opts"><button class="opt" type="button" data-i="0">程式寫錯了</button><button class="opt" type="button" data-i="1">電池電量過低</button><button class="opt" type="button" data-i="2">光達方向裝反</button></div><p class="explain" hidden></p><template class="explain-text">低電壓時蜂鳴器會連續警報，而且此時車子無法控制，要存檔關機去充電。</template></div><div class="quiz-item" data-answer="0"><p class="q">4. 擴展板 MCU 指示燈「每 3 秒快閃 2 次」代表什麼？</p><div class="opts"><button class="opt" type="button" data-i="0">正常狀態，已連上 agent</button><button class="opt" type="button" data-i="1">正在等 agent 連線</button><button class="opt" type="button" data-i="2">micro-ROS 錯誤</button></div><p class="explain" hidden></p><template class="explain-text">每 3 秒快閃 2 次是正常狀態；每 1 秒慢閃是還在等 agent；每 50 毫秒快閃是 micro-ROS 錯誤。</template></div><div class="quiz-item" data-answer="1"><p class="q">5. 第一次通電前為什麼建議把車架空？</p><div class="opts"><button class="opt" type="button" data-i="0">讓散熱比較好</button><button class="opt" type="button" data-i="1">出廠會自動啟動手把控制，避免誤觸讓車衝出去</button><button class="opt" type="button" data-i="2">光達需要懸空才能轉</button></div><p class="explain" hidden></p><template class="explain-text">出廠系統開機後會自動啟動手把控制，架空可以先確認四輪都會轉，也避免意外暴衝。</template></div><p class="quiz-score">得分：<span class="score">0</span> / 5</p></section>
+<footer class="lesson-foot card-box">
+<button class="btn primary" id="mark-done" type="button">✔ 標記為完成</button>
+<nav class="pager"><a class="btn" href="W4.html">← W4 上一單元</a><a class="btn" href="B2.html">B2 下一單元 →</a></nav>
+</footer>
+</main>
+<audio id="player" preload="none"></audio>
+<script src="app.js"></script>
+</body>
+</html>

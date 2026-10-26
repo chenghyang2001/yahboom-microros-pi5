@@ -1,0 +1,8 @@
+<!-- 建圖：slam_toolbox（非同步線上建圖），先開 sim.launch.xml 再開這個
+     用法：ros2 launch microros_pi5_sim slam.launch.xml
+     存圖：ros2 run nav2_map_server map_saver_cli -f ~/maps/house -->
+<launch>
+  <include file="$(find-pkg-share slam_toolbox)/launch/online_async_launch.py">
+    <arg name="use_sim_time" value="true"/>
+  </include>
+</launch>

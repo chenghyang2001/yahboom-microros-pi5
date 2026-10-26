@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B3 micro-ROS agent 與 Docker 容器：第一次看到車的節點｜Yahboom MicroROS-Pi5 × ROS 2 學習地圖</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-lesson">
+<header class="topbar"><a href="index.html">← 學習地圖</a><span>B3</span></header>
+<main class="container lesson" data-lesson-id="B3">
+
+<section class="lesson-head card-box" id="sec-0" data-audio="audio/B3-0.mp3">
+<div class="eyebrow"><span class="badge level-B">初級</span>
+<span class="unit-id">B3</span></div>
+<h1>micro-ROS agent 與 Docker 容器：第一次看到車的節點</h1>
+<div class="meta"><span class="badge">⏱ 45 分鐘</span><span class="badge car-yes">🚗 真車：是</span></div>
+<dl class="goal">
+<dt>🎯 學習目標</dt><dd>理解 agent 與 ROS 2 容器各自的角色，能自己關掉開機自動啟動的終端機、再手動啟動 agent 和容器，並在容器內看到車子的節點</dd>
+<dt>✅ 完成標準</dt><dd>在車上 Docker 容器內執行 ros2 node list，看到 /YB_Car_Node；並能用 docker exec 再開第二個終端機進入同一個容器</dd>
+</dl>
+<div class="player-bar">
+<button class="btn primary" id="play-all" type="button">▶ 全部播放</button>
+<label class="rate">播放速度
+<select id="rate">
+<option value="0.8">0.8×</option><option value="1" selected>1×</option>
+<option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+</select></label>
+<span class="now-playing" id="now-playing" aria-live="polite"></span>
+</div>
+</section>
+<section class="sec card-box" id="sec-1" data-audio="audio/B3-1.mp3">
+<div class="sec-head"><h2>1. 三個角色：小腦、翻譯官、大腦裡的工作室</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>上一課桌面上有兩個自動開啟的終端機，這一課要搞懂它們在做什麼。車上的 ESP32 小腦跑的是 micro-ROS，它是 ROS 2 的瘦身版，記憶體太小，沒辦法自己加入 ROS 2 網路。所以樹莓派上要跑一個翻譯官，叫做 micro-ROS agent，把小腦說的話翻成正式的 ROS 2 話題。第二個終端機則是一個 Docker 容器，你可以想成大腦裡一間裝潢好的工作室，ROS 2 Humble 和亞博寫好的所有套件都放在裡面。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">示意圖（不用執行）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-text"> ESP32-S3（micro-ROS 韌體，節點 /YB_Car_Node）
+        │  USB 序列線 /dev/ttyUSB0，921600 baud
+        ▼
+ Pi 5 主機：micro-ROS agent（Docker 映像 microros/micro-ros-agent:humble）
+        │  DDS（ROS 2 的通訊底層），ROS_DOMAIN_ID=20
+        ▼
+ Pi 5 主機：ROS 2 Humble 容器（yahboomcar_* 套件）→ 你在這裡打 ros2 指令</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>名詞</th>
+<th>白話</th>
+<th>在哪裡</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>micro-ROS</td>
+<td>能跑在微控制器上的迷你 ROS 2</td>
+<td>ESP32 韌體</td>
+</tr>
+<tr>
+<td>agent（代理）</td>
+<td>翻譯官：沒有它，ESP32 就是一座孤島</td>
+<td>Pi 5 主機，由 <code>start_agent_rpi5.sh</code> 用 Docker 啟動</td>
+</tr>
+<tr>
+<td>Docker 映像（image）</td>
+<td>唯讀的範本，像「工作室的設計圖」</td>
+<td>Pi 5 主機的 Docker 裡</td>
+</tr>
+<tr>
+<td>Docker 容器（container）</td>
+<td>用映像蓋出來、正在使用的工作室</td>
+<td>由 <code>ros2_humble.sh</code> 啟動</td>
+</tr>
+<tr>
+<td><code>ROS_DOMAIN_ID</code></td>
+<td>頻道號碼：同頻道的節點才看得到彼此</td>
+<td>控制板、容器、你的電腦三邊都要一樣，預設 <code>20</code></td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section class="sec card-box" id="sec-2" data-audio="audio/B3-2.mp3">
+<div class="sec-head"><h2>2. 兩支啟動腳本到底寫了什麼</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>官方教學每一課開頭都叫你打兩行指令，一行啟動 agent、一行進入容器。我們先打開這兩支腳本看一眼，知道它們在做什麼，出問題時才知道從哪裡查。兩支腳本都只有一行重點，都是 docker run。差別在於 agent 那支開的是官方的翻譯官映像，透過序列埠跟 ESP32 講話；容器那支開的是亞博的 ROS 2 映像，最後執行一個叫 root 底下一點 sh 的腳本，這個腳本會順便啟動手把控制。</p></details>
+<div class="md"><p>在 Pi 5 上看腳本內容（SSH 或 VNC 終端機都可以）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cat ~/start_agent_rpi5.sh
+cat ~/ros2_humble.sh</code></pre>
+</div>
+<p>官方原始碼包（<code>18. Summary of program source code</code>）裡的 <code>start_agent_rpi5.sh</code>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">#!/bin/bash
+# WIFI
+#docker run -it --rm -v /dev:/dev -v /dev/shm:/dev/shm --privileged --net=host microros/micro-ros-agent:humble udp4 --port 8090 -v4
+# serial
+docker run -it --rm -v /dev:/dev -v /dev/shm:/dev/shm --privileged --net=host microros/micro-ros-agent:humble serial --dev /dev/ttyUSB0 -b 921600 -v4</code></pre>
+</div>
+<ul>
+<li>被 <code>#</code> 註解掉的是 WiFi（UDP 8090 埠）版，給「虛擬機／電腦版」車用；<strong>Pi 5 版用下面那行序列版</strong>。</li>
+<li><code>serial --dev /dev/ttyUSB0 -b 921600</code>：從 USB 序列線、以 921600 鮑率跟 ESP32 通訊。</li>
+<li><code>--net=host</code>：容器直接用 Pi 5 的網路，DDS 才能和區網其他機器互通。</li>
+<li><code>-v4</code>：輸出比較詳細的 log，所以連上後 agent 終端機會「刷很多行」。</li>
+</ul>
+<p>同一包裡的 <code>ros2_humble.sh</code>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">#!/bin/bash
+xhost +
+docker run -it --rm \
+--privileged=true \
+--net=host \
+--env=&quot;DISPLAY&quot; \
+--env=&quot;QT_X11_NO_MITSHM=1&quot; \
+-v /tem/.X11-unix:/tmp/.X11-unix \
+--security-opt apparmor:unconfined \
+-v /dev/input:/dev/input \
+-v /dev/video0:/dev/video0 \
+yahboomtechnology/ros-humble:4.0.3 /bin/bash /root/1.sh </code></pre>
+</div>
+<ul>
+<li>映像：<code>yahboomtechnology/ros-humble:4.0.3</code>（你車上的版本號可能不同，以 <code>cat ~/ros2_humble.sh</code> 為準）。</li>
+<li><code>-v /dev/input</code>：把手把掛進容器；<code>-v /dev/video0</code>：把 USB 攝影機掛進容器。</li>
+<li><code>--rm</code>：<strong>離開容器時自動刪除容器</strong>，所以在容器裡改的檔案，離開就消失。</li>
+<li>最後執行 <code>/root/1.sh</code>：容器啟動時順便開手把控制（B4 會教怎麼關）。</li>
+</ul>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>原始碼包裡這一行寫成 <code>-v /tem/.X11-unix:/tmp/.X11-unix</code>，<code>/tem</code> 應該是 <code>/tmp</code> 的筆誤。因為有 <code>--net=host</code>，圖形視窗多半還是開得起來；如果你在容器裡開 rqt、rviz2 出現「cannot connect to X server」，可以檢查這一行（需實車確認車上版本是否相同）。</p>
+</div>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>Docker 課（第 13 章）的範例映像是 <code>yahboomtechnology/ros-foxy</code>、帳號 <code>jetson</code>，那是別款產品的 Foxy 版本，<strong>本車是 Humble</strong>，不要照抄。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-3" data-audio="audio/B3-3.mp3">
+<div class="sec-head"><h2>3. 關掉自動啟動的兩個終端機</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>開機自動開的 agent 和容器其實已經可以用了。但官方每一課的步驟都是從「自己啟動 agent」開始，如果自動開的那個 agent 還在跑，你再開一個就會打架，因為一台車同時只能有一個 agent 占用序列埠。所以我們先學會正確關掉它們。agent 那個視窗按 Ctrl 加 C 停止；Docker 那個視窗輸入 exit 離開。注意不要直接按視窗右上角的叉叉關掉，那樣 Docker 可能還在背景偷偷跑，之後就會出錯。</p></details>
+<div class="md"><p>用 VNC 進到 Pi 5 桌面（B2），然後：</p>
+<ol>
+<li>點一下 <strong>agent 終端機</strong>，按 <strong>Ctrl+C</strong>，等它回到 <code>pi@...$</code> 提示字元。</li>
+<li>點一下 <strong>Docker 終端機</strong>，輸入：</li>
+</ol>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">exit</code></pre>
+</div>
+<p>關掉以後，手把就暫時不能控制車了（官方影片 hq0Zbi7BmFA 有提醒），這是正常的。</p>
+<p>確認沒有殘留的 agent 容器：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">docker ps -a | grep microros/micro-ros-agent</code></pre>
+</div>
+<p>沒有輸出＝乾淨。有輸出的話，記下第一欄的容器 ID，用 <code>docker stop</code> 停掉（見第 7 節）。</p></div>
+</section>
+<section class="sec card-box" id="sec-4" data-audio="audio/B3-4.mp3">
+<div class="sec-head"><h2>4. 手動啟動 agent，等 ESP32 連上</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>現在自己啟動翻譯官。在 Pi 5 的終端機輸入 sh 空格 波浪號斜線 start 底線 agent 底線 rpi5 點 sh。啟動後先看輸出：如果只印了兩三行就停住，代表 ESP32 還沒連上，這時按一下擴展板上的 Reset 鍵，大約十秒內就會開始刷出一大串訊息，那就是連上了。同時看看擴展板的 MCU 指示燈，從每秒慢閃一次，變成每三秒快閃兩次，就是正常狀態。</p></details>
+<div class="md"><p>在 VNC 桌面開一個新的終端機（Pi 5 主機）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">sh ~/start_agent_rpi5.sh</code></pre>
+</div>
+<p>然後：</p>
+<ol>
+<li>若車子電源還沒開 → 打開電源，ESP32 會自動連 agent。</li>
+<li>若車子早就開著、agent 只輸出兩行就停住 → <strong>按擴展板 Reset</strong>，等約 10 秒。</li>
+<li>agent 終端機開始大量輸出（建立 session、建立 topic 之類的訊息）＝連上。</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>判斷依據</th>
+<th>沒連上</th>
+<th>已連上</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>agent 終端機</td>
+<td>只印兩行左右就停住</td>
+<td>一直刷出多行訊息</td>
+</tr>
+<tr>
+<td>MCU 指示燈</td>
+<td>每 1 秒慢閃一次</td>
+<td>每 3 秒快閃 2 次</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>這個 agent 終端機<strong>要一直開著</strong>，不要關。整堂課 ESP32 都要靠它連進 ROS 2。也不要再開第二個 agent。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-5" data-audio="audio/B3-5.mp3">
+<div class="sec-head"><h2>5. 進入容器，看到車的節點</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>翻譯官就位後，再開一個新的終端機，進入 ROS 2 的工作室。輸入 sh 空格 ros2 底線 humble 點 sh。注意要在家目錄執行，官方影片特別說，在別的資料夾執行會找不到檔案。進去之後，提示字元會變成 root 開頭，代表你現在在容器裡。輸入 ros2 node list，如果看到斜線 YB 底線 Car 底線 Node，恭喜，這就是 ESP32 小腦在 ROS 2 世界裡的身分，你第一次「看到」這台車了。</p></details>
+<div class="md"><p>開第二個 Pi 5 終端機：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cd ~
+sh ros2_humble.sh</code></pre>
+</div>
+<p>進入容器後（提示字元變成 <code>root@...</code>）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 node list</code></pre>
+</div>
+<p>預期看到：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（輸出範例）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-text">/YB_Car_Node</code></pre>
+</div>
+<p>如果手把自動控制還在（每次執行 <code>ros2_humble.sh</code> 都會跑 <code>/root/1.sh</code>），清單裡也可能多出手把相關的節點，例如 <code>yahboom_joy</code>、<code>joy_node</code>（官方影片 G7wb07OQIIQ 提到），這是正常的。</p>
+<p>順便確認頻道號碼：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">echo $ROS_DOMAIN_ID</code></pre>
+</div>
+<p>應該是 <code>20</code>，和控制板一致。</p>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>官方文件有的寫 <code>./ros2_humble.sh</code>、有的寫 <code>sh ros2_humble.sh</code>，兩者效果相同。本課程統一用 <code>sh ros2_humble.sh</code>。</p>
+</div>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>分辨你在哪一層，看提示字元就好：<code>pi@...</code> 是 Pi 5 主機，<code>root@...</code> 是容器內。<code>docker</code>、<code>sh ~/start_agent_rpi5.sh</code>、<code>python3 config_robot.py</code> 都在<strong>主機</strong>打；<code>ros2 ...</code> 都在<strong>容器內</strong>打。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-6" data-audio="audio/B3-6.mp3">
+<div class="sec-head"><h2>6. 第二個終端機：用 docker exec 進同一個容器</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>後面的課常常要同時跑兩三個程式，例如一個終端機啟動底層，另一個啟動鍵盤控制。這時候有個新手最常犯的錯：再執行一次進入容器的腳本。這樣做其實是蓋了「另一間」新的工作室，跟第一間互不相通，而且又會多啟動一份手把控制。正確作法是先用 docker ps 查出第一間工作室的編號，再用 docker exec 走進「同一間」。編號每次都不一樣，要每次重新查。</p></details>
+<div class="md"><p>開第三個 Pi 5 終端機：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">docker ps -a</code></pre>
+</div>
+<p>輸出範例（ID 每次都不同）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機（輸出範例）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-text">CONTAINER ID   IMAGE                                 ...   STATUS
+ef0e1b7da319   yahboomtechnology/ros-humble:4.0.3    ...   Up 3 minutes
+a1b2c3d4e5f6   microros/micro-ros-agent:humble       ...   Up 5 minutes</code></pre>
+</div>
+<p>找 IMAGE 是 <code>yahboomtechnology/ros-humble</code> 那一行（<strong>不是</strong> agent 那一行），用它的 ID 進入：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">docker exec -it ef0e1b7da319 /bin/bash</code></pre>
+</div>
+<ul>
+<li><code>ef0e1b7da319</code> 換成你看到的 ID；只要能唯一辨識，打前兩三個字也可以，例如 <code>docker exec -it ef /bin/bash</code>。</li>
+<li>進去後一樣是 <code>root@...</code>，執行 <code>ros2 node list</code> 結果應該和第一個終端機相同。</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>指令</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>再執行一次 <code>sh ros2_humble.sh</code></td>
+<td>開一個<strong>新</strong>容器，又啟動一份手把控制 ✗</td>
+</tr>
+<tr>
+<td><code>docker exec -it &lt;ID&gt; /bin/bash</code></td>
+<td>在<strong>同一個</strong>容器開新終端機 ✓</td>
+</tr>
+<tr>
+<td>在容器內 <code>exit</code></td>
+<td>離開；若是第一個終端機（<code>docker run</code> 那個），整個容器會停止並刪除</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>因為 <code>ros2_humble.sh</code> 有 <code>--rm</code>，<strong>第一個終端機一 <code>exit</code>，整個容器就刪掉了</strong>，用 <code>docker exec</code> 開的其他終端機也會一起斷線。在容器裡新增的檔案（例如之後建的地圖）要先備份，官方作法是 <code>docker cp</code> 或 <code>docker commit</code>（W3 與 Docker 課有教）。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-7" data-audio="audio/B3-7.mp3">
+<div class="sec-head"><h2>7. 出問題時怎麼辦</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>這一課是整個課程最常卡關的地方，所以出問題的表格特別長。看不到車的節點，九成是三個原因之一：agent 沒連上、頻道號碼不一致、或你其實不在容器裡。比較少見但很嚴重的是韌體被覆蓋，例如你玩過高級課的 ESP32 練習程式，車子就認不得了，這時要重新燒出廠韌體，再用 config 底線 robot 點 py 把參數寫回去。這兩個步驟放在表格後面，平常不需要做。</p></details>
+<div class="md"><h3>7.1 症狀對照表</h3>
+<table>
+<thead>
+<tr>
+<th>症狀</th>
+<th>可能原因</th>
+<th>解法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>agent 只印兩行就停住</td>
+<td>ESP32 還沒連上</td>
+<td>按擴展板 <strong>Reset</strong>，等 10～30 秒</td>
+</tr>
+<tr>
+<td>執行 <code>sh ~/start_agent_rpi5.sh</code> 一啟動就報錯</td>
+<td>已經有一個 agent 在跑（開機自動那個沒關）</td>
+<td>回到原本的 agent 終端機按 Ctrl+C；若視窗已被關掉，用下面的 <code>docker stop</code></td>
+</tr>
+<tr>
+<td>agent 報錯找不到 <code>/dev/ttyUSB0</code></td>
+<td>Serial 線沒接、接錯孔、線材只能充電不能傳資料</td>
+<td><code>ls /dev/ttyUSB*</code> 檢查；確認擴展板 <strong>Serial</strong> 口 → Pi 5 USB 孔</td>
+</tr>
+<tr>
+<td><code>ros2 node list</code> 空白或沒有 <code>/YB_Car_Node</code></td>
+<td><code>ROS_DOMAIN_ID</code> 不一致</td>
+<td>容器內 <code>echo $ROS_DOMAIN_ID</code>；不同就 <code>vi ~/.bashrc</code> 改成和控制板相同的 ID，<code>source ~/.bashrc</code> 後重查</td>
+</tr>
+<tr>
+<td>同上，ID 也對</td>
+<td>agent 沒連上</td>
+<td>看 agent 視窗與 MCU 燈；按 Reset</td>
+</tr>
+<tr>
+<td><code>ros2: command not found</code></td>
+<td>你在 Pi 5 主機，不在容器裡</td>
+<td>看提示字元；先 <code>sh ros2_humble.sh</code></td>
+</tr>
+<tr>
+<td><code>sh: ros2_humble.sh: No such file</code></td>
+<td>不在家目錄</td>
+<td>先 <code>cd ~</code> 再執行</td>
+</tr>
+<tr>
+<td>第二個終端機看不到第一個啟動的東西</td>
+<td>用 <code>sh ros2_humble.sh</code> 開了新容器</td>
+<td>改用 <code>docker ps -a</code> ＋ <code>docker exec -it &lt;ID&gt; /bin/bash</code></td>
+</tr>
+<tr>
+<td>MCU 燈每 50 毫秒快閃</td>
+<td>micro-ROS 錯誤</td>
+<td>按 Reset；重啟 agent；仍不行檢查韌體與參數（7.3、7.4）</td>
+</tr>
+<tr>
+<td>MCU 燈每 100 毫秒快閃、蜂鳴器嗶嗶</td>
+<td>低電壓</td>
+<td>充電（B1）</td>
+</tr>
+<tr>
+<td>建圖導航時說拿不到即時 TF</td>
+<td>時間不同步</td>
+<td>官方 FAQ 第 8 題：按 Reset 重新連 agent</td>
+</tr>
+</tbody>
+</table>
+<h3>7.2 清掉殘留的 agent 容器</h3>
+<p>agent 視窗被直接關掉時，Docker 會在背景繼續跑，之後再開 agent 會失敗（官方 FAQ 第 9 題）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">docker ps -a | grep microros/micro-ros-agent
+docker stop xxxxxxxxxx</code></pre>
+</div>
+<p><code>xxxxxxxxxx</code> 換成第一欄的容器 ID，然後重新 <code>sh ~/start_agent_rpi5.sh</code>。最簡單的萬用解是重開機。</p>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>官方 FAQ 第 9 題接著給的重啟指令是 <code>docker run ... microros/micro-ros-agent:humble udp4 --port 8090 -v4</code>，那是 <strong>WiFi／UDP 版</strong>（給虛擬機／電腦版車），Pi 5 版要用序列版，也就是直接再跑一次 <code>sh ~/start_agent_rpi5.sh</code>。</p>
+</div>
+<h3>7.3 重燒出廠韌體（只有韌體被覆蓋時才做）</h3>
+<p>出廠韌體已經燒好，<strong>沒有燒過別的程式就不用做這一步</strong>。需要時準備一台 Windows 電腦和一條能傳資料的 Type-C 線。流程是：裝序列埠驅動 → 用樂鑫（Espressif）燒錄工具把出廠 bin 檔燒到位址 0 → 用序列助手確認看到 <code>hello Yahboom</code>。</p>
+<p>步驟（官方 03.Preparation/1、影片 WuLcfn4lkRo），全部在 Windows：</p>
+<ol>
+<li><strong>裝 CP2102 驅動</strong>：官方資料 <code>Hardware related information → CP2102 serial port chip → CP2102-Windows driver file.zip</code>，64 位元執行 <code>CP210xVCPInstaller_x64.exe</code> → Next → Finish。Type-C 線接擴展板 <strong>Serial</strong> 口到電腦，「裝置管理員 → 連接埠」出現 CP210x 即成功。</li>
+<li><strong>下載燒錄工具</strong>：Espressif Flash Download Tool（<code>https://www.espressif.com.cn/zh-hans/support/download/other-tools</code>），解壓後執行 <code>flash_download_tool</code>，晶片選 <strong>ESP32-S3</strong>。</li>
+<li><strong>設定</strong>：SPIDownload 選 <code>microROS_Robot_Vx.x.x.bin</code>（Vx.x.x 是版本號），位址填 <strong><code>0x0</code></strong>，勾選 <strong>DoNotChgBin</strong>，選 COM 埠，其他預設。</li>
+<li>按 <strong>Start</strong>。沒有自動開始 → 按住 <strong>BOOT</strong>（文件寫 BOOT0）→ 按一下 <strong>Reset</strong> → 放開 BOOT。</li>
+<li>出現藍色 <strong>FINISH</strong> → 斷電重開或按 Reset。</li>
+<li><strong>驗證</strong>：用官方附的 <code>UartAssist.exe</code>，選該 COM 埠，<strong>115200</strong>、8 資料位元、1 停止位元、無同位、無流控；按 Reset，輸出出現 <strong><code>hello Yahboom</code></strong>，下一行是韌體版本號。</li>
+</ol>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>燒錄前要先停掉 Pi 5 上的 agent（它占著序列埠），而且燒錄時 Type-C 線是接到<strong>電腦</strong>，不是 Pi 5。燒完記得把線接回 Pi 5 的 USB 孔。</p>
+</div>
+<h3>7.4 用 config_robot.py 寫回控制板參數</h3>
+<p>重燒韌體、或要改 <code>ROS_DOMAIN_ID</code> 時才需要（官方 03.Preparation/2、影片 MNMRW13Uzgs）。<code>config_robot.py</code> 放在 Pi 5 家目錄，最後一段決定要寫入的值，原始碼包裡是：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">if __name__ == &#x27;__main__&#x27;:
+    robot = MicroROS_Robot(port=&#x27;/dev/ttyUSB0&#x27;, debug=False)
+
+    #robot.set_wifi_config(&quot;yahboom2&quot;, &quot;yahboom890729&quot;)
+    #robot.set_udp_config([192, 168, 2, 103], 8090)
+    #robot.set_car_type(robot.CAR_TYPE_COMPUTER)
+    robot.set_car_type(robot.CAR_TYPE_RPI5)
+    robot.set_ros_domain_id(20)
+    robot.set_ros_serial_baudrate(921600)
+    robot.set_ros_namespace(&quot;&quot;)
+    robot.set_pwm_servo_offset(1, 0)
+    robot.set_pwm_servo_offset(2, 0)
+    robot.set_motor_pid_parm(1, 0.2, 0.2)
+    robot.set_imu_yaw_pid_parm(1, 0, 0.2)</code></pre>
+</div>
+<p>重點：車型要是 <strong><code>robot.CAR_TYPE_RPI5</code></strong>（序列版）、ID 預設 <code>20</code>、namespace 空字串、其他保持預設。</p>
+<p>執行步驟：</p>
+<ol>
+<li>agent 終端機 Ctrl+C、Docker 終端機 <code>exit</code>（序列埠要空出來）。</li>
+<li>確認序列裝置：</li>
+</ol>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ls /dev/ttyUSB*</code></pre>
+</div>
+<ol>
+<li>視需要編輯：<code>vi ~/config_robot.py</code>（一般不用改）。</li>
+<li><strong>短按擴展板 Reset</strong>，在 <strong>5 秒內</strong>（MCU 燈每 300 毫秒閃一次的設定狀態）執行：</li>
+</ol>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cd ~
+python3 config_robot.py</code></pre>
+</div>
+<ol>
+<li>程式會印出讀回來的 <code>version</code>、<code>car_type</code>、<code>domain_id</code>、<code>ros_serial_baudrate</code>、<code>ros_namespace</code> 等，檢查和你設定的一致。</li>
+<li><strong>再按一次 Reset</strong>，讓板子載入新設定，然後回到第 4 節重新啟動 agent。</li>
+</ol>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>官方 FAQ 說 <code>ROS_DOMAIN_ID</code> 範圍是 0～101，但 <code>config_robot.py</code> 原始碼會把大於 100 的值強制改成 100。實際請用 0～100。改了控制板的 ID，容器的 <code>~/.bashrc</code> 也要改成一樣；B4 會講到開機自啟的手把服務也要跟著改。</p>
+</div>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>多機課程（A3）會叫你把 <code>set_ros_namespace</code> 改成 <code>robot1</code>／<code>robot2</code>。<strong>回到單車課程前一定要改回 <code>""</code> 並重新執行</strong>，否則所有話題都會變成 <code>/robot1/...</code>，本課程所有單車指令都會失效。</p>
+</div></div>
+</section>
+<section class="videos card-box"><h2>📺 官方影片</h2><div class="yt-grid"><figure class="yt" data-yt="SPAnpmR2944"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 1"><img src="https://i.ytimg.com/vi/SPAnpmR2944/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 1</figcaption></figure><figure class="yt" data-yt="WuLcfn4lkRo"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 2"><img src="https://i.ytimg.com/vi/WuLcfn4lkRo/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 2</figcaption></figure><figure class="yt" data-yt="MNMRW13Uzgs"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 3"><img src="https://i.ytimg.com/vi/MNMRW13Uzgs/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 3</figcaption></figure></div></section>
+<section class="quiz card-box" id="quiz"><h2>📝 小測驗</h2><div class="quiz-item" data-answer="1"><p class="q">1. micro-ROS agent 的角色最接近哪一個比喻？</p><div class="opts"><button class="opt" type="button" data-i="0">車子的電池</button><button class="opt" type="button" data-i="1">把 ESP32 說的話翻譯成 ROS 2 話題的翻譯官</button><button class="opt" type="button" data-i="2">一個遊戲手把</button></div><p class="explain" hidden></p><template class="explain-text">ESP32 跑的 micro-ROS 不能直接加入 DDS 網路，要靠 Pi 5 上的 agent 代為轉換。</template></div><div class="quiz-item" data-answer="1"><p class="q">2. 已經用 sh ros2_humble.sh 進了容器，想再開一個終端機進「同一個」容器，應該？</p><div class="opts"><button class="opt" type="button" data-i="0">再執行一次 sh ros2_humble.sh</button><button class="opt" type="button" data-i="1">docker ps -a 查 ID 後執行 docker exec -it &lt;ID&gt; /bin/bash</button><button class="opt" type="button" data-i="2">再執行一次 sh ~/start_agent_rpi5.sh</button></div><p class="explain" hidden></p><template class="explain-text">再跑 ros2_humble.sh 會開一個新容器；要進同一個必須用 docker exec 搭配當下的容器 ID。</template></div><div class="quiz-item" data-answer="1"><p class="q">3. 容器內 ros2 node list 看不到 /YB_Car_Node，最該先檢查哪兩件事？</p><div class="opts"><button class="opt" type="button" data-i="0">螢幕解析度和 VNC 密碼</button><button class="opt" type="button" data-i="1">agent 是否連上，以及容器與控制板的 ROS_DOMAIN_ID 是否一致</button><button class="opt" type="button" data-i="2">光達方向和輪胎氣壓</button></div><p class="explain" hidden></p><template class="explain-text">官方文件明寫：看不到節點時檢查 ID 是否相同；另外 agent 沒連上也一定看不到。</template></div><div class="quiz-item" data-answer="0"><p class="q">4. 為什麼執行 sh ~/start_agent_rpi5.sh 會一開就報錯？</p><div class="opts"><button class="opt" type="button" data-i="0">開機時已自動啟動一個 agent，同一時間只能有一個</button><button class="opt" type="button" data-i="1">因為沒有接螢幕</button><button class="opt" type="button" data-i="2">因為 ROS_DOMAIN_ID 是 20</button></div><p class="explain" hidden></p><template class="explain-text">agent 只能開一個；要先在原本的 agent 終端機 Ctrl+C，或 docker stop 殘留的 agent 容器。</template></div><div class="quiz-item" data-answer="1"><p class="q">5. 執行 config_robot.py 寫入參數，正確的時機是？</p><div class="opts"><button class="opt" type="button" data-i="0">隨時都可以</button><button class="opt" type="button" data-i="1">按下 Reset 後 5 秒內的設定狀態，而且 agent 要先停掉</button><button class="opt" type="button" data-i="2">agent 連上後的正常狀態</button></div><p class="explain" hidden></p><template class="explain-text">控制板只有在 Reset 後約 5 秒的設定狀態才能讀寫設定，而且序列埠不能被 agent 占用。</template></div><p class="quiz-score">得分：<span class="score">0</span> / 5</p></section>
+<footer class="lesson-foot card-box">
+<button class="btn primary" id="mark-done" type="button">✔ 標記為完成</button>
+<nav class="pager"><a class="btn" href="B2.html">← B2 上一單元</a><a class="btn" href="B4.html">B4 下一單元 →</a></nav>
+</footer>
+</main>
+<audio id="player" preload="none"></audio>
+<script src="app.js"></script>
+</body>
+</html>

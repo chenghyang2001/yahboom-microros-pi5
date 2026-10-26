@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2 ROS 2 最小必學：節點、話題、服務、參數｜Yahboom MicroROS-Pi5 × ROS 2 學習地圖</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-lesson">
+<header class="topbar"><a href="index.html">← 學習地圖</a><span>W2</span></header>
+<main class="container lesson" data-lesson-id="W2">
+
+<section class="lesson-head card-box" id="sec-0" data-audio="audio/W2-0.mp3">
+<div class="eyebrow"><span class="badge level-W">暖身</span>
+<span class="unit-id">W2</span></div>
+<h1>ROS 2 最小必學：節點、話題、服務、參數</h1>
+<div class="meta"><span class="badge">⏱ 90 分鐘</span><span class="badge car-no">🚗 真車：否</span></div>
+<dl class="goal">
+<dt>🎯 學習目標</dt><dd>用電腦 WSL 的 turtlesim 小烏龜，親手操作 ROS 2 的節點、話題、服務、參數與 launch，並知道每個觀念在這台車上對應到什麼</dd>
+<dt>✅ 完成標準</dt><dd>只用 ros2 node list、ros2 topic echo、ros2 topic pub 三個指令，找出小烏龜的速度話題並讓它持續轉圈</dd>
+</dl>
+<div class="player-bar">
+<button class="btn primary" id="play-all" type="button">▶ 全部播放</button>
+<label class="rate">播放速度
+<select id="rate">
+<option value="0.8">0.8×</option><option value="1" selected>1×</option>
+<option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+</select></label>
+<span class="now-playing" id="now-playing" aria-live="polite"></span>
+</div>
+</section>
+<section class="sec card-box" id="sec-1" data-audio="audio/W2-1.mp3">
+<div class="sec-head"><h2>1. ROS 2 是一群小程式在聊天</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>這個單元我們要學 ROS 2 最核心的四個觀念：節點、話題、服務、參數。先講一個比喻。想像一間公司，每個員工只做一件事，有人負責看路、有人負責開車、有人負責記帳。這些員工就是節點。他們之間用公司群組聊天，每個群組有名字，想知道某件事就加入那個群組，這就是話題。有時候要私下問某人一個問題並等他回答，這是服務。每個員工桌上還有一張設定單，可以隨時改，這就是參數。我們用一隻小烏龜來練習，因為小烏龜和這台車用的是完全相同的機制。</p></details>
+<div class="md"><table>
+<thead>
+<tr>
+<th>觀念</th>
+<th>比喻</th>
+<th>小烏龜上的例子</th>
+<th>這台車上的例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>節點 Node</td>
+<td>一個只做一件事的員工</td>
+<td><code>/turtlesim</code>（畫烏龜的視窗）</td>
+<td><code>/YB_Car_Node</code>（ESP32 小腦）</td>
+</tr>
+<tr>
+<td>話題 Topic</td>
+<td>群組聊天，一直廣播</td>
+<td><code>/turtle1/cmd_vel</code>（速度）</td>
+<td><code>/cmd_vel</code>（速度）</td>
+</tr>
+<tr>
+<td>服務 Service</td>
+<td>私訊問問題，等回答</td>
+<td><code>/spawn</code>（多生一隻烏龜）</td>
+<td>Nav2、存地圖等進階功能裡常見</td>
+</tr>
+<tr>
+<td>參數 Parameter</td>
+<td>桌上的設定單</td>
+<td><code>background_r</code>（背景紅色）</td>
+<td>避障距離 <code>ResponseDist</code>、校準係數</td>
+</tr>
+</tbody>
+</table>
+<p><strong>準備：每開一個新的 WSL 終端機，都要先載入 ROS 2 環境</strong></p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">source /opt/ros/jazzy/setup.bash
+# 不想每次打，可以寫進 ~/.bashrc（只要做一次）
+echo &quot;source /opt/ros/jazzy/setup.bash&quot; &gt;&gt; ~/.bashrc</code></pre>
+</div>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>車上是 <strong>Humble</strong>、你的 WSL 是 <strong>Jazzy</strong>。這個單元的指令兩邊完全一樣，只有 <code>source</code> 的路徑不同（車上容器已經幫你設好）。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-2" data-audio="audio/W2-2.mp3">
+<div class="sec-head"><h2>2. 節點：叫出小烏龜</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>第一步，我們叫出兩個節點。第一個終端機執行 turtlesim node，會跳出一個藍色視窗，中間有一隻烏龜。第二個終端機執行 turtle teleop key，這是鍵盤遙控器。滑鼠點一下這個終端機，按方向鍵，烏龜就會動。再開第三個終端機，輸入 ros2 node list，你會看到兩個名字，就是剛剛那兩個員工。再用 ros2 node info 看其中一個，它會列出這個節點聽哪些話題、說哪些話題，這就是節點的名片。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端機 1</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run turtlesim turtlesim_node</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端機 2</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run turtlesim turtle_teleop_key
+# 滑鼠先點這個視窗，再按方向鍵 ↑ ↓ ← →</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端機 3</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 node list
+# 預期看到：
+# /teleop_turtle
+# /turtlesim
+ros2 node info /turtlesim</code></pre>
+</div>
+<p><code>ros2 node info /turtlesim</code> 會分成幾段：<code>Subscribers</code>（它聽的話題，裡面有 <code>/turtle1/cmd_vel</code>）、<code>Publishers</code>（它說的話題，例如 <code>/turtle1/pose</code>）、<code>Service Servers</code>（它提供的服務，例如 <code>/spawn</code>）。</p>
+<p><code>ros2 run</code> 的格式是「<code>ros2 run 套件名 執行檔名</code>」。</p>
+<p><strong>對應到這台車</strong></p>
+<table>
+<thead>
+<tr>
+<th>小烏龜</th>
+<th>這台車（車上 Docker 容器內）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2 run turtlesim turtlesim_node</code></td>
+<td>ESP32 開機連上 agent 後，<code>/YB_Car_Node</code> 自動出現</td>
+</tr>
+<tr>
+<td><code>ros2 run turtlesim turtle_teleop_key</code></td>
+<td><code>ros2 run yahboomcar_ctrl yahboom_keyboard</code></td>
+</tr>
+<tr>
+<td><code>ros2 node info /turtlesim</code></td>
+<td><code>ros2 node info /YB_Car_Node</code></td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>鍵盤遙控「沒反應」九成是因為滑鼠焦點不在遙控那個終端機。車上的 <code>yahboom_keyboard</code> 也一樣，官方文件特別提醒要先點一下終端機。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-3" data-audio="audio/W2-3.mp3">
+<div class="sec-head"><h2>3. 話題：偷聽烏龜的對話</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>ros2 topic list 會列出所有話題，其中 turtle1 的 cmd vel 是速度指令，遙控器往這裡說，烏龜在這裡聽。用 ros2 topic echo 當旁聽者，再回去按方向鍵，就會看到速度資料一筆一筆跑出來。每個話題都有固定格式，叫訊息型別。速度用的是 Twist，分成直線速度和旋轉速度兩組。好消息是，這台車的 cmd vel 用的也是 Twist，在烏龜身上學會的，可以原封不動用在車上。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端機 3</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 topic list
+# /parameter_events
+# /rosout
+# /turtle1/cmd_vel
+# /turtle1/color_sensor
+# /turtle1/pose
+
+ros2 topic echo /turtle1/cmd_vel      # 回終端機 2 按方向鍵，這裡就會印出資料；Ctrl+C 結束
+ros2 topic info /turtle1/cmd_vel      # 看型別、幾個發布者、幾個訂閱者
+ros2 topic hz /turtle1/pose           # 看發布頻率
+ros2 interface show geometry_msgs/msg/Twist</code></pre>
+</div>
+<p><code>Twist</code> 的結構：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">text</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-text">Vector3 linear     ← 直線速度 x, y, z（公尺/秒）
+Vector3 angular    ← 旋轉速度 x, y, z（弧度/秒）</code></pre>
+</div>
+<p>兩輪或四輪的車只會用到兩個欄位：<strong><code>linear.x</code>（前進後退）</strong> 和 <strong><code>angular.z</code>（左轉右轉）</strong>。</p>
+<p><strong>對應到這台車</strong></p>
+<table>
+<thead>
+<tr>
+<th>小烏龜</th>
+<th>這台車</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/turtle1/cmd_vel</code>（Twist）</td>
+<td><code>/cmd_vel</code>（Twist，<strong>同型別</strong>）</td>
+</tr>
+<tr>
+<td><code>/turtle1/pose</code>（烏龜位置）</td>
+<td><code>/odom_raw</code>、<code>/odom</code>（車子位置）</td>
+</tr>
+<tr>
+<td><code>ros2 topic echo /turtle1/pose</code></td>
+<td><code>ros2 topic echo /scan</code>、<code>/imu</code>、<code>/odom_raw</code></td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section class="sec card-box" id="sec-4" data-audio="audio/W2-4.mp3">
+<div class="sec-head"><h2>4. 自己發話題：讓烏龜轉圈（本單元過關題）</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>剛剛是旁聽，現在我們親自在群組裡說話。ros2 topic pub 可以不寫任何程式，直接對一個話題發送資料。我們讓直線速度等於二、旋轉速度等於一點八，烏龜就會一邊前進一邊左轉，畫出一個圓。加上 r 一的選項，代表每秒發一次，烏龜就會一直轉下去，按 Ctrl C 才停。注意大括號裡每個冒號後面都要有一個空格，少了空格就會報格式錯誤。這是初學者最常踩的坑。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端機 3</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash"># 持續轉圈（每秒發一次），Ctrl+C 停止
+ros2 topic pub -r 1 /turtle1/cmd_vel geometry_msgs/msg/Twist &quot;{linear: {x: 2.0}, angular: {z: 1.8}}&quot;
+
+# 只發一次
+ros2 topic pub --once /turtle1/cmd_vel geometry_msgs/msg/Twist &quot;{linear: {x: 2.0}, angular: {z: 0.0}}&quot;</code></pre>
+</div>
+<p><strong>過關標準</strong>：不看講義，只用 <code>ros2 node list</code>（找節點）→ <code>ros2 topic list</code>／<code>ros2 topic echo</code>（找出速度話題、確認格式）→ <code>ros2 topic pub</code>（發指令）讓烏龜持續轉圈。</p>
+<p><strong>對應到這台車（B5 單元會在真車上做）</strong></p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash"># 慢慢原地左轉
+ros2 topic pub /cmd_vel geometry_msgs/msg/Twist &quot;{linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.5}}&quot;
+# 停車：一定要再發一次全零
+ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist &quot;{linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}&quot;</code></pre>
+</div>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p><code>ros2 topic pub</code> 不加選項時<strong>預設每秒重複發送</strong>，直到你按 Ctrl+C。在烏龜身上沒關係，在真車上代表車會一直跑。按 Ctrl+C 後<strong>車不一定會停</strong>，要再發一次全零速度。官方範例用線速度 0.5 m/s，室內偏快，第一次建議用 0.1 以下，並把車輪架空測試。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-5" data-audio="audio/W2-5.mp3">
+<div class="sec-head"><h2>5. 服務：一問一答</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>話題像廣播，一直講、誰想聽就聽。服務則像打電話給櫃台：你提出一個請求，對方處理完回你一個答案，一次就結束。小烏龜提供一個叫 spawn 的服務，意思是生出一隻新烏龜。我們告訴它新烏龜的座標、角度和名字，它就會在畫面上變出第二隻，並回傳名字給我們。什麼時候用話題、什麼時候用服務？持續不斷的資料，例如速度和感測器，用話題；偶爾做一次、需要確認結果的動作，例如存地圖，用服務。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端機 3</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 service list                       # 列出所有服務
+ros2 service type /spawn                # turtlesim/srv/Spawn
+ros2 interface show turtlesim/srv/Spawn # 看請求與回應的欄位（--- 上面是請求、下面是回應）
+
+# 在 (2, 2) 生出一隻叫 turtle2 的烏龜
+ros2 service call /spawn turtlesim/srv/Spawn &quot;{x: 2.0, y: 2.0, theta: 0.2, name: &#x27;turtle2&#x27;}&quot;
+
+# 新烏龜有自己的話題，可以單獨控制
+ros2 topic pub -r 1 /turtle2/cmd_vel geometry_msgs/msg/Twist &quot;{linear: {x: 1.0}, angular: {z: -1.0}}&quot;
+
+# 清掉軌跡、刪掉烏龜
+ros2 service call /clear std_srvs/srv/Empty
+ros2 service call /kill turtlesim/srv/Kill &quot;{name: &#x27;turtle2&#x27;}&quot;</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>比較</th>
+<th>話題 Topic</th>
+<th>服務 Service</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>方向</td>
+<td>單向廣播</td>
+<td>請求 → 回應</td>
+</tr>
+<tr>
+<td>頻率</td>
+<td>持續</td>
+<td>有需要才呼叫一次</td>
+</tr>
+<tr>
+<td>例子</td>
+<td><code>/cmd_vel</code>、<code>/scan</code>、<code>/imu</code></td>
+<td><code>/spawn</code>、存地圖、清除地圖</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p><strong>這台車上</strong>：ESP32 的 <code>/YB_Car_Node</code> 只用話題，沒有提供服務。服務會在進階單元出現，例如 A1 存地圖、A2 Nav2 導航內部大量使用（實際服務名稱以 <code>ros2 service list</code> 為準）。另外還有第三種溝通方式叫 <strong>action（動作）</strong>，用在「長時間任務＋過程回報」，例如導航到某個點；小烏龜可以試 <code>ros2 action send_goal /turtle1/rotate_absolute turtlesim/action/RotateAbsolute "{theta: 1.57}" --feedback</code>。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-6" data-audio="audio/W2-6.mp3">
+<div class="sec-head"><h2>6. 參數：節點的設定單</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>每個節點都可以有自己的參數，像是貼在桌上的設定單，程式執行中也能改。小烏龜的背景顏色就是三個參數：background r、background g、background b，分別是紅綠藍。用 ros2 param set 把紅色調到最大，背景就會變色；param dump 還能把設定單存成檔案。在這台車上，參數非常常用。例如光達避障程式有一個參數叫回應距離，決定障礙物多近才閃避；校準里程時，也是調整一個比例係數參數。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端機 3</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 param list                                   # 列出所有節點的參數
+ros2 param get /turtlesim background_r            # 查目前值
+ros2 param set /turtlesim background_r 255        # 背景變紅
+ros2 param describe /turtlesim background_r       # 看說明與範圍
+ros2 param dump /turtlesim &gt; turtlesim.yaml       # 存成 YAML 檔
+ros2 param load /turtlesim turtlesim.yaml         # 從檔案載回</code></pre>
+</div>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>如果 <code>param set</code> 回 <code>Set parameter successful</code> 但背景沒變，執行一次 <code>ros2 service call /clear std_srvs/srv/Empty</code> 讓畫面重畫。</p>
+</div>
+<p><strong>對應到這台車（原始碼裡宣告的參數）</strong></p>
+<table>
+<thead>
+<tr>
+<th>節點</th>
+<th>參數</th>
+<th>預設值</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>laser_Avoidance</code>（M4 光達避障）</td>
+<td><code>ResponseDist</code></td>
+<td><code>0.55</code></td>
+<td>障礙物多近（公尺）就閃避</td>
+</tr>
+<tr>
+<td><code>laser_Avoidance</code></td>
+<td><code>linear</code>、<code>angular</code></td>
+<td><code>0.3</code>、<code>1.0</code></td>
+<td>避障時的速度</td>
+</tr>
+<tr>
+<td><code>calibrate_linear</code>（B6 校準）</td>
+<td><code>odom_linear_scale_correction</code></td>
+<td>—</td>
+<td>里程比例係數，用 <code>rqt_reconfigure</code> 圖形化調整</td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section class="sec card-box" id="sec-7" data-audio="audio/W2-7.mp3">
+<div class="sec-head"><h2>7. 看全貌：rqt_graph 與 launch 檔</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>節點和話題一多，腦袋很難記住誰連誰。rqt graph 會畫一張關係圖，圓框是節點、箭頭上的字是話題，一眼就看懂資料怎麼流動。另外，真的機器人一次要開好幾個節點，一個一個打 ros2 run 太累。launch 檔就像一份開工清單，一個指令就把清單上的節點全部叫起來，還能順便設定參數。你在這台車上會大量用到 ros2 launch，例如手把控制，就是一個 launch 檔同時啟動手把驅動節點和控車節點。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端機 3</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run rqt_graph rqt_graph
+# 畫面空白時：左上選 Nodes/Topics (all)，再按左上角的重新整理</code></pre>
+</div>
+<p>你應該會看到：<code>/teleop_turtle</code> ──<code>/turtle1/cmd_vel</code>──▶ <code>/turtlesim</code>。</p>
+<p><strong>用 launch 一次開兩隻烏龜</strong>（先把前面的終端機都 Ctrl+C 關掉）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch turtlesim multisim.launch.py
+# 會開出兩個烏龜視窗；找不到這個 launch 檔時，改用兩個終端機各自 ros2 run
+ros2 node list</code></pre>
+</div>
+<p><strong>這台車的 launch 檔長什麼樣子</strong>（原始碼 <code>yahboomcar_ctrl/launch/yahboomcar_joy_launch.py</code>，完整內容）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">python</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">from launch import LaunchDescription
+from launch_ros.actions import Node
+
+def generate_launch_description():
+    node1 = Node(
+        package=&#x27;yahboomcar_ctrl&#x27;,
+        executable=&#x27;yahboom_joy&#x27;,     # 控車節點：讀 /joy，發 /cmd_vel、/beep、/servo_s1、/servo_s2
+    )
+    node2 = Node(
+            package=&#x27;joy&#x27;,
+            executable=&#x27;joy_node&#x27;,    # 手把驅動節點：讀 USB 手把，發 /joy
+    )
+    launch_description = LaunchDescription([node1,node2])
+    return launch_description</code></pre>
+</div>
+<p>這就是 ROS 常見的「<strong>驅動節點＋應用節點</strong>」分層：<code>joy_node</code> 只負責把手把按鍵變成 <code>/joy</code>，<code>yahboom_joy</code> 只負責把 <code>/joy</code> 翻譯成車子的指令。</p>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>官方 05-3 文件寫 <code>ros2 launch yahboomcar_ctrl yahboom_joy_launch.py</code>，但原始碼裡的檔名是 <strong><code>yahboomcar_joy_launch.py</code></strong>。到真車上如果出現找不到檔案，請改用原始碼的檔名，或在容器內 <code>ls /root/yahboomcar_ws/src/yahboomcar_ctrl/launch</code> 查看（需實車確認）。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-8" data-audio="audio/W2-8.mp3">
+<div class="sec-head"><h2>8. ROS_DOMAIN_ID：誰看得到誰</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>最後一個觀念和這台車息息相關。同一個網路上的 ROS 2 程式，會自動互相發現，就像同一棟大樓的人都能聽到廣播。但如果教室裡有十台車，大家的廣播全混在一起就亂了。ROS DOMAIN ID 就是樓層號碼，只有同一樓層的程式才看得到彼此。我們做個小實驗：兩個終端機都設成五號，一個說、一個聽，可以收到；把其中一個改成別的號碼，就收不到了。這台車預設是二十號。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端機 A</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ROS_DOMAIN_ID=5 ros2 run demo_nodes_cpp talker</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端機 B</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ROS_DOMAIN_ID=5 ros2 run demo_nodes_cpp listener     # 收得到 Hello World
+ROS_DOMAIN_ID=7 ros2 run demo_nodes_cpp listener     # 換號碼：什麼都收不到</code></pre>
+</div>
+<p>之後要讓電腦和車互通（A5 單元），電腦這邊要加一行：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">echo &quot;export ROS_DOMAIN_ID=20&quot; &gt;&gt; ~/.bashrc</code></pre>
+</div>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>現在先<strong>不要</strong>把 20 寫進 WSL 的 <code>~/.bashrc</code>，除非你已經要連車。WSL 預設是 NAT 網路，就算號碼一樣也看不到車，需要另外設定 mirrored 網路（A5 單元說明）。</p>
+</div>
+<p><strong>本單元總對照表</strong></p>
+<table>
+<thead>
+<tr>
+<th>指令</th>
+<th>小烏龜</th>
+<th>這台車</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2 node list</code></td>
+<td><code>/turtlesim</code>、<code>/teleop_turtle</code></td>
+<td><code>/YB_Car_Node</code></td>
+</tr>
+<tr>
+<td><code>ros2 topic echo</code></td>
+<td><code>/turtle1/pose</code></td>
+<td><code>/scan</code>、<code>/imu</code>、<code>/odom_raw</code></td>
+</tr>
+<tr>
+<td><code>ros2 topic pub</code></td>
+<td><code>/turtle1/cmd_vel</code></td>
+<td><code>/cmd_vel</code>、<code>/beep</code>、<code>/servo_s1</code></td>
+</tr>
+<tr>
+<td><code>ros2 service call</code></td>
+<td><code>/spawn</code></td>
+<td>進階功能（存地圖、導航）</td>
+</tr>
+<tr>
+<td><code>ros2 param set</code></td>
+<td><code>background_r</code></td>
+<td><code>ResponseDist</code> 等</td>
+</tr>
+<tr>
+<td><code>ros2 launch</code></td>
+<td><code>multisim.launch.py</code></td>
+<td><code>yahboomcar_joy_launch.py</code>、<code>yahboomcar_bringup_launch.py</code></td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section class="videos card-box"><h2>📺 官方影片</h2><div class="yt-grid"><figure class="yt" data-yt="cxN5gvPufYY"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 1"><img src="https://i.ytimg.com/vi/cxN5gvPufYY/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 1</figcaption></figure><figure class="yt" data-yt="hRfJiAchX_Y"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 2"><img src="https://i.ytimg.com/vi/hRfJiAchX_Y/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 2</figcaption></figure><figure class="yt" data-yt="3A7KNww1vx0"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 3"><img src="https://i.ytimg.com/vi/3A7KNww1vx0/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 3</figcaption></figure></div></section>
+<section class="quiz card-box" id="quiz"><h2>📝 小測驗</h2><div class="quiz-item" data-answer="1"><p class="q">1. 想知道「現在有哪些節點在跑」，要用哪個指令？</p><div class="opts"><button class="opt" type="button" data-i="0">ros2 topic list</button><button class="opt" type="button" data-i="1">ros2 node list</button><button class="opt" type="button" data-i="2">ros2 param list</button></div><p class="explain" hidden></p><template class="explain-text">ros2 node list 列出節點；在車上應該看到 /YB_Car_Node。</template></div><div class="quiz-item" data-answer="0"><p class="q">2. 小烏龜的 /turtle1/cmd_vel 和這台車的 /cmd_vel，訊息型別是？</p><div class="opts"><button class="opt" type="button" data-i="0">都是 geometry_msgs/msg/Twist</button><button class="opt" type="button" data-i="1">烏龜是 Twist，車是 Odometry</button><button class="opt" type="button" data-i="2">都是 std_msgs/msg/Int32</button></div><p class="explain" hidden></p><template class="explain-text">兩者同型別，所以在烏龜上學會的 ros2 topic pub 寫法可以直接用在車上，只是換話題名稱與速度值。</template></div><div class="quiz-item" data-answer="1"><p class="q">3. 在真車上用 ros2 topic pub 發了速度指令後按 Ctrl+C，接下來最應該做什麼？</p><div class="opts"><button class="opt" type="button" data-i="0">什麼都不用做，車會自己停</button><button class="opt" type="button" data-i="1">再發一次全零速度讓車停下</button><button class="opt" type="button" data-i="2">重開機</button></div><p class="explain" hidden></p><template class="explain-text">ros2 topic pub 預設每秒重複發送，停止發送不保證車會停，要再發一次 linear 與 angular 全零的 Twist。</template></div><div class="quiz-item" data-answer="1"><p class="q">4. 「偶爾做一次、需要對方回覆結果」的動作，例如生出一隻新烏龜，適合用哪種溝通方式？</p><div class="opts"><button class="opt" type="button" data-i="0">話題 Topic</button><button class="opt" type="button" data-i="1">服務 Service</button><button class="opt" type="button" data-i="2">參數 Parameter</button></div><p class="explain" hidden></p><template class="explain-text">服務是請求／回應模式，像打電話給櫃台；話題適合持續不斷的資料流。</template></div><div class="quiz-item" data-answer="1"><p class="q">5. 兩個終端機一個設 ROS_DOMAIN_ID=5 執行 talker，另一個設 7 執行 listener，結果會？</p><div class="opts"><button class="opt" type="button" data-i="0">正常收到</button><button class="opt" type="button" data-i="1">收不到任何訊息</button><button class="opt" type="button" data-i="2">listener 會報錯當掉</button></div><p class="explain" hidden></p><template class="explain-text">不同 Domain ID 的程式互相看不見。這台車預設 20，電腦要連車時也必須設 20。</template></div><p class="quiz-score">得分：<span class="score">0</span> / 5</p></section>
+<footer class="lesson-foot card-box">
+<button class="btn primary" id="mark-done" type="button">✔ 標記為完成</button>
+<nav class="pager"><a class="btn" href="W1.html">← W1 上一單元</a><a class="btn" href="W3.html">W3 下一單元 →</a></nav>
+</footer>
+</main>
+<audio id="player" preload="none"></audio>
+<script src="app.js"></script>
+</body>
+</html>

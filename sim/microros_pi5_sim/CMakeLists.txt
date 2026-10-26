@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.8)
+project(microros_pi5_sim)
+find_package(ament_cmake REQUIRED)
+install(DIRECTORY urdf meshes launch config worlds maps DESTINATION share/${PROJECT_NAME})
+ament_package()

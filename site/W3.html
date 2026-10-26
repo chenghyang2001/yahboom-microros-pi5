@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W3 Linux、SSH 與 Docker 速成｜Yahboom MicroROS-Pi5 × ROS 2 學習地圖</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-lesson">
+<header class="topbar"><a href="index.html">← 學習地圖</a><span>W3</span></header>
+<main class="container lesson" data-lesson-id="W3">
+
+<section class="lesson-head card-box" id="sec-0" data-audio="audio/W3-0.mp3">
+<div class="eyebrow"><span class="badge level-W">暖身</span>
+<span class="unit-id">W3</span></div>
+<h1>Linux、SSH 與 Docker 速成</h1>
+<div class="meta"><span class="badge">⏱ 1 小時</span><span class="badge car-no">🚗 真車：否</span></div>
+<dl class="goal">
+<dt>🎯 學習目標</dt><dd>學會操作這台車必備的 Linux 指令、用 SSH 遠端登入，並看懂車上 start_agent_rpi5.sh 與 ros2_humble.sh 兩支腳本在做什麼</dd>
+<dt>✅ 完成標準</dt><dd>能 SSH 進一台 Linux，用 docker ps 找到容器 ID，再用 docker exec -it 開第二個終端進同一個容器</dd>
+</dl>
+<div class="player-bar">
+<button class="btn primary" id="play-all" type="button">▶ 全部播放</button>
+<label class="rate">播放速度
+<select id="rate">
+<option value="0.8">0.8×</option><option value="1" selected>1×</option>
+<option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+</select></label>
+<span class="now-playing" id="now-playing" aria-live="polite"></span>
+</div>
+</section>
+<section class="sec card-box" id="sec-1" data-audio="audio/W3-1.mp3">
+<div class="sec-head"><h2>1. 為什麼要學這三樣</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>這台車的大腦是一台跑 Linux 的樹莓派，平常沒有接螢幕和鍵盤，你要從電腦遠端操作它。遠端操作的方式有兩種：一種是 VNC，看得到整個桌面；另一種是 SSH，只有一個文字終端機，但又快又穩。連進去之後，車上的 ROS 2 程式都放在 Docker 容器裡，所以你還要會開容器、進容器。這三樣東西，Linux 指令、SSH、Docker，就是你每次開工都會用到的基本功。今天花一小時把它練熟，之後在車上就不會手忙腳亂。</p></details>
+<div class="md"><p>本單元可以全部在電腦上練：</p>
+<table>
+<thead>
+<tr>
+<th>要練的</th>
+<th>在哪練</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Linux 指令</td>
+<td>電腦 WSL（Ubuntu 24.04）</td>
+</tr>
+<tr>
+<td>SSH</td>
+<td>Windows 內建 <code>ssh</code> 指令；車到了再實際連</td>
+</tr>
+<tr>
+<td>Docker</td>
+<td>WSL 裡有 Docker 的話可練 <code>ros:humble</code> 容器；沒有就先看懂，B3 單元在車上做</td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section class="sec card-box" id="sec-2" data-audio="audio/W3-2.mp3">
+<div class="sec-head"><h2>2. Linux 終端機十個必學指令</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>Linux 的終端機就像跟電腦對話的對講機，你打一行字，它回一段結果。先記住你永遠站在某個資料夾裡，pwd 告訴你在哪，ls 看這裡有什麼，cd 走到別的資料夾。波浪號代表你的家目錄。打字打一半按 Tab 鍵會自動補完，這能幫你少打很多錯字。還有一個救命鍵：Ctrl C，用來中斷正在跑的程式。在 ROS 裡，停止一個節點就是按 Ctrl C。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">pwd                     # 我現在在哪個資料夾
+ls                      # 這裡有哪些檔案（ls -a 連隱藏檔一起看）
+cd ~                    # 回家目錄；cd .. 往上一層；cd /opt/ros 到指定路徑
+mkdir -p test/src       # 建資料夾（-p 連上層一起建）
+cat ~/.bashrc           # 印出檔案內容
+nano test.txt           # 最適合新手的編輯器：Ctrl+O 存檔、Ctrl+X 離開
+sudo apt update         # sudo = 用管理員權限執行；apt = 安裝軟體
+hostname -I             # 看這台機器的 IP
+ls /dev/ttyUSB*         # 看 USB 序列裝置（在車上會看到 /dev/ttyUSB0）
+history                 # 看剛剛打過哪些指令</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>按鍵</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Tab</code></td>
+<td>自動補完指令與檔名（按兩下列出所有可能）</td>
+</tr>
+<tr>
+<td><code>↑</code> / <code>↓</code></td>
+<td>叫出上一個／下一個指令</td>
+</tr>
+<tr>
+<td><code>Ctrl+C</code></td>
+<td>中斷目前執行中的程式（停 ROS 節點就靠它）</td>
+</tr>
+<tr>
+<td><code>Ctrl+Shift+C</code> / <code>Ctrl+Shift+V</code></td>
+<td>在終端機裡複製／貼上</td>
+</tr>
+</tbody>
+</table>
+<p><strong>檔案系統重點</strong>：所有東西都在根目錄 <code>/</code> 底下。<code>/home/pi</code> 是車上 pi 帳號的家目錄（<code>~</code>），<code>/dev</code> 是裝置，<code>/opt/ros/humble</code> 是 ROS 2 安裝位置，<code>/root/yahboomcar_ws</code> 是<strong>容器內</strong>的車子工作空間。</p>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>Linux 指令<strong>分大小寫</strong>，而且空格很重要。官方文件有幾處排版錯誤，例如 <code>sshpi@...</code>（應為 <code>ssh pi@...</code>）、<code>Newgrp Docker</code>（應為 <code>newgrp docker</code>），照抄會失敗。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-3" data-audio="audio/W3-3.mp3">
+<div class="sec-head"><h2>3. SSH：遠端登入車子</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>SSH 讓你在電腦上打開一個終端機，但裡面打的每一行指令，都在遠方的樹莓派上執行，像是一條通往車子的電話線。格式是 ssh、帳號、小老鼠、IP。這台車連熱點時的 IP 是十點四十二點零點一，帳號是 pi，密碼是 yahboom。第一次連線會問你要不要信任這台主機，輸入 yes。輸入密碼時畫面不會顯示任何字，這是正常的，打完按 Enter 就好。要離開就輸入 exit。</p></details>
+<div class="md"><p><strong>步驟</strong>（車到了之後做；現在先看懂）：</p>
+<ol>
+<li>電腦 WiFi 連上車子的熱點 <code>Micro_ros</code>，密碼 <code>12345678</code>。</li>
+<li>開 Windows 的 PowerShell 或 WSL 終端機：</li>
+</ol>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Windows</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ssh pi@10.42.0.1
+# 第一次會問 Are you sure you want to continue connecting (yes/no)? → 輸入 yes
+# 輸入密碼 yahboom（畫面不會顯示，正常）</code></pre>
+</div>
+<ol>
+<li>提示符號變成 <code>pi@...</code> 就代表你已經在車上了：</li>
+</ol>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">hostname -I          # 看車的 IP
+ls ~                 # 應該看得到 start_agent_rpi5.sh、ros2_humble.sh、config_robot.py
+exit                 # 離開 SSH，回到你的電腦</code></pre>
+</div>
+<p><strong>傳檔案</strong>：用 <code>scp</code>（或 Windows 圖形工具 WinSCP）。</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Windows</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">scp test.txt pi@10.42.0.1:~/          # 電腦 → 車子家目錄
+scp pi@10.42.0.1:~/test.txt .         # 車子 → 電腦目前資料夾</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>SSH</th>
+<th>VNC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>看到什麼</td>
+<td>只有文字終端機</td>
+<td>整個 Pi 5 桌面</td>
+</tr>
+<tr>
+<td>速度</td>
+<td>快、省流量</td>
+<td>較慢</td>
+</tr>
+<tr>
+<td>什麼時候用</td>
+<td>下指令、看 log</td>
+<td>要看 RViz、相機畫面、rqt 等視窗</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>官方 Linux 課的範例帳號是 <code>jetson</code>、IP 是 <code>192.168.2.93</code>，那是別的產品。<strong>本車帳號是 <code>pi</code></strong>；連熱點時 IP 是 <code>10.42.0.1</code>，連家裡 WiFi 時 IP 會變，要用 <code>hostname -I</code> 或 <code>ros2 topic echo /rpi5_ip</code> 查。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-4" data-audio="audio/W3-4.mp3">
+<div class="sec-head"><h2>4. Docker 三個名詞：映像、容器、倉庫</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>Docker 有三個名詞一定要分清楚。用遊戲來比喻：映像是遊戲光碟，內容固定、不能改；容器是你把光碟放進主機後正在玩的那一局，可以存檔、可以亂玩。同一張光碟可以同時開好幾局，彼此互不影響。倉庫則是遊戲商店，例如 Docker Hub，可以下載別人做好的光碟。車上的 ROS 2 環境是一張叫 ros humble 的光碟，每次執行 ros2 humble 腳本，就是開一局新的遊戲。</p></details>
+<div class="md"><table>
+<thead>
+<tr>
+<th>名詞</th>
+<th>比喻</th>
+<th>在這台車上</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>映像 Image</td>
+<td>遊戲光碟，唯讀範本</td>
+<td><code>yahboomtechnology/ros-humble:4.0.3</code>、<code>microros/micro-ros-agent:humble</code></td>
+</tr>
+<tr>
+<td>容器 Container</td>
+<td>正在玩的那一局，可寫入</td>
+<td>執行 <code>ros2_humble.sh</code> 後產生的那個容器</td>
+</tr>
+<tr>
+<td>倉庫 Registry</td>
+<td>遊戲商店</td>
+<td>Docker Hub</td>
+</tr>
+</tbody>
+</table>
+<p><strong>最重要的一個性質</strong>：容器裡改的東西，是寫在「這一局」上面。容器一刪掉，改的東西就不見了，除非你用 <code>docker commit</code> 把這一局存成一張新光碟。</p></div>
+</section>
+<section class="sec card-box" id="sec-5" data-audio="audio/W3-5.mp3">
+<div class="sec-head"><h2>5. Docker 常用指令實作</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>現在動手練。如果你的 WSL 裡有裝 Docker，可以下載官方的 ros humble 映像，開一個跟車上同版本的 ROS 2 容器。練習的重點有兩個：第一，用 docker ps 找到容器的名字或 ID；第二，用 docker exec 再開一個終端機，進入同一個容器。用 docker exec 進去的新終端機，不會自動載入 ROS 環境，要自己先 source 一次，這個小細節在車上也一樣。</p></details>
+<div class="md"><p>先確認有沒有 Docker：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">docker --version
+# 出現 command not found 就代表沒裝，這一節先看懂即可（B3 在車上實作）</code></pre>
+</div>
+<p><strong>終端機 1：開一個 Humble 容器</strong></p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端機 1</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">docker run -it --rm --name ros_practice ros:humble
+# 第一次會下載映像，稍等。提示符號變成 root@xxxx:/# 就是進到容器了</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端機 1（容器內）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 topic pub /chatter std_msgs/msg/String &quot;{data: &#x27;hello from container&#x27;}&quot;</code></pre>
+</div>
+<p><strong>終端機 2：進入「同一個」容器</strong></p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端機 2</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">docker ps                                  # 看執行中的容器：CONTAINER ID、IMAGE、NAMES
+docker images                              # 看本機有哪些映像
+docker exec -it ros_practice /bin/bash     # 用名字或 ID 進入同一個容器</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）終端機 2（容器內）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">source /opt/ros/humble/setup.bash          # exec 進來的終端要自己 source
+ros2 topic echo /chatter                   # 收得到終端機 1 發的訊息 → 成功</code></pre>
+</div>
+<p><strong>其他常用指令</strong></p>
+<table>
+<thead>
+<tr>
+<th>指令</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>docker ps -a</code></td>
+<td>連已停止的容器一起列出</td>
+</tr>
+<tr>
+<td><code>docker stop &lt;ID或名字&gt;</code></td>
+<td>停止容器</td>
+</tr>
+<tr>
+<td><code>docker commit &lt;容器ID&gt; 新名字:標籤</code></td>
+<td>把容器目前的狀態存成新映像</td>
+</tr>
+<tr>
+<td><code>docker cp &lt;容器ID&gt;:/路徑 ./</code></td>
+<td>從容器複製檔案到主機</td>
+</tr>
+<tr>
+<td><code>exit</code></td>
+<td>離開容器終端（若是第一個終端，容器會跟著停止）</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>容器 ID 可以只打前幾碼，例如 <code>docker exec -it c5 /bin/bash</code>，只要能唯一辨識就行。車上的容器沒有取名字，<strong>每次 ID 都不同</strong>，所以一定要先 <code>docker ps</code> 查。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-6" data-audio="audio/W3-6.mp3">
+<div class="sec-head"><h2>6. 逐行看懂 start_agent_rpi5.sh</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>現在來看車上真正的腳本。第一支是 start agent rpi5，它只做一件事：用 Docker 開一個 micro ROS agent 容器，也就是翻譯官。最後面的參數最重要：serial 代表走 USB 序列線，dev 後面是 ttyUSB0 這個裝置，b 九二一六零零是傳輸速度。被註解掉的那一行是 WiFi 版，給電腦或虛擬機用的。記住，翻譯官同一時間只能開一個，重複開會報錯。</p></details>
+<div class="md"><p>原始碼完整內容（<code>~/start_agent_rpi5.sh</code>）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機（檔案內容）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">#!/bin/bash
+# WIFI
+#docker run -it --rm -v /dev:/dev -v /dev/shm:/dev/shm --privileged --net=host microros/micro-ros-agent:humble udp4 --port 8090 -v4
+# serial
+docker run -it --rm -v /dev:/dev -v /dev/shm:/dev/shm --privileged --net=host microros/micro-ros-agent:humble serial --dev /dev/ttyUSB0 -b 921600 -v4</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>片段</th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>docker run -it</code></td>
+<td>開一個新容器，並給你互動終端（<code>-i</code> 互動、<code>-t</code> 終端）</td>
+</tr>
+<tr>
+<td><code>--rm</code></td>
+<td>容器結束後自動刪除</td>
+</tr>
+<tr>
+<td><code>-v /dev:/dev</code></td>
+<td>把主機的裝置資料夾掛進容器，容器才看得到 <code>/dev/ttyUSB0</code></td>
+</tr>
+<tr>
+<td><code>-v /dev/shm:/dev/shm</code></td>
+<td>共享記憶體，ROS 2 的 DDS 通訊會用到</td>
+</tr>
+<tr>
+<td><code>--privileged</code></td>
+<td>給容器存取硬體的權限</td>
+</tr>
+<tr>
+<td><code>--net=host</code></td>
+<td>容器直接用主機的網路，車上的話題才能被電腦看見</td>
+</tr>
+<tr>
+<td><code>microros/micro-ros-agent:humble</code></td>
+<td>映像名稱：官方 micro-ROS agent，Humble 版</td>
+</tr>
+<tr>
+<td><code>serial --dev /dev/ttyUSB0 -b 921600</code></td>
+<td>走序列埠、裝置 <code>/dev/ttyUSB0</code>、鮑率 921600</td>
+</tr>
+<tr>
+<td><code>-v4</code></td>
+<td>日誌詳細程度（數字越大印越多）；注意這個 <code>-v4</code> 是 agent 的參數，和前面掛載用的 <code>-v</code> 不同</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p><strong>agent 只能開一個</strong>。出廠時開機就已自動啟動 agent，再手動開會報錯。正確結束方式是在 agent 終端按 <strong>Ctrl+C</strong>，不要直接關視窗（關視窗容器會留在背景）。殘留時：<code>docker ps -a | grep microros/micro-ros-agent</code> 找 ID，再 <code>docker stop &lt;ID&gt;</code>。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-7" data-audio="audio/W3-7.mp3">
+<div class="sec-head"><h2>7. 逐行看懂 ros2_humble.sh</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>第二支腳本是 ros2 humble，它開的是裝滿車子程式的 ROS 2 容器。前面幾行是讓容器裡的視窗程式，例如 RViz，可以顯示在樹莓派的桌面上。接著把手把和相機兩個裝置掛進容器，最後用 yahboom 的 ros humble 映像，執行容器裡的一支啟動腳本。要記住兩件事。第一，它有 rm 選項，容器裡裝的東西關掉就沒了。第二，每執行一次就開一個全新容器，想多開終端要用 docker exec，不能再跑一次這支腳本。</p></details>
+<div class="md"><p>原始碼完整內容（<code>~/ros2_humble.sh</code>）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機（檔案內容）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">#!/bin/bash
+xhost +
+docker run -it --rm \
+--privileged=true \
+--net=host \
+--env=&quot;DISPLAY&quot; \
+--env=&quot;QT_X11_NO_MITSHM=1&quot; \
+-v /tem/.X11-unix:/tmp/.X11-unix \
+--security-opt apparmor:unconfined \
+-v /dev/input:/dev/input \
+-v /dev/video0:/dev/video0 \
+yahboomtechnology/ros-humble:4.0.3 /bin/bash /root/1.sh</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>行</th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>xhost +</code></td>
+<td>允許任何程式連到桌面顯示（讓容器內的 RViz 能開視窗）</td>
+</tr>
+<tr>
+<td><code>docker run -it --rm</code></td>
+<td>開新容器、給終端、結束就刪除</td>
+</tr>
+<tr>
+<td><code>--privileged=true</code>、<code>--net=host</code></td>
+<td>同 agent：硬體權限、共用主機網路</td>
+</tr>
+<tr>
+<td><code>--env="DISPLAY"</code>、<code>QT_X11_NO_MITSHM=1</code></td>
+<td>把顯示器位置傳進容器，修正 Qt 視窗顯示問題</td>
+</tr>
+<tr>
+<td><code>-v ...X11-unix:/tmp/.X11-unix</code></td>
+<td>掛載桌面顯示用的通道</td>
+</tr>
+<tr>
+<td><code>--security-opt apparmor:unconfined</code></td>
+<td>關掉 AppArmor 安全限制</td>
+</tr>
+<tr>
+<td><code>-v /dev/input:/dev/input</code></td>
+<td>掛載輸入裝置，手把接收器在這裡</td>
+</tr>
+<tr>
+<td><code>-v /dev/video0:/dev/video0</code></td>
+<td>掛載 USB 相機</td>
+</tr>
+<tr>
+<td><code>yahboomtechnology/ros-humble:4.0.3</code></td>
+<td>車子 ROS 2 容器的映像與版本</td>
+</tr>
+<tr>
+<td><code>/bin/bash /root/1.sh</code></td>
+<td>容器啟動後執行 <code>/root/1.sh</code>（出廠用它自動啟動手把控制；內容需實車 <code>cat /root/1.sh</code> 確認）</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p><strong>原始碼小瑕疵</strong>：<code>-v /tem/.X11-unix:/tmp/.X11-unix</code> 的 <code>/tem</code> 應該是 <code>/tmp</code>（筆誤）。因為同時用了 <code>--net=host</code>，桌面視窗通常仍能顯示，所以出廠沒人發現；若遇到容器內 RViz 開不出視窗，可以先檢查這一行（需實車確認）。另外 <code>xhost +</code> 會關閉桌面的存取控制，只在可信任的區網使用。</p>
+</div>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p><strong><code>--rm</code> 的後果</strong>：容器內做的修改（裝套件、改 <code>~/.bashrc</code> 的 <code>ROS_DOMAIN_ID</code>、建好的地圖）關掉容器就消失。要保留就在<strong>主機</strong>另開終端 <code>docker ps</code> 查 ID，再 <code>docker commit &lt;ID&gt; 新映像名:標籤</code>，並把 <code>ros2_humble.sh</code> 最後的映像改成新的；地圖等檔案也可以用 <code>docker cp</code> 複製出來。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-8" data-audio="audio/W3-8.mp3">
+<div class="sec-head"><h2>8. 車上的標準開工流程</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>把今天學的串起來，就是你每次在車上開工的流程。先在主機開翻譯官，再打開車子電源或按 reset，等 ESP32 連上。接著另開一個終端執行 ros2 humble 進容器，打 ros2 node list，看到 YB Car Node 就代表三層全通了。要開第二、第三個終端，在主機用 docker ps 查容器 ID，再用 docker exec 進去。這套流程請練到不用看講義也打得出來。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機 終端機 1</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">sh ~/start_agent_rpi5.sh          # 開翻譯官；接著打開車子電源或按控制板 Reset，等約 10 秒</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機 終端機 2</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">sh ros2_humble.sh                 # 進 ROS 2 容器（官方有時寫 ./ros2_humble.sh，效果相同）</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 node list                    # 看到 /YB_Car_Node 就成功</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機 終端機 3</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">docker ps                         # 找 yahboomtechnology/ros-humble:4.0.3 那一列的 CONTAINER ID
+docker exec -it &lt;容器ID&gt; /bin/bash # 進同一個容器開第二個終端</code></pre>
+</div>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>車上的容器 <code>~/.bashrc</code> 已經設好 ROS 環境，<code>docker exec</code> 進去後通常可直接用 <code>ros2</code>；若出現 <code>ros2: command not found</code>，執行 <code>source /opt/ros/humble/setup.bash</code>（需實車確認）。另外出廠時開機就已經自動開好 agent 與容器兩個視窗，VNC 桌面上看得到；這時直接用那兩個視窗即可，不必重開。</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>常見錯誤</th>
+<th>原因</th>
+<th>解法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>第二個終端看不到第一個終端開的節點</td>
+<td>又跑了一次 <code>ros2_humble.sh</code>，開到新容器</td>
+<td>改用 <code>docker ps</code> + <code>docker exec</code></td>
+</tr>
+<tr>
+<td>開 agent 報錯</td>
+<td>背景已經有一個 agent</td>
+<td>Ctrl+C 原本那個，或 <code>docker stop</code> 殘留容器</td>
+</tr>
+<tr>
+<td><code>ros2 node list</code> 沒有 <code>/YB_Car_Node</code></td>
+<td>agent 沒開、沒按 Reset、或 <code>ROS_DOMAIN_ID</code> 不是 20</td>
+<td>依序檢查；<code>ls /dev/ttyUSB*</code> 確認序列線</td>
+</tr>
+<tr>
+<td>在主機打 <code>ros2</code> 找不到指令</td>
+<td>ROS 2 只裝在容器裡</td>
+<td>先進容器再打</td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section class="videos card-box"><h2>📺 官方影片</h2><div class="yt-grid"><figure class="yt" data-yt="SPAnpmR2944"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 1"><img src="https://i.ytimg.com/vi/SPAnpmR2944/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 1</figcaption></figure><figure class="yt" data-yt="hq0Zbi7BmFA"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 2"><img src="https://i.ytimg.com/vi/hq0Zbi7BmFA/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 2</figcaption></figure></div></section>
+<section class="quiz card-box" id="quiz"><h2>📝 小測驗</h2><div class="quiz-item" data-answer="1"><p class="q">1. 用 SSH 登入連著熱點的這台車，正確指令是？</p><div class="opts"><button class="opt" type="button" data-i="0">ssh jetson@192.168.2.93</button><button class="opt" type="button" data-i="1">ssh pi@10.42.0.1</button><button class="opt" type="button" data-i="2">sshpi@10.42.0.1</button></div><p class="explain" hidden></p><template class="explain-text">本車帳號 pi、熱點 IP 10.42.0.1。jetson 與 192.168.2.93 是其他產品的範例；sshpi 是官方排版錯誤，少了空格。</template></div><div class="quiz-item" data-answer="1"><p class="q">2. 已經用 ros2_humble.sh 進了容器，想再開一個終端進「同一個」容器，應該？</p><div class="opts"><button class="opt" type="button" data-i="0">再執行一次 sh ros2_humble.sh</button><button class="opt" type="button" data-i="1">在主機 docker ps 查 ID，再 docker exec -it &lt;ID&gt; /bin/bash</button><button class="opt" type="button" data-i="2">docker run -it ros:humble</button></div><p class="explain" hidden></p><template class="explain-text">每執行一次 ros2_humble.sh 就是開一個全新容器，看不到前一個容器的節點；多開終端要用 docker exec。</template></div><div class="quiz-item" data-answer="0"><p class="q">3. start_agent_rpi5.sh 裡的 serial --dev /dev/ttyUSB0 -b 921600 代表什麼？</p><div class="opts"><button class="opt" type="button" data-i="0">agent 走 USB 序列線連 ESP32，速度 921600</button><button class="opt" type="button" data-i="1">agent 走 WiFi 的 8090 埠</button><button class="opt" type="button" data-i="2">開啟相機裝置</button></div><p class="explain" hidden></p><template class="explain-text">Pi 5 版走序列埠；被註解掉的 udp4 --port 8090 才是 WiFi 版。</template></div><div class="quiz-item" data-answer="1"><p class="q">4. 在車上容器內裝了一個套件，關掉容器後再用 ros2_humble.sh 進去，套件還在嗎？</p><div class="opts"><button class="opt" type="button" data-i="0">還在</button><button class="opt" type="button" data-i="1">不在，因為腳本有 --rm 而且每次都從原映像開新容器</button><button class="opt" type="button" data-i="2">要重開機才會出現</button></div><p class="explain" hidden></p><template class="explain-text">--rm 讓容器結束就刪除；要保留修改，得用 docker commit 存成新映像並修改腳本使用新映像。</template></div><div class="quiz-item" data-answer="0"><p class="q">5. Docker 的「映像」和「容器」關係最像？</p><div class="opts"><button class="opt" type="button" data-i="0">遊戲光碟與正在玩的那一局</button><button class="opt" type="button" data-i="1">兩個名字不同但完全一樣的東西</button><button class="opt" type="button" data-i="2">硬碟與記憶體</button></div><p class="explain" hidden></p><template class="explain-text">映像是唯讀範本，容器是由映像啟動、可寫入的執行個體；同一映像可開很多容器。</template></div><p class="quiz-score">得分：<span class="score">0</span> / 5</p></section>
+<footer class="lesson-foot card-box">
+<button class="btn primary" id="mark-done" type="button">✔ 標記為完成</button>
+<nav class="pager"><a class="btn" href="W2.html">← W2 上一單元</a><a class="btn" href="W4.html">W4 下一單元 →</a></nav>
+</footer>
+</main>
+<audio id="player" preload="none"></audio>
+<script src="app.js"></script>
+</body>
+</html>

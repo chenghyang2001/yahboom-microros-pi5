@@ -1,0 +1,119 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 0.5
+      Plane Cell Count: 20
+      Reference Frame: <Fixed Frame>
+      Value: true
+    - Class: rviz_default_plugins/Map
+      Name: Map
+      Enabled: true
+      Topic:
+        Value: /map
+        Durability Policy: Transient Local
+      Alpha: 0.7
+      Value: true
+    - Class: rviz_default_plugins/Map
+      Name: Global Costmap
+      Enabled: true
+      Topic:
+        Value: /global_costmap/costmap
+      Color Scheme: costmap
+      Alpha: 0.35
+      Value: true
+    - Class: rviz_default_plugins/Path
+      Name: Plan
+      Enabled: true
+      Topic:
+        Value: /plan
+      Color: 25; 230; 80
+      Line Style: Billboards
+      Line Width: 0.04
+      Value: true
+    - Class: nav2_rviz_plugins/ParticleCloud
+      Name: AMCL Particles
+      Enabled: true
+      Topic:
+        Value: /particle_cloud
+        Reliability Policy: Best Effort
+      Color: 0; 255; 120
+      Value: true
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Enabled: true
+      Description Source: Topic
+      Description Topic:
+        Value: /robot_description
+      Value: true
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: false
+      Show Names: true
+      Marker Scale: 0.3
+      Value: false
+    - Class: rviz_default_plugins/LaserScan
+      Name: LaserScan
+      Enabled: true
+      Topic:
+        Value: /scan
+      Size (m): 0.05
+      Style: Flat Squares
+      Color Transformer: FlatColor
+      Color: 255; 40; 40
+      Value: true
+    - Class: rviz_default_plugins/Odometry
+      Name: Odometry
+      Enabled: true
+      Topic:
+        Value: /odom
+      Keep: 30
+      Position Tolerance: 0.2
+      Angle Tolerance: 0.3
+      Shape:
+        Value: Arrow
+        Color: 255; 170; 0
+        Shaft Length: 0.2
+        Shaft Radius: 0.015
+        Head Length: 0.06
+        Head Radius: 0.035
+      Value: true
+    - Class: rviz_default_plugins/Image
+      Name: Camera
+      Enabled: true
+      Topic:
+        Value: /camera/image_raw
+      Value: true
+  Enabled: true
+  Global Options:
+    Background Color: 40; 40; 44
+    Fixed Frame: odom
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/SetInitialPose
+      Topic:
+        Value: /initialpose
+    - Class: rviz_default_plugins/SetGoal
+      Topic:
+        Value: /goal_pose
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/TopDownOrtho
+      Name: Current View
+      Scale: 75
+      X: 0
+      Y: 0
+      Target Frame: <Fixed Frame>
+      Value: TopDownOrtho (rviz_default_plugins)
+    Saved: ~
+Window Geometry:
+  Height: 690
+  Width: 640

@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A3 多機協作：namespace、多車遙控與導航｜Yahboom MicroROS-Pi5 × ROS 2 學習地圖</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-lesson">
+<header class="topbar"><a href="index.html">← 學習地圖</a><span>A3</span></header>
+<main class="container lesson" data-lesson-id="A3">
+
+<section class="lesson-head card-box" id="sec-0" data-audio="audio/A3-0.mp3">
+<div class="eyebrow"><span class="badge level-A">高級</span>
+<span class="unit-id">A3</span></div>
+<h1>多機協作：namespace、多車遙控與導航</h1>
+<div class="meta"><span class="badge">⏱ 90 分鐘</span><span class="badge car-yes">🚗 真車：是</span></div>
+<dl class="goal">
+<dt>🎯 學習目標</dt><dd>理解 namespace（命名空間）如何讓兩台車在同一個 ROS 網路裡互不打架，並用一支手把或一個鍵盤同時控制兩台車，再讓兩台車各自導航。</dd>
+<dt>✅ 完成標準</dt><dd>兩台車設成 robot1、robot2 後，一支手把能同時控制兩台；做完後把兩台車都改回單車設定（namespace 空白），單車課程恢復正常。</dd>
+</dl>
+<div class="player-bar">
+<button class="btn primary" id="play-all" type="button">▶ 全部播放</button>
+<label class="rate">播放速度
+<select id="rate">
+<option value="0.8">0.8×</option><option value="1" selected>1×</option>
+<option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+</select></label>
+<span class="now-playing" id="now-playing" aria-live="polite"></span>
+</div>
+</section>
+<section class="sec card-box" id="sec-1" data-audio="audio/A3-1.mp3">
+<div class="sec-head"><h2>1. 為什麼多機需要 namespace</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>想像一間教室有兩個同學都叫小明，老師喊小明站起來，兩個人會一起站起來。ROS 也一樣：兩台車的速度話題都叫 cmd vel，你發一個前進命令，兩台會一起動，而且兩台的光達資料也會混在同一個 scan 話題裡。解法是幫每台車加一個姓氏，叫做 namespace，命名空間。一台叫 robot1，一台叫 robot2，話題就變成 robot1 斜線 cmd vel 和 robot2 斜線 cmd vel，各聽各的。</p></details>
+<div class="md"><h3>1.1 兩個概念不要搞混</h3>
+<table>
+<thead>
+<tr>
+<th>設定</th>
+<th>作用</th>
+<th>多機時怎麼設</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ROS_DOMAIN_ID</code></td>
+<td>「頻道」：同一個 ID 的節點才互相看得到</td>
+<td>兩台車、電腦<strong>全部設一樣</strong>（預設 <code>20</code>）</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>「姓氏」：同一個頻道裡，用前綴區分是誰的話題</td>
+<td>兩台車<strong>設不一樣</strong>：<code>robot1</code>、<code>robot2</code></td>
+</tr>
+</tbody>
+</table>
+<p>為什麼不乾脆給兩台車不同的 Domain ID？那樣兩台車就完全看不到對方，一支手把也沒辦法同時控制兩台。<strong>同頻道、不同姓氏</strong>才是多機協作的做法。</p>
+<h3>1.2 加了 namespace 之後話題長怎樣</h3>
+<table>
+<thead>
+<tr>
+<th>單車（namespace 空白）</th>
+<th>多機 robot1</th>
+<th>多機 robot2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/cmd_vel</code></td>
+<td><code>/robot1/cmd_vel</code></td>
+<td><code>/robot2/cmd_vel</code></td>
+</tr>
+<tr>
+<td><code>/scan</code></td>
+<td><code>/robot1/scan</code></td>
+<td><code>/robot2/scan</code></td>
+</tr>
+<tr>
+<td><code>/odom_raw</code>、<code>/imu</code></td>
+<td><code>/robot1/odom_raw</code>、<code>/robot1/imu</code></td>
+<td><code>/robot2/odom_raw</code>、<code>/robot2/imu</code></td>
+</tr>
+<tr>
+<td><code>/beep</code>、<code>/servo_s1</code>、<code>/servo_s2</code></td>
+<td><code>/robot1/beep</code>…</td>
+<td><code>/robot2/beep</code>…</td>
+</tr>
+</tbody>
+</table>
+<p>座標系（TF frame）也會加前綴，例如 <code>robot1/base_link</code>、<code>robot1/odom</code>、<code>robot1/laser_frame</code>，避免兩台車的 TF 樹打架。</p>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p>namespace 是寫進 <strong>ESP32 韌體設定</strong>裡的（不是 Pi 5 上的檔案），所以 ESP32 一開機發布的話題就已經帶前綴。這也是為什麼做完多機課，<strong>一定要改回來</strong>，否則所有單車課程都會因為找不到 <code>/cmd_vel</code>、<code>/scan</code> 而失敗（見第 6 節）。</p>
+</div>
+<h3>1.3 事前準備</h3>
+<ul>
+<li><strong>兩台</strong> MicroROS-Pi5 車，電池都充飽。</li>
+<li>兩台車要連到<strong>同一個 WiFi 路由器</strong>。出廠時每台車各自開熱點 <code>Micro_ros</code>，兩台各開各的熱點是互相看不到的；請先照 B2 單元把兩台都設成連你家的 WiFi，並記下兩台的 IP。</li>
+<li>一支手把接收器（只要插在其中一台 Pi 5 上）。官方程式以 Yahboom 的「ROS Robot USB Wireless Controller」為例，其他手把按鍵對應可能不同。</li>
+<li>多機導航建議另備一台電腦跑 RViz（在 Pi 上開 RViz 會很卡），電腦設定見 A5。</li>
+</ul></div>
+</section>
+<section class="sec card-box" id="sec-2" data-audio="audio/A3-2.mp3">
+<div class="sec-head"><h2>2. 兩台車的設定：config_robot.py</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>設定 namespace 要用 Pi 5 家目錄裡的 config robot 點 py。它會透過序列線，把設定寫進 ESP32 控制板。有一個時間限制要記住：按下控制板的 Reset 後，只有前五秒是設定狀態，指示燈每零點三秒閃一次，要在這五秒內執行程式才寫得進去。寫好之後再按一次 Reset，新設定才會生效。兩台車各做一次，一台填 robot1，另一台填 robot2。</p></details>
+<div class="md"><h3>2.1 先停掉 agent 與容器</h3>
+<p>設定期間序列埠不能被 agent 佔用。在 VNC 桌面上：</p>
+<ol>
+<li>Docker 終端輸入 <code>exit</code> 離開容器。</li>
+<li>agent 終端按 <strong>Ctrl+C</strong> 關掉 agent。</li>
+</ol>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機（確認序列裝置還在）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ls /dev/ttyUSB*</code></pre>
+</div>
+<h3>2.2 修改 config_robot.py</h3>
+<p><code>config_robot.py</code> 在 Pi 5 家目錄（<code>/home/pi</code>）。原始檔最後一段長這樣：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">config_robot.py（原始碼節錄，在 Pi 5 主機的 /home/pi）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">if __name__ == &#x27;__main__&#x27;:
+    robot = MicroROS_Robot(port=&#x27;/dev/ttyUSB0&#x27;, debug=False)
+
+    #robot.set_wifi_config(&quot;yahboom2&quot;, &quot;yahboom890729&quot;)
+    #robot.set_udp_config([192, 168, 2, 103], 8090)
+    #robot.set_car_type(robot.CAR_TYPE_COMPUTER)
+    robot.set_car_type(robot.CAR_TYPE_RPI5)
+    robot.set_ros_domain_id(20)
+    robot.set_ros_serial_baudrate(921600)
+    robot.set_ros_namespace(&quot;&quot;)
+    robot.set_pwm_servo_offset(1, 0)
+    robot.set_pwm_servo_offset(2, 0)
+    robot.set_motor_pid_parm(1, 0.2, 0.2)
+    robot.set_imu_yaw_pid_parm(1, 0, 0.2)</code></pre>
+</div>
+<p><strong>改之前先備份</strong>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cd ~
+cp config_robot.py config_robot.py.bak
+nano config_robot.py</code></pre>
+</div>
+<p>只改一行：</p>
+<table>
+<thead>
+<tr>
+<th>車</th>
+<th>把 <code>robot.set_ros_namespace("")</code> 改成</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>第一台</td>
+<td><code>robot.set_ros_namespace("robot1")</code></td>
+</tr>
+<tr>
+<td>第二台</td>
+<td><code>robot.set_ros_namespace("robot2")</code></td>
+</tr>
+</tbody>
+</table>
+<p>其他行（<code>CAR_TYPE_RPI5</code>、<code>set_ros_domain_id(20)</code>、鮑率 <code>921600</code>、PID）<strong>都不要動</strong>。兩台的 <code>set_ros_domain_id</code> 必須相同。</p>
+<h3>2.3 寫入板子</h3>
+<ol>
+<li>短按控制板 <strong>Reset</strong>，看 MCU 指示燈<strong>每 300 毫秒閃一次</strong>（設定狀態，約 5 秒）。</li>
+<li>在這 5 秒內執行：</li>
+</ol>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cd ~
+sudo python3 config_robot.py</code></pre>
+</div>
+<ol>
+<li>程式最後會印出目前所有韌體參數（<code>print_all_firmware_parm()</code>），確認 <code>ros_namespace: robot1</code>（或 robot2）、<code>domain_id: 20</code>。</li>
+<li>程式提示 <code>Please reboot the device to take effect</code> → 再按一次 <strong>Reset</strong>，讓板子載入新設定。</li>
+</ol>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>官方文件〈控制板設定參數〉寫 <code>python3 config_robot.py</code>，多機課程寫 <code>sudo python3 config_robot.py</code>，兩種寫法並存；如果不加 <code>sudo</code> 出現序列埠權限錯誤，就加 <code>sudo</code>。另外 FAQ 說 ROS_DOMAIN_ID 範圍是 0～101，但 <code>config_robot.py</code> 原始碼實際會把大於 100 的值壓成 100，所以請用 0～100 之間的數字。</p>
+</div>
+<h3>2.4 確認兩台都上線</h3>
+<p>兩台各自啟動 agent 與容器：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機（兩台都做）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">sh ~/start_agent_rpi5.sh</code></pre>
+</div>
+<p>按控制板 Reset 等連上後，另開終端：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機（兩台都做）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">sh ros2_humble.sh</code></pre>
+</div>
+<p>任選一台的容器：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（任一台）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 node list
+ros2 topic list</code></pre>
+</div>
+<p>應該看到兩組話題：<code>/robot1/cmd_vel</code>、<code>/robot1/scan</code>…以及 <code>/robot2/cmd_vel</code>、<code>/robot2/scan</code>…。只看到自己那台，見第 7 節。</p></div>
+</section>
+<section class="sec card-box" id="sec-3" data-audio="audio/A3-3.mp3">
+<div class="sec-head"><h2>3. 一支手把控兩台車</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>手把接收器只要插在其中一台 Pi 上。在那台車的容器裡開兩個節點：一個是 joy node，負責讀手把按鍵；另一個是 Yahboom 寫的多機手把程式，它把同一份速度命令同時發給 robot1 和 robot2。所以你推一下搖桿，兩台車會做一模一樣的動作，像在跳整齊的雙人舞。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（插著手把接收器的那台；兩行各開一個終端，用 docker exec 進同一個容器）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run joy joy_node
+ros2 run yahboomcar_multi multi_joy_ctrl</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（看節點關係圖）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run rqt_graph rqt_graph</code></pre>
+</div>
+<p><code>multi_joy_ctrl</code>（原始碼 <code>yahboomcar_multi/multi_yahboom_joy.py</code>）做的事：</p>
+<ul>
+<li>訂閱 <code>joy</code>（手把按鍵）</li>
+<li>發布 <code>/robot1/cmd_vel</code>、<code>/robot2/cmd_vel</code>（速度）</li>
+<li>發布 <code>/robot1/beep</code>、<code>/robot2/beep</code>（蜂鳴器）</li>
+<li>發布 <code>/robot1/servo_s1</code>、<code>robot2/servo_s1</code>、<code>/robot1/servo_s2</code>、<code>/robot2/servo_s2</code>（雲台）</li>
+<li>發布 <code>JoyState</code>（手把是否接管）</li>
+</ul>
+<p>按鍵與單車手把（B4）相同；<strong>R1 要先按下</strong>，手把才會輸出速度。</p>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>原始碼裡 <code>robot2/servo_s1</code> 少了開頭的 <code>/</code>（其他都有）。在預設的根命名空間下兩者結果相同，但這看起來是原廠的小瑕疵；如果你以後把這個節點放進某個 namespace 執行，robot2 的雲台 S1 可能會收不到。原始碼也預留了 <code>/robot3/cmd_vel</code>、<code>/robot3/beep</code>，代表程式設計上可以擴充到第三台。</p>
+</div>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>車子開機時，容器會自動啟動單車版的手把程式（<code>/root/1.sh</code>）。它發的是沒有前綴的 <code>/cmd_vel</code>，在多機設定下沒有車會聽，但仍會佔用手把。如果多機手把沒反應，先照 B4 單元關掉自啟動的手把行程，再開上面兩個節點。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-4" data-audio="audio/A3-4.mp3">
+<div class="sec-head"><h2>4. 多機鍵盤控制</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>沒有手把也沒關係，鍵盤一樣能同時控制兩台。這個鍵盤程式會開兩個發布者，分別送到 robot1 和 robot2 的速度話題，按鍵和單車鍵盤控制一模一樣：i 前進、逗號後退、j 和 l 原地轉、s 停車。記得要先用滑鼠點一下終端機視窗，鍵盤輸入才會進得去。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（任一台）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run yahboomcar_multi multi_keyboard_ctrl</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>鍵</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>i</code></td>
+<td>前進</td>
+</tr>
+<tr>
+<td><code>,</code></td>
+<td>後退</td>
+</tr>
+<tr>
+<td><code>j</code> / <code>l</code></td>
+<td>原地左轉 / 右轉</td>
+</tr>
+<tr>
+<td><code>q</code> / <code>z</code></td>
+<td>線速度與角速度一起加大 / 減小</td>
+</tr>
+<tr>
+<td><code>w</code> / <code>x</code></td>
+<td>只調線速度</td>
+</tr>
+<tr>
+<td><code>e</code> / <code>c</code></td>
+<td>只調角速度</td>
+</tr>
+<tr>
+<td><code>s</code> 或空白鍵</td>
+<td>停車</td>
+</tr>
+<tr>
+<td>Ctrl+C</td>
+<td>離開</td>
+</tr>
+</tbody>
+</table>
+<p>原始碼重點（<code>multi_yahboom_keyboard.py</code>）：建立 <code>/robot1/cmd_vel</code>、<code>/robot2/cmd_vel</code> 兩個 <code>Twist</code> 發布者；每 0.1 秒讀一次鍵盤；<strong>連續沒有按鍵超過 4 次就自動歸零</strong>，所以放開按鍵車子會自己停。超過速度上限會印 <code>Linear speed limit reached!</code>。</p>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>鍵盤程式會把終端切成 raw 模式。如果程式異常結束後終端打字怪怪的，輸入 <code>reset</code> 按 Enter 就會恢復。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-5" data-audio="audio/A3-5.mp3">
+<div class="sec-head"><h2>5. 多機導航</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>多機導航是把上一課的 Nav2 複製成兩份，各自加上 robot1 和 robot2 的姓氏。順序是：先在電腦開多機版 RViz 和地圖伺服器，再在兩台車上各自啟動底層、AMCL 定位、導航。RViz 工具列上有四個按鈕，前兩個管 robot1 的初始位置和目標，後兩個管 robot2 的。紅色是 robot1，藍色是 robot2，規劃出的路線則一黃一綠。</p></details>
+<div class="md"><h3>5.1 事前準備</h3>
+<ul>
+<li>一張兩台車都在裡面的地圖（用 A1 建好）。</li>
+<li>兩台車都完成第 2 節設定，並各自啟動 agent、進容器。</li>
+<li>先在任一台容器確認兩車節點都在：</li>
+</ul>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 node list</code></pre>
+</div>
+<h3>5.2 RViz 與地圖（官方建議在電腦／虛擬機執行）</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦的 Humble 環境（官方虛擬機，或 A5 的 Docker ros:humble 容器）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_nav multi_nav_display_launch.py</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦的 Humble 環境（另一終端）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_multi map_server_launch.py</code></pre>
+</div>
+<p>電腦上要有 Yahboom 的 <code>yahboomcar_nav</code> 與 <code>yahboomcar_multi</code> 套件才跑得起來；如果電腦端還沒準備好，這兩行也可以在其中一台車的容器裡執行（RViz 會比較卡）。地圖有時載入失敗，按 Ctrl+C 重跑即可。</p>
+<p>RViz 工具列：</p>
+<table>
+<thead>
+<tr>
+<th>按鈕</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>【1】</td>
+<td>robot1 設初始位置</td>
+</tr>
+<tr>
+<td>【2】</td>
+<td>robot1 設目標點</td>
+</tr>
+<tr>
+<td>【3】</td>
+<td>robot2 設初始位置</td>
+</tr>
+<tr>
+<td>【4】</td>
+<td>robot2 設目標點</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>官方文件說 <code>map_server_launch.py</code> 預設載入 <code>/root/yahboomcar_ws/src/yahboomcar_multi/maps/yahboom_map.yaml</code>，但原始碼實際寫的是：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">yahboomcar_multi/launch/map_server_launch.py（原始碼節錄）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">map_file = os.path.join(&#x27;/root/yahboomcar_ws/src/yahboomcar_nav&#x27;,&#x27;maps&#x27;,&#x27;yahboom_map.yaml&#x27;)</code></pre>
+</div>
+<p>也就是讀 <strong><code>yahboomcar_nav/maps</code></strong> 底下的 <code>yahboom_map.yaml</code>。所以最簡單的做法：把你的地圖照 A1 的方式放成 <code>/root/yahboomcar_ws/src/yahboomcar_nav/maps/yahboom_map.yaml</code>（以車上實際行為為準，需實車確認）。官方文件這一節的章節編號也寫錯（寫成 4.2），指令順序本身沒問題。</p>
+</div>
+<h3>5.3 兩台車各自啟動底層</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（robot1 那台）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_multi yahboomcar_bringup_multi.launch.xml robot_name:=robot1</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（robot2 那台）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_multi yahboomcar_bringup_multi.launch.xml robot_name:=robot2</code></pre>
+</div>
+<p>這個 XML launch 用 <code>&lt;push-ros-namespace namespace="$(var robot_name)"/&gt;</code> 把群組內所有節點加上前綴，並啟動 <code>imu_filter_madgwick_node</code>、<code>ekf_filter_node</code>（參數檔 <code>param/ekf_$(var robot_name).yaml</code>）、IMU 靜態 TF，以及 <code>description_multi_$(var robot_name).launch.py</code>（帶前綴的 URDF）。</p>
+<h3>5.4 兩台車各自啟動 AMCL</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（robot1 那台，另一終端）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_multi robot1_amcl_launch.py</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（robot2 那台，另一終端）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_multi robot2_amcl_launch.py</code></pre>
+</div>
+<p>出現 <code>Please set the initial pose...</code> 之後，在 RViz 用【1】、【3】分別替兩台車設初始位置（點擊拖曳）。光達點和牆大致重合就是準的。</p>
+<h3>5.5 兩台車各自啟動導航</h3>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（robot1 那台，另一終端）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_multi robot1_navigation_dwb_launch.py</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（robot2 那台，另一終端）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 launch yahboomcar_multi robot2_navigation_dwb_launch.py</code></pre>
+</div>
+<p>出現 <code>Creating bond timer...</code> 代表載入完成。接著用【2】、【4】分別給兩台車目標點。黃線是 robot1 的路徑、綠線是 robot2 的路徑。</p>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p><code>robot1_navigation_dwb_launch.py</code> 使用 <code>yahboomcar_nav/params/robot1_nav_params.yaml</code>，並啟動 <code>stop_robot1_car</code> 節點，Ctrl+C 時只對 robot1 送停車。想加第三台車要複製一整套 URDF、EKF、AMCL、導航參數與 launch，再改 <code>multi_nav.rviz</code> 並 <code>colcon build</code>，工程不小，建議兩台玩熟了再挑戰。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-6" data-audio="audio/A3-6.mp3">
+<div class="sec-head"><h2>6. 做完一定要改回單車設定</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>這一節最重要，請一定要做。多機的 namespace 是寫在 ESP32 板子裡的，你關機再開機它還是 robot1。之後你回去練建圖、導航、避障，所有程式找的都是沒有前綴的 cmd vel 和 scan，車子會完全沒反應，看起來像壞掉，其實只是姓氏還沒改回來。兩台車都要改回空白，再重新寫入一次。</p></details>
+<div class="md"><p>步驟和第 2 節一樣，只是把 namespace 改回空字串：</p>
+<ol>
+<li>容器內 <code>exit</code>、agent 終端 Ctrl+C。</li>
+<li>還原備份（或手動把那一行改回 <code>robot.set_ros_namespace("")</code>）：</li>
+</ol>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機（兩台都做）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cd ~
+cp config_robot.py.bak config_robot.py
+grep set_ros_namespace config_robot.py</code></pre>
+</div>
+<p>確認印出的是 <code>robot.set_ros_namespace("")</code>。</p>
+<ol>
+<li>短按 Reset，<strong>5 秒內</strong>執行：</li>
+</ol>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機（兩台都做）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">sudo python3 config_robot.py</code></pre>
+</div>
+<ol>
+<li>確認印出 <code>ros_namespace:</code> 後面是空的，再按一次 Reset。</li>
+<li>重開 agent 與容器，<code>ros2 topic list</code> 應該又看到沒有前綴的 <code>/cmd_vel</code>、<code>/scan</code>，<code>ros2 node list</code> 看到 <code>/YB_Car_Node</code>。</li>
+</ol>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>只改 Pi 5 上的 <code>config_robot.py</code> 檔案<strong>不夠</strong>，一定要在設定狀態下執行它，把設定寫進 ESP32，再按 Reset。忘了這一步是「多機課做完，其他課全部失效」的頭號原因。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-7" data-audio="audio/A3-7.mp3">
+<div class="sec-head"><h2>7. 出問題時怎麼辦</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>多機最常卡在三件事：兩台車看不到彼此、設定沒寫進板子、做完忘了改回來。先用 ros2 topic list 看看話題有沒有帶前綴、有沒有兩組，就能很快判斷問題在哪一層。網路層的問題，例如兩台車不在同一個路由器、Domain ID 不同，請搭配 A5 單元一起排查。</p></details>
+<div class="md"><table>
+<thead>
+<tr>
+<th>症狀</th>
+<th>最可能的原因</th>
+<th>怎麼做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ros2 topic list</code> 只看到自己那台的話題</td>
+<td>兩台不在同一 WiFi（各開各的熱點）或 Domain ID 不同</td>
+<td>兩台都連同一個路由器；確認兩台 <code>set_ros_domain_id</code> 相同、容器 <code>~/.bashrc</code> 的 <code>ROS_DOMAIN_ID</code> 相同</td>
+</tr>
+<tr>
+<td>話題沒有 <code>/robot1/</code> 前綴</td>
+<td>namespace 沒寫進板子</td>
+<td>Reset 後 5 秒內重跑 <code>sudo python3 config_robot.py</code>，再按 Reset</td>
+</tr>
+<tr>
+<td>兩台都是 <code>/robot1/...</code></td>
+<td>第二台忘了改成 robot2</td>
+<td>第二台改 <code>set_ros_namespace("robot2")</code> 重寫</td>
+</tr>
+<tr>
+<td>執行 <code>config_robot.py</code> 沒反應或讀到奇怪的值</td>
+<td>超過 5 秒設定窗口，或 agent 還佔著序列埠</td>
+<td>先 Ctrl+C 關 agent；按 Reset 後立刻執行</td>
+</tr>
+<tr>
+<td>手把推了兩台都不動</td>
+<td>沒按 R1、自啟動手把程式搶手把、接收器插錯台</td>
+<td>按 R1；關掉 <code>/root/1.sh</code> 的自啟動行程；接收器要插在跑 <code>joy_node</code> 的那台</td>
+</tr>
+<tr>
+<td>鍵盤按了沒反應</td>
+<td>終端視窗沒有被選取</td>
+<td>用滑鼠點一下鍵盤程式的終端</td>
+</tr>
+<tr>
+<td>一直沒出現 <code>Please set the initial pose...</code></td>
+<td>時間戳不同步</td>
+<td>按車子 Reset 讓它重新連 agent，多試幾次</td>
+</tr>
+<tr>
+<td>地圖沒出來</td>
+<td><code>map_server_launch.py</code> 讀的是 <code>yahboomcar_nav/maps/yahboom_map.yaml</code></td>
+<td>確認容器內那個路徑有你的地圖；Ctrl+C 重跑</td>
+</tr>
+<tr>
+<td>Pi 上的 RViz 很卡</td>
+<td>Pi 5 同時跑導航與繪圖太吃力</td>
+<td>RViz 改在電腦開（A5）</td>
+</tr>
+<tr>
+<td>多機課做完，單車課全部沒反應</td>
+<td>namespace 還是 robot1／robot2</td>
+<td>照第 6 節改回空白並重新寫入</td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section class="videos card-box"><h2>📺 官方影片</h2><div class="yt-grid"><figure class="yt" data-yt="NVwqPLjneiQ"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 1"><img src="https://i.ytimg.com/vi/NVwqPLjneiQ/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 1</figcaption></figure><figure class="yt" data-yt="PzwkA-Bz5qs"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 2"><img src="https://i.ytimg.com/vi/PzwkA-Bz5qs/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 2</figcaption></figure><figure class="yt" data-yt="7ebkfrAPUJc"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 3"><img src="https://i.ytimg.com/vi/7ebkfrAPUJc/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 3</figcaption></figure></div></section>
+<section class="quiz card-box" id="quiz"><h2>📝 小測驗</h2><div class="quiz-item" data-answer="1"><p class="q">1. 多機協作時，兩台車的 ROS_DOMAIN_ID 和 namespace 應該怎麼設？</p><div class="opts"><button class="opt" type="button" data-i="0">Domain ID 不同、namespace 相同</button><button class="opt" type="button" data-i="1">Domain ID 相同、namespace 不同</button><button class="opt" type="button" data-i="2">兩個都要不同</button></div><p class="explain" hidden></p><template class="explain-text">同一個 Domain ID 才看得到彼此；不同 namespace 才能區分是哪台車的話題。</template></div><div class="quiz-item" data-answer="0"><p class="q">2. 設定 robot1 之後，第一台車的速度話題會變成？</p><div class="opts"><button class="opt" type="button" data-i="0">/robot1/cmd_vel</button><button class="opt" type="button" data-i="1">/cmd_vel</button><button class="opt" type="button" data-i="2">/cmd_vel_robot1</button></div><p class="explain" hidden></p><template class="explain-text">namespace 會加在話題名前面，成為 /robot1/cmd_vel。</template></div><div class="quiz-item" data-answer="1"><p class="q">3. 執行 config_robot.py 時要注意什麼時間限制？</p><div class="opts"><button class="opt" type="button" data-i="0">開機後 30 秒內</button><button class="opt" type="button" data-i="1">按 Reset 後 5 秒內的設定狀態</button><button class="opt" type="button" data-i="2">沒有時間限制</button></div><p class="explain" hidden></p><template class="explain-text">按 Reset 後約 5 秒是設定狀態（燈每 300 毫秒閃一次），這時執行才寫得進板子；寫完再按一次 Reset 生效。</template></div><div class="quiz-item" data-answer="1"><p class="q">4. multi_joy_ctrl 如何同時控制兩台車？</p><div class="opts"><button class="opt" type="button" data-i="0">它輪流控制兩台</button><button class="opt" type="button" data-i="1">它把同一份速度命令同時發到 /robot1/cmd_vel 和 /robot2/cmd_vel</button><button class="opt" type="button" data-i="2">它只控制插手把的那台</button></div><p class="explain" hidden></p><template class="explain-text">原始碼建立兩個 Twist 發布者，同一份手把資料同時送給兩台。</template></div><div class="quiz-item" data-answer="2"><p class="q">5. 多機課做完沒有把 namespace 改回空白，會發生什麼事？</p><div class="opts"><button class="opt" type="button" data-i="0">什麼事都不會發生</button><button class="opt" type="button" data-i="1">車子會自動改回來</button><button class="opt" type="button" data-i="2">單車課程的程式找不到 /cmd_vel、/scan，車子沒反應</button></div><p class="explain" hidden></p><template class="explain-text">namespace 存在 ESP32 板子裡，重開機也不會消失；必須改回空字串並重新寫入。</template></div><p class="quiz-score">得分：<span class="score">0</span> / 5</p></section>
+<footer class="lesson-foot card-box">
+<button class="btn primary" id="mark-done" type="button">✔ 標記為完成</button>
+<nav class="pager"><a class="btn" href="A2.html">← A2 上一單元</a><a class="btn" href="A4.html">A4 下一單元 →</a></nav>
+</footer>
+</main>
+<audio id="player" preload="none"></audio>
+<script src="app.js"></script>
+</body>
+</html>

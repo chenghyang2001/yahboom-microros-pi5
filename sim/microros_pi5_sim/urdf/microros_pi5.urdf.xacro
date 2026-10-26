@@ -1,0 +1,205 @@
+<?xml version="1.0"?>
+<!-- Yahboom MicroROS-Pi5 模擬版。外觀用官方 yahboomcar_description/urdf/MicroROS.urdf 的 STL，和原檔的差異：
+     1. 加 base_footprint 當根節點（離地 0.045 m：輪半徑 0.024 + 輪軸在 base_link 下方 0.02125）
+     2. 右側兩輪的轉軸由 0 -1 0 改成 0 1 0（四輪同向，差速外掛才不會左右反轉）
+     3. 碰撞改用方塊與圓柱（STL 碰撞很慢）；質量與慣量改成接近實物
+     4. 加上 MS200 光達（gpu_lidar）、相機（雲台上）、IMU、四輪差速驅動、雲台位置控制、關節狀態發布 -->
+<robot name="microros_pi5" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!-- camera:=true 才加相機感測器（WSL 上相機渲染很吃資源，會讓模擬變慢） -->
+  <xacro:arg name="camera" default="false"/>
+  <material name="body"><color rgba="0.15 0.15 0.18 1"/></material>
+  <material name="wheel"><color rgba="0.95 0.75 0.10 1"/></material>
+  <material name="lidar"><color rgba="0.05 0.05 0.05 1"/></material>
+  <material name="board"><color rgba="0.10 0.45 0.80 1"/></material>
+  <material name="gimbal"><color rgba="0.80 0.80 0.82 1"/></material>
+
+  <link name="base_footprint"/>
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/><child link="base_link"/>
+    <origin xyz="0 0 0.045" rpy="0 0 0"/>
+  </joint>
+
+  <link name="base_link">
+    <visual><geometry><mesh filename="package://microros_pi5_sim/meshes/base_link.STL"/></geometry><material name="body"/></visual>
+    <collision><origin xyz="0.002 0 0.004"/><geometry><box size="0.165 0.105 0.075"/></geometry></collision>
+    <inertial><mass value="0.9"/>
+      <inertia ixx="0.00125" ixy="0" ixz="0" iyy="0.00247" iyz="0" izz="0.00287"/></inertial>
+  </link>
+
+  <!-- 四個輪子：zq 左前、yq 右前、yh 右後、zh 左後（官方命名：z 左 y 右、q 前 h 後） -->
+  <joint name="zq_Joint" type="continuous">
+    <parent link="base_link"/><child link="zq_Link"/>
+    <origin xyz="0.0455 0.0675 -0.02125" rpy="0 0 0"/><axis xyz="0 1 0"/>
+  </joint>
+  <link name="zq_Link">
+    <visual><geometry><mesh filename="package://microros_pi5_sim/meshes/zq_Link.STL"/></geometry><material name="wheel"/></visual>
+    <collision><origin rpy="1.5707963 0 0"/><geometry><cylinder radius="0.024" length="0.0215"/></geometry></collision>
+    <inertial><mass value="0.05"/><inertia ixx="0.0000091" ixy="0" ixz="0" iyy="0.0000144" iyz="0" izz="0.0000091"/></inertial>
+  </link>
+  <joint name="yq_Joint" type="continuous">
+    <parent link="base_link"/><child link="yq_Link"/>
+    <origin xyz="0.0455 -0.0675 -0.02125" rpy="0 0 0"/><axis xyz="0 1 0"/>
+  </joint>
+  <link name="yq_Link">
+    <visual><geometry><mesh filename="package://microros_pi5_sim/meshes/yq_Link.STL"/></geometry><material name="wheel"/></visual>
+    <collision><origin rpy="1.5707963 0 0"/><geometry><cylinder radius="0.024" length="0.0215"/></geometry></collision>
+    <inertial><mass value="0.05"/><inertia ixx="0.0000091" ixy="0" ixz="0" iyy="0.0000144" iyz="0" izz="0.0000091"/></inertial>
+  </link>
+  <joint name="yh_Joint" type="continuous">
+    <parent link="base_link"/><child link="yh_Link"/>
+    <origin xyz="-0.0495 -0.0675 -0.02125" rpy="0 0 0"/><axis xyz="0 1 0"/>
+  </joint>
+  <link name="yh_Link">
+    <visual><geometry><mesh filename="package://microros_pi5_sim/meshes/yh_Link.STL"/></geometry><material name="wheel"/></visual>
+    <collision><origin rpy="1.5707963 0 0"/><geometry><cylinder radius="0.024" length="0.0215"/></geometry></collision>
+    <inertial><mass value="0.05"/><inertia ixx="0.0000091" ixy="0" ixz="0" iyy="0.0000144" iyz="0" izz="0.0000091"/></inertial>
+  </link>
+  <joint name="zh_Joint" type="continuous">
+    <parent link="base_link"/><child link="zh_Link"/>
+    <origin xyz="-0.0495 0.0675 -0.02125" rpy="0 0 0"/><axis xyz="0 1 0"/>
+  </joint>
+  <link name="zh_Link">
+    <visual><geometry><mesh filename="package://microros_pi5_sim/meshes/zh_Link.STL"/></geometry><material name="wheel"/></visual>
+    <collision><origin rpy="1.5707963 0 0"/><geometry><cylinder radius="0.024" length="0.0215"/></geometry></collision>
+    <inertial><mass value="0.05"/><inertia ixx="0.0000091" ixy="0" ixz="0" iyy="0.0000144" iyz="0" izz="0.0000091"/></inertial>
+  </link>
+
+  <joint name="imu_Joint" type="fixed">
+    <parent link="base_link"/><child link="imu_Link"/>
+    <origin xyz="-0.002999 -0.0030001 0.031701" rpy="0 0 0"/>
+  </joint>
+  <link name="imu_Link">
+    <visual><geometry><mesh filename="package://microros_pi5_sim/meshes/imu_Link.STL"/></geometry><material name="board"/></visual>
+    <inertial><mass value="0.02"/><inertia ixx="0.000002" ixy="0" ixz="0" iyy="0.000002" iyz="0" izz="0.000002"/></inertial>
+  </link>
+
+  <!-- MS200 光達：link 原點在光達頂面，掃描平面離地約 0.12 m -->
+  <joint name="radar_Joint" type="fixed">
+    <parent link="base_link"/><child link="radar_Link"/>
+    <origin xyz="0 0 0.078933557468359" rpy="0 0 0"/>
+  </joint>
+  <link name="radar_Link">
+    <visual><geometry><mesh filename="package://microros_pi5_sim/meshes/radar_Link.STL"/></geometry><material name="lidar"/></visual>
+    <collision><origin xyz="0 0 -0.0165"/><geometry><cylinder radius="0.019" length="0.033"/></geometry></collision>
+    <inertial><mass value="0.04"/><inertia ixx="0.000007" ixy="0" ixz="0" iyy="0.000007" iyz="0" izz="0.000007"/></inertial>
+  </link>
+
+  <!-- 雙軸雲台：jq1 左右（servo_s1）、jq2 上下（servo_s2），相機裝在 jq2 前端 -->
+  <joint name="jq1_Joint" type="revolute">
+    <parent link="base_link"/><child link="jq1_Link"/>
+    <origin xyz="0.064 0 0.014" rpy="0 0 0"/><axis xyz="0 0 1"/>
+    <limit lower="-1.57" upper="1.57" effort="1" velocity="3"/>
+    <dynamics damping="0.02" friction="0.01"/>
+  </joint>
+  <link name="jq1_Link">
+    <visual><geometry><mesh filename="package://microros_pi5_sim/meshes/jq1_Link.STL"/></geometry><material name="gimbal"/></visual>
+    <inertial><mass value="0.012"/><inertia ixx="0.000002" ixy="0" ixz="0" iyy="0.000002" iyz="0" izz="0.000002"/></inertial>
+  </link>
+  <joint name="jq2_Joint" type="revolute">
+    <parent link="jq1_Link"/><child link="jq2_Link"/>
+    <origin xyz="0.016864 0.0000849 0.023959" rpy="0 0 0"/><axis xyz="0 -1 0"/>
+    <limit lower="-1.57" upper="0.35" effort="1" velocity="3"/>
+    <dynamics damping="0.02" friction="0.01"/>
+  </joint>
+  <link name="jq2_Link">
+    <visual><geometry><mesh filename="package://microros_pi5_sim/meshes/jq2_Link.STL"/></geometry><material name="gimbal"/></visual>
+    <inertial><mass value="0.013"/><inertia ixx="0.000002" ixy="0" ixz="0" iyy="0.000002" iyz="0" izz="0.000002"/></inertial>
+  </link>
+  <joint name="camera_joint" type="fixed">
+    <parent link="jq2_Link"/><child link="camera_link"/>
+    <origin xyz="0.036 0 0.004" rpy="0 0 0"/>
+  </joint>
+  <link name="camera_link">
+    <inertial><mass value="0.005"/><inertia ixx="0.0000005" ixy="0" ixz="0" iyy="0.0000005" iyz="0" izz="0.0000005"/></inertial>
+  </link>
+
+  <gazebo reference="zq_Link"><mu1>0.9</mu1><mu2>0.9</mu2></gazebo>
+  <gazebo reference="yq_Link"><mu1>0.9</mu1><mu2>0.9</mu2></gazebo>
+  <gazebo reference="yh_Link"><mu1>0.9</mu1><mu2>0.9</mu2></gazebo>
+  <gazebo reference="zh_Link"><mu1>0.9</mu1><mu2>0.9</mu2></gazebo>
+
+  <gazebo reference="radar_Link">
+    <sensor name="ms200_lidar" type="gpu_lidar">
+      <topic>scan</topic>
+      <gz_frame_id>radar_Link</gz_frame_id>
+      <update_rate>10</update_rate>
+      <always_on>1</always_on>
+      <visualize>true</visualize>
+      <lidar>
+        <scan><horizontal><samples>450</samples><resolution>1</resolution>
+          <min_angle>-3.14159265</min_angle><max_angle>3.12763</max_angle></horizontal></scan>
+        <range><min>0.10</min><max>12.0</max><resolution>0.01</resolution></range>
+        <noise><type>gaussian</type><mean>0</mean><stddev>0.008</stddev></noise>
+      </lidar>
+    </sensor>
+  </gazebo>
+
+  <xacro:if value="$(arg camera)">
+  <gazebo reference="camera_link">
+    <sensor name="usb_camera" type="camera">
+      <topic>camera/image_raw</topic>
+      <gz_frame_id>camera_link</gz_frame_id>
+      <update_rate>10</update_rate>
+      <always_on>1</always_on>
+      <camera>
+        <horizontal_fov>1.13</horizontal_fov>
+        <image><width>320</width><height>240</height><format>R8G8B8</format></image>
+        <clip><near>0.02</near><far>20</far></clip>
+      </camera>
+    </sensor>
+  </gazebo>
+  </xacro:if>
+
+  <gazebo reference="imu_Link">
+    <sensor name="imu" type="imu">
+      <topic>imu</topic>
+      <gz_frame_id>imu_Link</gz_frame_id>
+      <update_rate>50</update_rate>
+      <always_on>1</always_on>
+    </sensor>
+  </gazebo>
+
+  <gazebo>
+    <!-- 代替 ESP32＋四顆 370 編碼馬達：收 /cmd_vel，四輪差速（官方是同側兩輪一起轉的 4WD） -->
+    <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
+      <left_joint>zq_Joint</left_joint>
+      <left_joint>zh_Joint</left_joint>
+      <right_joint>yq_Joint</right_joint>
+      <right_joint>yh_Joint</right_joint>
+      <wheel_separation>0.135</wheel_separation>
+      <wheel_radius>0.024</wheel_radius>
+      <topic>/cmd_vel</topic>
+      <!-- 四輪滑移轉向時輪子里程計會高估轉角，不橋接到 ROS；/odom 改由下面的 OdometryPublisher 提供 -->
+      <odom_topic>/wheel_odom</odom_topic>
+      <tf_topic>/wheel_odom_tf</tf_topic>
+      <frame_id>odom</frame_id>
+      <child_frame_id>base_footprint</child_frame_id>
+      <odom_publish_frequency>20</odom_publish_frequency>
+      <max_linear_acceleration>1.0</max_linear_acceleration>
+      <max_angular_acceleration>4.0</max_angular_acceleration>
+    </plugin>
+    <!-- 相當於真車 Pi 5 上 EKF（輪速＋IMU）融合後的 /odom 與 odom→base_footprint TF -->
+    <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+      <odom_frame>odom</odom_frame>
+      <robot_base_frame>base_footprint</robot_base_frame>
+      <odom_topic>/odom</odom_topic>
+      <tf_topic>/tf</tf_topic>
+      <odom_publish_frequency>30</odom_publish_frequency>
+      <dimensions>2</dimensions>
+    </plugin>
+    <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher">
+      <topic>/joint_states</topic>
+    </plugin>
+    <!-- 代替雲台舵機：/gimbal/pan、/gimbal/tilt（弧度，std_msgs/Float64） -->
+    <plugin filename="gz-sim-joint-position-controller-system" name="gz::sim::systems::JointPositionController">
+      <joint_name>jq1_Joint</joint_name>
+      <topic>/gimbal/pan</topic>
+      <p_gain>0.3</p_gain><i_gain>0.0</i_gain><d_gain>0.005</d_gain>
+    </plugin>
+    <plugin filename="gz-sim-joint-position-controller-system" name="gz::sim::systems::JointPositionController">
+      <joint_name>jq2_Joint</joint_name>
+      <topic>/gimbal/tilt</topic>
+      <p_gain>0.3</p_gain><i_gain>0.0</i_gain><d_gain>0.005</d_gain>
+    </plugin>
+  </gazebo>
+</robot>

@@ -1,0 +1,46 @@
+<!-- Gazebo 模擬：小屋世界＋MicroROS-Pi5 模型＋ROS 橋接（＋RViz）
+     用法：ros2 launch microros_pi5_sim sim.launch.xml [gui:=true|false] [rviz:=true|false]
+     話題（和真車對照）：/cmd_vel（收）、/scan、/odom、/imu、/tf、/joint_states、/camera/image_raw、/gimbal/pan、/gimbal/tilt -->
+<launch>
+  <arg name="gui" default="true"/>
+  <arg name="rviz" default="true"/>
+  <arg name="camera" default="false"/>
+  <arg name="world" default="$(find-pkg-share microros_pi5_sim)/worlds/house.sdf"/>
+
+  <!-- 讓 Gazebo 找得到 package://microros_pi5_sim/meshes/*.STL -->
+  <set_env name="GZ_SIM_RESOURCE_PATH" value="$(find-pkg-prefix microros_pi5_sim)/share:$(env GZ_SIM_RESOURCE_PATH '')"/>
+
+  <include file="$(find-pkg-share ros_gz_sim)/launch/gz_sim.launch.py" if="$(var gui)">
+    <arg name="gz_args" value="-r $(var world)"/>
+  </include>
+  <include file="$(find-pkg-share ros_gz_sim)/launch/gz_sim.launch.py" unless="$(var gui)">
+    <arg name="gz_args" value="-r -s $(var world)"/>
+  </include>
+
+  <node pkg="robot_state_publisher" exec="robot_state_publisher" name="robot_state_publisher">
+    <param name="robot_description" value="$(command 'xacro $(find-pkg-share microros_pi5_sim)/urdf/microros_pi5.urdf.xacro camera:=$(var camera)')" type="str"/>
+    <param name="use_sim_time" value="true"/>
+  </node>
+
+  <node pkg="ros_gz_sim" exec="create" name="spawn_microros_pi5"
+        args="-topic robot_description -name microros_pi5 -x 0 -y 0 -z 0.02"/>
+
+  <!-- 代替 micro-ROS agent：把 Gazebo 的感測器與馬達接到 ROS 2 -->
+  <node pkg="ros_gz_bridge" exec="parameter_bridge" name="hw_bridge"
+        args="/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock
+              /cmd_vel@geometry_msgs/msg/Twist]gz.msgs.Twist
+              /scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan
+              /odom@nav_msgs/msg/Odometry[gz.msgs.Odometry
+              /tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V
+              /imu@sensor_msgs/msg/Imu[gz.msgs.IMU
+              /joint_states@sensor_msgs/msg/JointState[gz.msgs.Model
+              /camera/image_raw@sensor_msgs/msg/Image[gz.msgs.Image
+              /gimbal/pan@std_msgs/msg/Float64]gz.msgs.Double
+              /gimbal/tilt@std_msgs/msg/Float64]gz.msgs.Double">
+    <param name="use_sim_time" value="true"/>
+  </node>
+
+  <node pkg="rviz2" exec="rviz2" name="rviz2" args="-d $(find-pkg-share microros_pi5_sim)/config/sim.rviz" if="$(var rviz)">
+    <param name="use_sim_time" value="true"/>
+  </node>
+</launch>

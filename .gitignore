@@ -1,0 +1,29 @@
+# 官方資料（版權屬 Yahboom，只留在本機）
+official/
+source-code/
+research/pdf-text/
+videos/audio/
+videos/audio-extra/
+videos/subs/
+videos/transcripts/
+videos/playlist.json
+
+# 產物（影片太大，放 YouTube）
+videos-out/
+logs/
+
+# 工具暫存
+tools/fixtures/_out*/
+__pycache__/
+*.pyc
+.venv/
+
+# 當機與系統垃圾
+*.stackdump
+core
+*.core
+*.dmp
+*~
+*.swp
+.DS_Store
+Thumbs.db

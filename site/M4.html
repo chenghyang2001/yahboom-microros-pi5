@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>M4 光達應用：避障、跟隨、警衛、巡邏｜Yahboom MicroROS-Pi5 × ROS 2 學習地圖</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-lesson">
+<header class="topbar"><a href="index.html">← 學習地圖</a><span>M4</span></header>
+<main class="container lesson" data-lesson-id="M4">
+
+<section class="lesson-head card-box" id="sec-0" data-audio="audio/M4-0.mp3">
+<div class="eyebrow"><span class="badge level-M">中級</span>
+<span class="unit-id">M4</span></div>
+<h1>光達應用：避障、跟隨、警衛、巡邏</h1>
+<div class="meta"><span class="badge">⏱ 90 分鐘</span><span class="badge car-yes">🚗 真車：是</span></div>
+<dl class="goal">
+<dt>🎯 學習目標</dt><dd>讀懂 /scan 的 ranges、angle_min、angle_increment，理解四支官方光達程式「感測→判斷→速度」的邏輯，並會用 rqt_reconfigure 與 ros2 param 即時調參數。</dd>
+<dt>✅ 完成標準</dt><dd>實車執行 laser_Avoidance，車子自己繞開障礙物；並能用 ros2 param set 改 ResponseDist 看到行為改變。</dd>
+</dl>
+<div class="player-bar">
+<button class="btn primary" id="play-all" type="button">▶ 全部播放</button>
+<label class="rate">播放速度
+<select id="rate">
+<option value="0.8">0.8×</option><option value="1" selected>1×</option>
+<option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+</select></label>
+<span class="now-playing" id="now-playing" aria-live="polite"></span>
+</div>
+</section>
+<section class="sec card-box" id="sec-1" data-audio="audio/M4-1.mp3">
+<div class="sec-head"><h2>1. 讀懂 /scan：一圈距離組成的陣列</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>光達就像一個不停轉圈的雷射測距儀，每轉一圈，就把每個方向量到的距離打包成一則訊息，送到 scan 話題。這則訊息最重要的是一個叫 ranges 的陣列，裡面一格就是一個方向的距離，單位是公尺。那第幾格是哪個方向呢？訊息裡會告訴你第一格的角度和每格之間差幾度，用起始角度加上格數乘以間隔，就算得出來。看懂這一條公式，這一單元的四支程式你就全都看得懂了。</p></details>
+<div class="md"><p><strong><code>sensor_msgs/LaserScan</code> 重要欄位</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>欄位</th>
+<th>意義</th>
+<th>單位</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ranges[]</code></td>
+<td>每一條雷射打到東西的距離</td>
+<td>公尺</td>
+</tr>
+<tr>
+<td><code>angle_min</code>、<code>angle_max</code></td>
+<td>第一條、最後一條雷射的角度</td>
+<td>弧度</td>
+</tr>
+<tr>
+<td><code>angle_increment</code></td>
+<td>相鄰兩條雷射的角度差</td>
+<td>弧度</td>
+</tr>
+<tr>
+<td><code>range_min</code>、<code>range_max</code></td>
+<td>光達量得到的最近、最遠距離；超出範圍的值不可信</td>
+<td>公尺</td>
+</tr>
+<tr>
+<td><code>header.frame_id</code></td>
+<td>這份資料屬於哪個座標系（光達本身）</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<div class="code-block">
+<div class="code-head"><span class="code-title"></span><button class="copy-btn" type="button">複製</button></div>
+<pre><code>第 i 條雷射的角度 = angle_min + angle_increment × i        （弧度）
+角度（度）        = 上式 × 180 / π
+        +90° 左
+          ↑
+  ±180° ← 車 → 0° 正前方         ROS 慣例：逆時針為正，左邊是正角度
+          ↓
+        -90° 右</code></pre>
+</div>
+<p>官方四支程式都用同一段迴圈把每一格換成「度」，並把大於 180 的角度減 360，讓前方是 0、左正右負：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（yahboomcar_laser 共同寫法）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">RAD2DEG = 180 / math.pi
+for i in range(len(ranges)):
+    angle = (scan_data.angle_min + scan_data.angle_increment * i) * RAD2DEG
+    if angle &gt; 180: angle = angle - 360</code></pre>
+</div>
+<p><strong>自己看一眼真實資料</strong>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 interface show sensor_msgs/msg/LaserScan     # 看欄位定義
+ros2 topic echo /scan --once --no-arr             # 只看 angle_min、angle_increment 等，不印 ranges
+ros2 topic hz /scan                               # 一秒幾圈</code></pre>
+</div>
+<p>沒車也可以在電腦上看模擬車的 <code>/scan</code>（模擬環境由講義另外提供，指令固定如下）：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">cd ~/yahboom_ws &amp;&amp; source install/setup.bash &amp;&amp; ros2 launch microros_pi5_sim sim.launch.xml
+# 另一個終端：
+source /opt/ros/jazzy/setup.bash
+ros2 topic echo /scan --once --no-arr</code></pre>
+</div>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p><code>ranges</code> 裡可能出現 <code>inf</code>（太遠沒打到）、<code>nan</code> 或 <code>0.0</code>（無效點）。官方程式有的用 <code>ranges[i] &gt; 0</code> 濾掉 0，有的沒有；自己寫程式時一律先過濾無效值（M5 會示範）。MS200 的實際點數與 0° 方向請用上面的 <code>--no-arr</code> 指令在實車確認（需實車確認）。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-2" data-audio="audio/M4-2.mp3">
+<div class="sec-head"><h2>2. 共同前置：陀螺儀初始化與 Switch 開關</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>光達課每一課開頭都有同樣的準備動作，其中最容易被跳過的，是讓陀螺儀初始化。開機時車子必須穩穩放在地上、靜止五秒，讓陀螺儀量出「不動的時候是多少」。如果開機時車子在你手上晃，之後里程計會一直以為車在轉，巡邏走不出正方形，第三級的建圖導航更會整個歪掉。另一件事是每支程式都有一個叫 Switch 的開關參數，它的意思要看清楚。</p></details>
+<div class="md"><p><strong>每次上課的開機流程</strong>：</p>
+<ol>
+<li>車子<strong>斷電</strong>，平穩放在地上。</li>
+<li>開電源，<strong>放著不動 5 秒</strong>（陀螺儀初始化）。</li>
+<li>啟動 agent、按控制板 reset、進容器：</li>
+</ol>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">sh ~/start_agent_rpi5.sh
+sh ros2_humble.sh            # 另開終端；多開請用 docker ps -a ＋ docker exec -it &lt;ID&gt; /bin/bash</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 node list               # 看到 /YB_Car_Node 才繼續
+ros2 topic list              # 要有 /scan、/cmd_vel、/beep</code></pre>
+</div>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p><strong><code>Switch</code> 的意思，文件和原始碼不一致</strong>：</p>
+<ul>
+<li>官方文件說 <code>Switch</code> 是「功能開關，要打開才會動」。</li>
+<li>但 <code>laser_Avoidance</code>、<code>laser_Tracker</code>、<code>laser_Warning</code> 的原始碼寫的是 <code>if self.Joy_active or self.Switch == True:</code> → <strong>停車並暫停</strong>。也就是預設 <code>False</code> 時一啟動就會動，勾成 <code>True</code> 反而是「暫停」。</li>
+<li><code>patrol</code> 則相反：<code>Switch</code> 為 <code>True</code> 才開始走，走完一段會自動改回 <code>False</code>。</li>
+<li>車上映像的版本可能與原始碼不同（需實車確認）。<strong>第一次執行前先把車架高或放在空曠處</strong>，並準備好隨時 Ctrl+C。</li>
+</ul>
+</div>
+<p>另外，搖桿一動（<code>/JoyState</code> 為 <code>True</code>），所有程式都會讓出控制權並停車。</p></div>
+</section>
+<section class="sec card-box" id="sec-3" data-audio="audio/M4-3.mp3">
+<div class="sec-head"><h2>3. 第 1 課 避障 laser_Avoidance</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>避障的邏輯是把前方切成三個扇區：正前方、左前方、右前方，然後數一數每個扇區裡有幾個點比安全距離還近。只看一個點很容易被雜訊騙，所以要超過十個點才算「那邊有東西」。接著就是一張判斷表：只有右邊有東西就左轉，只有左邊有東西就右轉，三邊都有就右轉試著脫困，都沒有就直走。這就是最基本的「感測、判斷、動作」迴圈。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run yahboomcar_laser laser_Avoidance
+ros2 run rqt_reconfigure rqt_reconfigure        # 另一個終端；找節點 laser_Avoidance，看不到就按 Refresh</code></pre>
+</div>
+<p><strong>扇區定義</strong>（<code>LaserAngle</code> 預設 45°；距離門檻是 <code>ResponseDist × 1.5</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>扇區</th>
+<th>角度範圍</th>
+<th>計數條件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>左 <code>Left_warning</code></td>
+<td>20° &lt; angle &lt; <code>LaserAngle</code></td>
+<td><code>ranges[i] &lt; ResponseDist*1.5</code></td>
+</tr>
+<tr>
+<td>右 <code>Right_warning</code></td>
+<td>-<code>LaserAngle</code> &lt; angle &lt; -20°</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>前 <code>front_warning</code></td>
+<td>|angle| ≤ 20°</td>
+<td><code>ranges[i] &lt;= ResponseDist*1.5</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>判斷表</strong>（計數 &gt; 10 才算有障礙；原始碼完整版）：</p>
+<table>
+<thead>
+<tr>
+<th>前</th>
+<th>左</th>
+<th>右</th>
+<th>終端機訊息</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>有</td>
+<td>有</td>
+<td>有</td>
+<td><code>1, there are obstacles in the left and right, turn right</code></td>
+<td>邊走邊右轉</td>
+</tr>
+<tr>
+<td>有</td>
+<td>無</td>
+<td>有</td>
+<td><code>2, there is an obstacle in the middle right, turn left</code></td>
+<td>左轉</td>
+</tr>
+<tr>
+<td>有</td>
+<td>有</td>
+<td>無</td>
+<td><code>4. There is an obstacle in the middle left, turn right</code></td>
+<td>右轉（但原始碼這行的 <code>publish</code> 被註解掉，實際不會送出新速度）</td>
+</tr>
+<tr>
+<td>有</td>
+<td>無</td>
+<td>無</td>
+<td><code>6, there is an obstacle in the middle, turn left</code></td>
+<td>左轉</td>
+</tr>
+<tr>
+<td>無</td>
+<td>有</td>
+<td>有</td>
+<td><code>7. There are obstacles on the left and right, turn right</code></td>
+<td>右轉</td>
+</tr>
+<tr>
+<td>無</td>
+<td>有</td>
+<td>無</td>
+<td><code>8, there is an obstacle on the left, turn right</code></td>
+<td>右轉</td>
+</tr>
+<tr>
+<td>無</td>
+<td>無</td>
+<td>有</td>
+<td><code>9, there is an obstacle on the right, turn left</code></td>
+<td>左轉</td>
+</tr>
+<tr>
+<td>無</td>
+<td>無</td>
+<td>無</td>
+<td><code>10, no obstacles, go forward</code></td>
+<td>直走</td>
+</tr>
+</tbody>
+</table>
+<p><strong>參數</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>參數</th>
+<th>意義</th>
+<th>預設</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>linear</code></td>
+<td>線速度 m/s</td>
+<td>0.3</td>
+</tr>
+<tr>
+<td><code>angular</code></td>
+<td>角速度 rad/s</td>
+<td>1.0</td>
+</tr>
+<tr>
+<td><code>LaserAngle</code></td>
+<td>左右扇區的外側角度</td>
+<td>45.0</td>
+</tr>
+<tr>
+<td><code>ResponseDist</code></td>
+<td>障礙距離（程式乘 1.5 使用）</td>
+<td>0.55</td>
+</tr>
+<tr>
+<td><code>Switch</code></td>
+<td>見上一小節的警告</td>
+<td>False</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<ul>
+<li>官方文件把線速度參數拼成 <strong><code>linera</code></strong>，原始碼實際是 <strong><code>linear</code></strong>。在 rqt 或 <code>ros2 param set</code> 請用 <code>linear</code>。</li>
+<li>預設 0.3 m/s 在室內偏快，第一次建議先 <code>ros2 param set /laser_Avoidance linear 0.15</code>。</li>
+<li>程式每次送完轉彎速度會 <code>sleep(0.2)</code>，所以反應會有一點延遲，這是正常的。</li>
+</ul>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-4" data-audio="audio/M4-4.mp3">
+<div class="sec-head"><h2>4. 第 2 課跟隨 laser_Tracker、第 3 課警衛 laser_Warning</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>跟隨和警衛都在做同一件事：在掃描範圍裡找出最近的那個點，記下它的距離和角度。跟隨程式用兩個 PID：距離差多少決定前進或後退，角度差多少決定轉多少，讓車和你保持固定距離。警衛程式只轉不走，原地轉身盯著最近的東西，一旦太近就讓蜂鳴器響。你可以拿一個紙箱慢慢移動，親眼看到控制器怎麼追。</p></details>
+<div class="md"><p><strong>跟隨</strong>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run yahboomcar_laser laser_Tracker
+ros2 run rqt_reconfigure rqt_reconfigure        # 節點 laser_Tracker</code></pre>
+</div>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內（laser_Tracker.py 節錄）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-python">self.lin_pid = SinglePID(2.0, 0.0, 2.0)
+self.ang_pid = SinglePID(3.0, 0.0, 5.0)
+# 優先：正前方 ±priorityAngle 內、距離 &lt; ResponseDist + 0.5 的點；沒有才看 ±LaserAngle 內的點
+if abs(minDist - self.ResponseDist) &lt; 0.1: minDist = self.ResponseDist    # 差 0.1 m 內算到位
+velocity.linear.x = -self.lin_pid.pid_compute(self.ResponseDist, minDist)  # 太近倒退、太遠前進
+ang_pid_compute = self.ang_pid.pid_compute(minDistID/48, 0)               # 角度 ÷ 48 是官方經驗常數
+if abs(ang_pid_compute) &lt; 0.1: velocity.angular.z = 0.0                    # 死區</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>參數</th>
+<th>意義</th>
+<th>預設</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>priorityAngle</code></td>
+<td>優先追蹤的正前方角度</td>
+<td>10.0</td>
+</tr>
+<tr>
+<td><code>LaserAngle</code></td>
+<td>偵測角度</td>
+<td>45.0</td>
+</tr>
+<tr>
+<td><code>ResponseDist</code></td>
+<td>想保持的距離 m</td>
+<td>0.55</td>
+</tr>
+<tr>
+<td><code>Switch</code></td>
+<td>為 True 時暫停</td>
+<td>False</td>
+</tr>
+</tbody>
+</table>
+<p><strong>警衛</strong>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 run yahboomcar_laser laser_Warning
+ros2 run rqt_reconfigure rqt_reconfigure        # 節點名是 laser_Warnning（兩個 n）</code></pre>
+</div>
+<ul>
+<li>只發 <code>angular.z</code>（原地轉向最近物體），沒有線速度。</li>
+<li>最近距離 ≤ <code>ResponseDist</code>（預設 <strong>0.3</strong>）時印 <code>---------------</code> 並發布 <code>/beep</code>（<code>std_msgs/UInt16</code>，<code>data: 1</code> 響）；否則印 <code>no obstacles@</code> 並發 <code>data: 0</code>。</li>
+<li><code>LaserAngle</code> 預設 45.0。</li>
+</ul>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p>可執行檔叫 <code>laser_Warning</code>，但程式裡建立節點時寫成 <strong><code>laser_Warnning</code></strong>（多一個 n），文件裡的原始檔名也寫成 <code>laser_Warnning.py</code>。所以：啟動用 <code>ros2 run yahboomcar_laser laser_Warning</code>，調參數時節點名要用 <code>/laser_Warnning</code>。</p>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-5" data-audio="audio/M4-5.mp3">
+<div class="sec-head"><h2>5. 第 4 課 巡邏 patrol：第一次用到 TF 與里程計</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>巡邏是讓車照著設定好的路線走，例如正方形、圓形或三角形。車子怎麼知道自己走了一公尺、轉了九十度呢？靠的是里程計，它用輪子轉了幾圈加上陀螺儀，估算出車子從開機起點走到哪裡。這個位置用座標轉換 TF 來表示，從 odom 到 base footprint。所以這一課要先啟動底層資料處理，TF 存在了，巡邏程式才算得出距離和角度。</p></details>
+<div class="md"><div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash"># 終端 1：底層資料處理（IMU 濾波 + EKF 融合 + 機器人模型），會發布 odom → base_footprint 的 TF
+ros2 launch yahboomcar_bringup yahboomcar_bringup_launch.py
+# 終端 2：巡邏程式
+ros2 run yahboomcar_bringup patrol
+# 終端 3：
+ros2 run rqt_reconfigure rqt_reconfigure        # 節點 YahboomCarPatrol；Command 選路線，再勾 Switch 開始</code></pre>
+</div>
+<table>
+<thead>
+<tr>
+<th>參數</th>
+<th>意義</th>
+<th>預設</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Command</code></td>
+<td><code>LengthTest</code>（直線）、<code>Circle</code>、<code>Square</code>、<code>Triangle</code></td>
+<td><code>Square</code></td>
+</tr>
+<tr>
+<td><code>Switch</code></td>
+<td><strong>True 才開始</strong>（與前三支相反）</td>
+<td>False</td>
+</tr>
+<tr>
+<td><code>Set_loop</code></td>
+<td>走完再重來</td>
+<td>False</td>
+</tr>
+<tr>
+<td><code>Linear</code>、<code>Angular</code></td>
+<td>線速度、角速度</td>
+<td>0.2、0.9</td>
+</tr>
+<tr>
+<td><code>Length</code></td>
+<td>直線距離 m</td>
+<td>0.5</td>
+</tr>
+<tr>
+<td><code>LineTolerance</code>、<code>RotationTolerance</code></td>
+<td>直線、旋轉的容許誤差</td>
+<td>0.05、0.25</td>
+</tr>
+<tr>
+<td><code>LineScaling</code>、<code>RotationScaling</code></td>
+<td>里程計校正係數</td>
+<td>1.0、1.0</td>
+</tr>
+<tr>
+<td><code>circle_adjust</code></td>
+<td>圓形大小係數</td>
+<td>2.0</td>
+</tr>
+<tr>
+<td><code>ResponseDist</code>、<code>LaserAngle</code></td>
+<td>避障距離、角度</td>
+<td>0.6、20.0</td>
+</tr>
+<tr>
+<td><code>odom_frame</code>、<code>base_frame</code></td>
+<td>座標系名稱</td>
+<td><code>odom</code>、<code>base_footprint</code></td>
+</tr>
+</tbody>
+</table>
+<p>程式核心：<code>tf_buffer.lookup_transform(odom_frame, base_frame, ...)</code> 取得目前位置與航向；<code>advancing()</code> 直走到距離誤差小於 <code>LineTolerance</code>，<code>Spin()</code> 轉到角度誤差小於 <code>RotationTolerance</code>；<code>Square()</code> 用 <code>self.index</code> 依序「直走 → 轉 90° → 直走 …」。</p>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<ul>
+<li>沒先跑 bringup，TF 不存在，程式會一直印 <code>transform not ready</code>。</li>
+<li>速度話題在這支程式寫成 <code>cmd_vel</code>（沒有斜線），效果與 <code>/cmd_vel</code> 相同。</li>
+<li>手上這份原始碼的 <code>patrol.py</code> 中，訂閱 <code>/scan</code> 的那一行<strong>被註解掉了</strong>（<code>#self.sub_scan = ...</code>），所以「遇障停車並響蜂鳴器」的功能可能不會發生。車上映像版本可能不同（需實車確認）；保險起見巡邏路線上不要放障礙物，並隨時準備 Ctrl+C。</li>
+<li>走出來的正方形歪掉，先回 B6 做線速度、角速度校準，再微調 <code>LineScaling</code>、<code>RotationScaling</code>。</li>
+</ul>
+</div></div>
+</section>
+<section class="sec card-box" id="sec-6" data-audio="audio/M4-6.mp3">
+<div class="sec-head"><h2>6. 執行中調參數：rqt_reconfigure 與 ros2 param</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>這四支程式都把速度、距離、角度做成「參數」，而且每隔一小段時間就重新讀一次，所以程式不用重開，改了馬上生效。改的方法有兩種：圖形介面的 rqt reconfigure，適合邊看邊拉；指令列的 ros2 param，適合精確設定和存檔。這種「把可調的數字做成參數」的設計，下一單元你自己寫節點時也會用上。</p></details>
+<div class="md"><p><strong>圖形介面</strong>：<code>ros2 run rqt_reconfigure rqt_reconfigure</code> → 左側選節點（看不到按 <strong>Refresh</strong>）→ 改數值 → <strong>在空白處點一下</strong>才會送出。</p>
+<p><strong>指令列</strong>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">ros2 param list /laser_Avoidance                        # 列出這個節點有哪些參數
+ros2 param get /laser_Avoidance ResponseDist            # 查目前值
+ros2 param set /laser_Avoidance ResponseDist 0.4        # 改成 0.4（要寫小數，型別是 double）
+ros2 param set /laser_Avoidance linear 0.15
+ros2 param set /laser_Avoidance Switch true             # 暫停（依原始碼語意）
+ros2 param dump /laser_Avoidance &gt; avoid.yaml           # 存成 YAML
+# 下次啟動直接帶參數：
+ros2 run yahboomcar_laser laser_Avoidance --ros-args -p linear:=0.15 -p ResponseDist:=0.4
+ros2 run yahboomcar_laser laser_Avoidance --ros-args --params-file avoid.yaml</code></pre>
+</div>
+<div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
+<p>參數有型別。<code>ResponseDist</code> 宣告時是 <code>0.55</code>（浮點數），用 <code>ros2 param set ... ResponseDist 1</code> 會因為 <code>1</code> 被當成整數而失敗，要寫 <code>1.0</code>。巡邏的 <code>Command</code> 是字串，例如 <code>ros2 param set /YahboomCarPatrol Command Circle</code>。</p>
+</div>
+<p><strong>沒車先練（選做）</strong>：<code>yahboomcar_laser</code> 只依賴標準訊息，可以從原始碼複製到電腦，在模擬車上跑：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在電腦 WSL（Jazzy）</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">WINHOME=$(wslpath &quot;$(cmd.exe /c echo %USERPROFILE% 2&gt;/dev/null | tr -d &#x27;\r&#x27;)&quot;)
+mkdir -p ~/laser_ws/src
+cp -r &quot;$WINHOME/workspace/yahboom-microros-pi5/source-code/src/18. Summary of program source code/yahboomcar_ws/src/yahboomcar_laser&quot; ~/laser_ws/src/
+cd ~/laser_ws &amp;&amp; source /opt/ros/jazzy/setup.bash &amp;&amp; colcon build
+source install/setup.bash
+ros2 run yahboomcar_laser laser_Avoidance --ros-args -p linear:=0.15   # 先另開終端啟動模擬車</code></pre>
+</div>
+<p>模擬車沒有蜂鳴器，<code>laser_Warning</code> 發的 <code>/beep</code> 只是沒人收；Jazzy 編譯時出現 <code>SetuptoolsDeprecationWarning</code> 可忽略。</p></div>
+</section>
+<section class="sec card-box" id="sec-7" data-audio="audio/M4-7.mp3">
+<div class="sec-head"><h2>7. 出問題時怎麼辦</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
+<details class="narration"><summary>🔊 旁白文字</summary><p>光達程式出問題時，先問自己三個問題：有沒有收到 scan、程式有沒有發出 cmd vel、車子有沒有照 cmd vel 動。用 topic hz 看頻率、用 topic echo 看速度值，就能分出是哪一段壞掉。另外，如果車子明明沒動，螢幕上的模型卻自己在轉，那幾乎都是開機時沒有讓陀螺儀靜止初始化。</p></details>
+<div class="md"><table>
+<thead>
+<tr>
+<th>症狀</th>
+<th>檢查</th>
+<th>怎麼做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>程式啟動後完全不動</td>
+<td><code>Switch</code> 是否被設成 True；搖桿是否被碰到</td>
+<td><code>ros2 param get /laser_Avoidance Switch</code>；放開搖桿</td>
+</tr>
+<tr>
+<td>巡邏不動</td>
+<td><code>Switch</code> 沒勾、<code>Command</code> 打錯字</td>
+<td>巡邏要勾 <code>Switch</code>；<code>Command</code> 只能是 <code>LengthTest</code>、<code>Circle</code>、<code>Square</code>、<code>Triangle</code></td>
+</tr>
+<tr>
+<td><code>ros2 topic hz /scan</code> 沒數字</td>
+<td>光達或 agent 沒連上</td>
+<td>重啟 agent、按 reset；確認光達有在轉</td>
+</tr>
+<tr>
+<td>一直判斷有障礙、原地打轉</td>
+<td>地板反光、車身附近有線材被掃到、無效點被當成障礙</td>
+<td>清空周圍；把 <code>ResponseDist</code> 調小；<code>ros2 topic echo /scan --once</code> 看是否有一堆 0</td>
+</tr>
+<tr>
+<td>巡邏一直印 <code>transform not ready</code></td>
+<td>沒跑 bringup</td>
+<td>先 <code>ros2 launch yahboomcar_bringup yahboomcar_bringup_launch.py</code></td>
+</tr>
+<tr>
+<td>車沒動但 RViz 模型自己轉／漂</td>
+<td>開機時陀螺儀沒靜止初始化</td>
+<td>斷電、放平、開機後靜置 5 秒</td>
+</tr>
+<tr>
+<td><code>ros2 param set</code> 說 <code>Wrong parameter type</code></td>
+<td>整數與浮點數混用</td>
+<td>浮點參數寫 <code>0.4</code>、<code>1.0</code></td>
+</tr>
+<tr>
+<td>rqt 找不到 <code>laser_Warning</code> 節點</td>
+<td>節點名多一個 n</td>
+<td>選 <code>laser_Warnning</code></td>
+</tr>
+<tr>
+<td>Ctrl+C 後車還在走</td>
+<td>停車指令沒送到</td>
+<td><code>ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{}"</code></td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section class="videos card-box"><h2>📺 官方影片</h2><div class="yt-grid"><figure class="yt" data-yt="XvpxYugtDZc"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 1"><img src="https://i.ytimg.com/vi/XvpxYugtDZc/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 1</figcaption></figure><figure class="yt" data-yt="VZr06Z55wvM"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 2"><img src="https://i.ytimg.com/vi/VZr06Z55wvM/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 2</figcaption></figure><figure class="yt" data-yt="z1S6sRkWMbk"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 3"><img src="https://i.ytimg.com/vi/z1S6sRkWMbk/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 3</figcaption></figure><figure class="yt" data-yt="qv-O5G3qBCM"><button class="yt-thumb" type="button" aria-label="播放影片：官方影片 4"><img src="https://i.ytimg.com/vi/qv-O5G3qBCM/hqdefault.jpg" alt="" loading="lazy"><span class="yt-play">▶</span></button><figcaption>官方影片 4</figcaption></figure></div></section>
+<section class="quiz card-box" id="quiz"><h2>📝 小測驗</h2><div class="quiz-item" data-answer="1"><p class="q">1. LaserScan 中第 i 條雷射的角度怎麼算？</p><div class="opts"><button class="opt" type="button" data-i="0">angle_max - i</button><button class="opt" type="button" data-i="1">angle_min + angle_increment × i</button><button class="opt" type="button" data-i="2">ranges[i] × angle_increment</button></div><p class="explain" hidden></p><template class="explain-text">起始角度加上 i 格乘以每格間隔，單位是弧度；官方再乘 180/π 換成度。</template></div><div class="quiz-item" data-answer="1"><p class="q">2. laser_Avoidance 為什麼要「計數超過 10」才算那一區有障礙？</p><div class="opts"><button class="opt" type="button" data-i="0">光達只有 10 個點</button><button class="opt" type="button" data-i="1">避免單一雜訊點造成誤判</button><button class="opt" type="button" data-i="2">因為速度上限是 10</button></div><p class="explain" hidden></p><template class="explain-text">單點可能是雜訊或反光，要多個點同時很近才可信。</template></div><div class="quiz-item" data-answer="1"><p class="q">3. 依照原始碼，laser_Avoidance 的 Switch 設成 True 會怎樣？</p><div class="opts"><button class="opt" type="button" data-i="0">開始避障</button><button class="opt" type="button" data-i="1">停車並暫停</button><button class="opt" type="button" data-i="2">蜂鳴器響</button></div><p class="explain" hidden></p><template class="explain-text">原始碼 if self.Joy_active or self.Switch == True 會停車並 return；巡邏程式則是 True 才開始，兩者相反。</template></div><div class="quiz-item" data-answer="1"><p class="q">4. 巡邏 patrol 啟動前一定要先跑什麼？</p><div class="opts"><button class="opt" type="button" data-i="0">rqt_graph</button><button class="opt" type="button" data-i="1">ros2 launch yahboomcar_bringup yahboomcar_bringup_launch.py</button><button class="opt" type="button" data-i="2">usb_cam_node_exe</button></div><p class="explain" hidden></p><template class="explain-text">patrol 要用 odom → base_footprint 的 TF 算距離與角度，TF 由 bringup 提供。</template></div><div class="quiz-item" data-answer="0"><p class="q">5. 要把避障距離改成 0.4 公尺，哪個指令正確？</p><div class="opts"><button class="opt" type="button" data-i="0">ros2 param set /laser_Avoidance ResponseDist 0.4</button><button class="opt" type="button" data-i="1">ros2 param set laser_Avoidance linera 0.4</button><button class="opt" type="button" data-i="2">ros2 topic pub /ResponseDist 0.4</button></div><p class="explain" hidden></p><template class="explain-text">參數屬於節點，用 ros2 param set 節點名 參數名 值；linera 是文件拼錯的名字。</template></div><p class="quiz-score">得分：<span class="score">0</span> / 5</p></section>
+<footer class="lesson-foot card-box">
+<button class="btn primary" id="mark-done" type="button">✔ 標記為完成</button>
+<nav class="pager"><a class="btn" href="M3.html">← M3 上一單元</a><a class="btn" href="M5.html">M5 下一單元 →</a></nav>
+</footer>
+</main>
+<audio id="player" preload="none"></audio>
+<script src="app.js"></script>
+</body>
+</html>

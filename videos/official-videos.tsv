@@ -1,0 +1,56 @@
+idx	id	seconds	title	transcript
+01	TDdD7tqdnZs	94	MicroROS-Pi5 Robot Course--Handle Control	videos/transcripts/01-TDdD7tqdnZs.txt
+02	hq0Zbi7BmFA	297	Micro ROS-Pi5 Robot Course---VNC Control	videos/transcripts/02-hq0Zbi7BmFA.txt
+03	G7wb07OQIIQ	185	MicroROS Robot-Pi 5 Course--Keyboard control	videos/transcripts/03-G7wb07OQIIQ.txt
+04	zEbXcGlfq0Y	102	MicroROS Car-Pi5 Course---Autopilot	videos/transcripts/04-zEbXcGlfq0Y.txt
+05	cxN5gvPufYY	156	[MicroROS Pi5 Robot] 5.1-Robot information release	videos/transcripts/05-cxN5gvPufYY.txt
+06	hRfJiAchX_Y	335	[MicroROS Pi5 Robot]-5.2 Robot keyboard control	videos/transcripts/06-hRfJiAchX_Y.txt
+07	3A7KNww1vx0	103	[MicroROS Pi5 Robot] 5.3-Robot handle control	videos/transcripts/07-3A7KNww1vx0.txt
+08	N8yGIIZQ2MM	181	[MicroROS Pi5 Robot] 5.4-Robot state estimation	videos/transcripts/08-N8yGIIZQ2MM.txt
+09	UZIGEVnOjmY	114	[MicroROS Pi5 Robot] 5.5-Linear speed calibration	videos/transcripts/09-UZIGEVnOjmY.txt
+10	nTrdtKT-Rh8	124	[MicroROS Pi5 Robot] 5.6-Angular velocity calibration	videos/transcripts/10-nTrdtKT-Rh8.txt
+11	AAI_SxInfI4	229	[MicroROS Pi5 Robot] 5.7-Robot URDF model	videos/transcripts/11-AAI_SxInfI4.txt
+12	Vko4Lfua-nA	153	[MicroROS Pi5 Robot] 6.1-Getting started with OpenCV	videos/transcripts/12-Vko4Lfua-nA.txt
+13	XC5KQlaDzNg	104	[MicroROS Pi5 Robot] 6.2-Geometric transformation	videos/transcripts/13-XC5KQlaDzNg.txt
+14	AOh87GC8TOo	159	[MicroROS Pi5 Robot] 6.3-Image processing and drawing	videos/transcripts/14-AOh87GC8TOo.txt
+15	Qu8xEgG93hc	91	[MicroROS Pi5 Robot] 6.4-Open Source CV image beautification	videos/transcripts/15-Qu8xEgG93hc.txt
+16	lpm7rAdEBUI	201	[MicroROS Pi5 Robot] 6.5-QR code creation and recognition	videos/transcripts/16-lpm7rAdEBUI.txt
+17	OmUe0kuHerM	77	[MicroROS Pi5 Robot] 6.6-AR vision	videos/transcripts/17-OmUe0kuHerM.txt
+18	zGHaw4BgqEY	174	[MicroROS Pi5 Robot] 6.7-ROS+Opencv application	videos/transcripts/18-zGHaw4BgqEY.txt
+19	nU_dqnUFpVA	93	[MicroROS Pi5 Robot] 7.1-Hand detection	videos/transcripts/19-nU_dqnUFpVA.txt
+20	qOnUNZFiu78	41	[MicroROS Pi5 Robot]  7.2-Posture detection	videos/transcripts/20-qOnUNZFiu78.txt
+21	A_Xs83L08gw	47	[MicroROS Pi5 Robot] 7.3-Overall detection	videos/transcripts/21-A_Xs83L08gw.txt
+22	d-hsVLPjCFM	42	[MicroROS Pi5 Robot] 7.4-Face detection	videos/transcripts/22-d-hsVLPjCFM.txt
+23	98mF111sJxM	36	[MicroROS Pi5 Robot] 7.5-Face recognition	videos/transcripts/23-98mF111sJxM.txt
+24	epIiWwL2jfs	37	[MicroROS Pi5 Robot] 7.6-Face effects	videos/transcripts/24-epIiWwL2jfs.txt
+25	LjZArdnDzOg	54	[MicroROS Pi5 Robot] 7.7-3D object recognition	videos/transcripts/25-LjZArdnDzOg.txt
+26	CKNvkfC1JKs	77	[MicroROS Pi5 Robot] 7.8-Brush	videos/transcripts/26-CKNvkfC1JKs.txt
+27	HKdIRD278vk	59	[MicroROS Pi5 Robot] 7.9-Finger control	videos/transcripts/27-HKdIRD278vk.txt
+28	fql2KpIWh88	50	[MicroROS Pi5 Robot]7.10-Gesture recognition	videos/transcripts/28-fql2KpIWh88.txt
+29	1m0jfKBknls	243	[MicroROS Pi5 Robot] 8.1-Monocular camera calibration	videos/transcripts/29-1m0jfKBknls.txt
+30	2eXFiC_hwuo	155	[MicroROS Pi5 Robot] 8.2-Color tracking	videos/transcripts/30-2eXFiC_hwuo.txt
+31	Pv0OzpAUiUk	148	[MicroROS Pi5 Robot] 8.3-Object recognition and tracking	videos/transcripts/31-Pv0OzpAUiUk.txt
+32	u_ujn2X0TM4	100	[MicroROS Pi5 Robot]  8.4-Face recognition tracking	videos/transcripts/32-u_ujn2X0TM4.txt
+33	UbSkyTiqVxU	98	[MicroROS Pi5 Robot]  8.5-Autonomous driving line patrol	videos/transcripts/33-UbSkyTiqVxU.txt
+34	q7VXHUFZLvs	60	[MicroROS Pi5 Robot] 8.6-QR code motion control	videos/transcripts/34-q7VXHUFZLvs.txt
+35	XB6IoaSK43A	79	[MicroROS Pi5 Robot] 8.7-Gesture control of basic movement of the car	videos/transcripts/35-XB6IoaSK43A.txt
+36	ompfnQhFX-M	80	[MicroROS Pi5 Robot] 8.8-Control the car movement with your palm	videos/transcripts/36-ompfnQhFX-M.txt
+37	sQ949xZmSiI	49	[MicroROS Pi5 Robot] 8.9-Gesture control car action group	videos/transcripts/37-sQ949xZmSiI.txt
+38	XvpxYugtDZc	120	[MicroROS Pi5 Robot]  9.1-Lidar avoid	videos/transcripts/38-XvpxYugtDZc.txt
+39	VZr06Z55wvM	83	[MicroROS Pi5 Robot] 9.2-Lidar following	videos/transcripts/39-VZr06Z55wvM.txt
+40	z1S6sRkWMbk	117	[MicroROS Pi5 Robot] 9.3-Lidar guard	videos/transcripts/40-z1S6sRkWMbk.txt
+41	qv-O5G3qBCM	121	[MicroROS Pi5 Robot] 9.4-Lidar patrol	videos/transcripts/41-qv-O5G3qBCM.txt
+42	V6b10a2W-G8	391	[MicroROS Pi5 Robot] 9.6-Cartographer mapping	videos/transcripts/42-V6b10a2W-G8.txt
+43	bARf2f4_EJ8	346	[MicroROS Pi5 Robot]  9.7-Navigation2 navigation avoid	videos/transcripts/43-bARf2f4_EJ8.txt
+44	PiPBBzjPaU0	334	[MicroROS Pi5 Robot] 9.5-Gmapping mapping	videos/transcripts/44-PiPBBzjPaU0.txt
+45	pXILwOTkY00	248	[MicroROS Pi5 Robot] 9.8-ROS Robot APP mapping	videos/transcripts/45-pXILwOTkY00.txt
+46	heZTYURACdA	58	[MicroROS Pi5 Robot] 8.10-Palm control of the two-dimensional gimbal servo	videos/transcripts/46-heZTYURACdA.txt
+47	WhKewkmbdT0	251	[MicroROS Pi5 Robot] 9.9-ROS Robot APP navigation	videos/transcripts/47-WhKewkmbdT0.txt
+48	NVwqPLjneiQ	381	[MicroROS Pi5 Robot] 10.1-Multi-machine handle control	videos/transcripts/48-NVwqPLjneiQ.txt
+49	SPAnpmR2944	91	[MicroROS Pi5 Robot]  3.3-Connect to MicroROS agent	videos/transcripts/49-SPAnpmR2944.txt
+50	nfDkzUcxuDc	182	[MicroROS Pi5 Robot] 3.4-Connect to WIFI in hotspot mode	videos/transcripts/50-nfDkzUcxuDc.txt
+51	WuLcfn4lkRo	106	[MicroROS Pi5 Robot] 3.1-Write firmware	videos/transcripts/51-WuLcfn4lkRo.txt
+52	MNMRW13Uzgs	96	[MicroROS Pi5 Robot] 3.2 MicroROS control board parameter configuration	videos/transcripts/52-MNMRW13Uzgs.txt
+53	P1vqjdfPqv8	168	[MicroROS Pi5 Robot] 4.4-Mapping APP control	videos/transcripts/53-P1vqjdfPqv8.txt
+54	PzwkA-Bz5qs	220	[MicroROS Pi5 Robot] 10.2 Multi machine keyboard control	videos/transcripts/54-PzwkA-Bz5qs.txt
+55	7ebkfrAPUJc	801	[MicroROS Pi5 Robot] 10.3-Multi-machine navigation	videos/transcripts/55-7ebkfrAPUJc.txt
