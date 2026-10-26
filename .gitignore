@@ -27,3 +27,7 @@ core
 *.swp
 .DS_Store
 Thumbs.db
+
+# Claude Code 工具自動產生的快照
+.claude/
+**/.claude/

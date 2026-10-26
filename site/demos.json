@@ -17,6 +17,10 @@
     {
       "title": "電腦模擬示範 1：用 ros2 topic pub 控制 /cmd_vel 與雲台",
       "youtube": "pNIErAozFfI"
+    },
+    {
+      "title": "實車演練 3：讀話題、轉輪子、雲台、蜂鳴器",
+      "youtube": "D3tGG8TTLlM"
     }
   ],
   "M4": [
@@ -37,6 +41,10 @@
     {
       "title": "電腦模擬示範 4：自己寫避障節點（本單元的程式實跑）",
       "youtube": "ME9kcqrZJYA"
+    },
+    {
+      "title": "實車演練 7：避障節點上真車",
+      "youtube": "l8536CTbVCk"
     }
   ],
   "A1": [
@@ -75,6 +83,10 @@
     {
       "title": "本單元有聲投影片影片（W3）",
       "youtube": "qsTH17UuyVM"
+    },
+    {
+      "title": "實車演練 1：SSH 與 Docker 指令",
+      "youtube": "OfHi11OWJgw"
     }
   ],
   "B1": [
@@ -87,18 +99,30 @@
     {
       "title": "本單元有聲投影片影片（B2）",
       "youtube": "_8u4DCkhPlA"
+    },
+    {
+      "title": "實車演練 1：連線與環境",
+      "youtube": "OfHi11OWJgw"
     }
   ],
   "B3": [
     {
       "title": "本單元有聲投影片影片（B3）",
       "youtube": "JB6VmzuzJNk"
+    },
+    {
+      "title": "實車演練 2：agent 與容器",
+      "youtube": "FESCjBMSkfs"
     }
   ],
   "B4": [
     {
       "title": "本單元有聲投影片影片（B4）",
       "youtube": "rnqrgkOfTHM"
+    },
+    {
+      "title": "實車演練 4：手把遙控與搶方向盤",
+      "youtube": "KVbYhYYbTSo"
     }
   ],
   "B6": [
@@ -111,12 +135,20 @@
     {
       "title": "本單元有聲投影片影片（M1）",
       "youtube": "tL5AdGnhnyY"
+    },
+    {
+      "title": "實車演練 5：OpenCV 與影像話題",
+      "youtube": "6S6Worl9BLo"
     }
   ],
   "M2": [
     {
       "title": "本單元有聲投影片影片（M2）",
       "youtube": "98SnlossLnU"
+    },
+    {
+      "title": "實車演練 6：MediaPipe 手部與臉部",
+      "youtube": "U13wy_M-V2g"
     }
   ],
   "M3": [
