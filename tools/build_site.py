@@ -341,10 +341,10 @@ def extract_architecture(plan_path):
 def render_demos(demos):
     if not demos:
         return ""
-    items = "".join(youtube_embed(d.get("youtube", ""), d.get("title", "示範影片")) for d in demos if isinstance(d, dict))
+    items = "".join(f'<li><a href="https://youtu.be/{esc(d["youtube"])}" target="_blank" rel="noopener">▶ {esc(d.get("title", "示範影片"))}</a>（YouTube 私人影片，需登入擁有者帳號觀看）</li>' for d in demos if isinstance(d, dict) and YT_ID_RE.match(d.get("youtube", "")))
     if not items:
         return ""
-    return f'<section class="demos card-box"><h2>🎬 先看示範</h2><div class="yt-grid">{items}</div></section>'
+    return f'<section class="demos card-box"><h2>🎬 先看示範（電腦模擬實錄）</h2><ul class="demo-links">{items}</ul></section>'
 
 
 def render_head(lesson, audio):

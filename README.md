@@ -2,7 +2,9 @@
 
 給「手上只有一台 Yahboom MicroROS-Pi5 機器人車、完全沒碰過 ROS」的人。從官方文件（155 份 PDF）、官方影片（56 支）和官方原始碼整理成四級、20 個單元的繁體中文教材，每段都有中文語音，並附電腦模擬套件，車子到手前就能先練。
 
-- **互動教材網站**：`site/index.html`（GitHub Pages 上線網址見下方）
+- **互動教材網站**：https://chenghyang2001.github.io/yahboom-microros-pi5/ （原始檔 `site/`）
+- **NotebookLM 產物**（語音導覽、影片摘要、簡報、資訊圖表、心智圖）：https://187-127-109-145.sslip.io/yahboom-microros-pi5/
+- **YouTube（私人）**：20 單元有聲投影片 https://www.youtube.com/playlist?list=PLL8HRt5nNsd4 ；電腦模擬示範 https://www.youtube.com/playlist?list=PLR7jGHAzkwiY
 - **學習規劃**：[LEARNING-PLAN.md](LEARNING-PLAN.md)
 - **講義原稿**：`lessons/*.md`（格式見 `lessons/LESSON-FORMAT.md`）
 - **研究筆記**：`research/notes/`（A 入門與控制、B 視覺、C1 光達、C2 系統、D ROS 2 基礎、E ESP32/micro-ROS、F 原始碼分析）
@@ -27,6 +29,8 @@ ros2 launch microros_pi5_sim sim.launch.xml              # Gazebo 小屋＋車�
 ros2 launch microros_pi5_sim slam.launch.xml             # 建圖（另開終端）
 ros2 launch microros_pi5_sim nav2.launch.xml             # 導航（另開終端）
 ```
+
+`sim/scripts/route_driver.py` 是建圖示範用的路線行駛程式（依 /odom 走預設路線）。
 
 模擬話題和真車對照：`/cmd_vel`（收）、`/scan`、`/odom`、`/imu`、`/tf`、`/joint_states`、`/camera/image_raw`；雲台用 `/gimbal/pan`、`/gimbal/tilt`（弧度，真車是 `/servo_s1`、`/servo_s2` 角度）。
 
