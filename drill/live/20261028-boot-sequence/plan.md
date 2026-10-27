@@ -1,0 +1,25 @@
+# 拍五逐步演練：開機流程（2026-10-28）
+
+第一次用 skill `pi5-live-drill` 實測。開始時電池 67（6.7 V，偏低）；使用者選擇直接開始，掉到 65 以下要停下來提醒。
+
+格子（tmux session `drill`）：① agent 終端　② ROS 2 容器終端　③ 主機檢查用
+
+| 步驟 | 格子 | 指令 | 預期效果 |
+| --- | --- | --- | --- |
+| 準備 | — | 關掉上次的演練視窗與兩個容器，開三格終端，開始錄影 | 三格都是空的提示字元 |
+| 1 | ③→① | ③ `docker ps`；① `sh ~/start_agent_rpi5.sh` | ③ 沒有容器；① agent `running...` 等小腦 |
+| 2 | ①（使用者按 Reset） | 按 ESP32 Reset | ① `session established` 加一串 `created`；燈號每 3 秒快閃 2 次 |
+| 3 | ③→②→③ | ③ `cat -n ~/ros2_humble.sh`；② `sh ~/ros2_humble.sh`；③ `docker ps` | ② 變成 `root@`；有 2 個容器 |
+| 4 | ② | `ros2 node list`、`ros2 topic list`、`ros2 topic echo --once /battery` | `/YB_Car_Node`、10 個話題、電池數值 |
+
+## 進度（2026-10-28 07:02 暫停）
+
+- ✅ 準備：三格終端（tmux session `drill`）、開場語音 `01-intro`
+- ✅ 第一步：③ `docker ps`（空）→ ③ `cat -n start_agent_rpi5.sh` → ① 翻譯官 `running...`（語音 `02-step1`、`03-step1-result`，截圖 `shots/02-step1.png`）
+- ⏸ **暫停**：使用者的手機沒電要充電，預計 2～3 小時後繼續
+- ⬜ 第二步：按 ESP32 Reset（接著寫 `04-step2.txt`）
+- ⬜ 第三步、第四步
+
+錄影第 1 段：`~/Videos/pi5-drill/pi5drill-boot-sequence-20261028-065224.mp4`（596 秒，06:52:25 開始）。
+繼續時要開第 2 段錄影，合成影片時兩段要接起來；`tts_log.tsv` 用的是絕對時間，兩段各自對齊。
+暫停時電池 67（6.7 V），之後要先看電量。
