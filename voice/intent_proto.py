@@ -134,6 +134,8 @@ def transcribe(path, model="small"):
         str(wav_path), language="zh", initial_prompt=STT_INITIAL_PROMPT,
         # 實測雜音觸發溫度 fallback 反覆重試（跑了 144 秒）：固定單一溫度、不帶前文
         temperature=0.0, condition_on_previous_text=False,
+        # 雜音會讓它把提示詞重複 30 多次（25 秒）：先濾掉非人聲、限制輸出長度
+        vad_filter=True, max_new_tokens=40,
     )
     # segments 是 generator，真正的辨識在迭代時才發生，所以計時要包住 join
     text = "".join(seg.text for seg in segments).strip()
