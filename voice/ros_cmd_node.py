@@ -7,7 +7,7 @@
 指令格式（每行一個 JSON）：
     {"action":"beep","ms":30000}
     {"action":"move","linear":0.1,"angular":0.0,"seconds":2}
-    {"action":"drive","linear":0.1,"angular":0.0}   # 持續移動，直到 stop／新指令／30 秒／雷達防撞
+    {"action":"drive","linear":0.1,"angular":0.0}   # 持續移動，直到 stop／新指令／180 秒／雷達防撞
     {"action":"stop"}                     # 只停車與蜂鳴器，不動雲台
     {"action":"gimbal","pan":45,"tilt":-30}   # 絕對角度（度）
 
@@ -41,7 +41,7 @@ BEEP_MS_MIN, BEEP_MS_MAX = 0, 60000
 LINEAR_MAX = 0.15
 ANGULAR_MAX = 0.8
 SECONDS_MIN, SECONDS_MAX = 0.5, 3.0
-DRIVE_MAX_SEC = 30.0        # drive 的保底上限：就算一直沒聽到「停」也會自己停
+DRIVE_MAX_SEC = 180.0        # drive 的保底上限：就算一直沒聽到「停」也會自己停
 # 雲台安全鐵律：/servo_s2 大於 0 會抬頭扯掉相機 USB 線，只准 -45（低頭到底）～0（平視）
 PAN_MIN, PAN_MAX = -90, 90
 TILT_MIN, TILT_MAX = -45, 0
@@ -281,7 +281,7 @@ class RosCmdNode:
     def _do_drive(self, cmd):
         linear, angular = self._speeds(cmd)
         if linear == 0.0 and angular == 0.0:
-            return self._do_stop()  # 零速度的 drive 等同停車，不必佔用 30 秒
+            return self._do_stop()  # 零速度的 drive 等同停車，不必佔用 180 秒
         blocked = self._start_motion("drive", linear, angular, DRIVE_MAX_SEC)
         if blocked is not None:
             return blocked

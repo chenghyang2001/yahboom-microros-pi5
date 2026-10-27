@@ -261,7 +261,7 @@ def _sanitize_move(cmd):
 
 
 def _sanitize_drive(cmd):
-    """drive 沒有秒數（由節點的 30 秒上限與「停」結束）；兩軸都是 0 等於停車。"""
+    """drive 沒有秒數（由節點的 180 秒上限與「停」結束）；兩軸都是 0 等於停車。"""
     linear = _clamp(_to_finite_float(cmd.get("linear"), 0.0), -LINEAR_MAX, LINEAR_MAX)
     angular = _clamp(_to_finite_float(cmd.get("angular"), 0.0), -ANGULAR_MAX, ANGULAR_MAX)
     if linear == 0.0 and angular == 0.0:
