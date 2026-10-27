@@ -28,13 +28,15 @@ LLM_TIMEOUT_SEC = 3.0
 STT_INITIAL_PROMPT = (
     "以下是繁體中文的小車語音指令：小車，蜂鳴器響三十秒、蜂鳴器停止、"
     "直線前進、後退、左轉、右轉、停止。鏡頭往左看、鏡頭往右看、鏡頭低頭、鏡頭回正、"
-    "雲台回正、拍一張照片、慢慢前進、快一點前進。"
+    "雲台回正、拍一張照片、慢慢前進、快一點前進、一直前進、持續前進、一直後退。"
 )
 
 # whisper 對「小車」常見的誤辨字；MVP 先用清單比對，之後再考慮拼音近似
 WAKE_WORDS = ("小車", "小鞋", "小謝", "曉車", "小陳")
 
-ALLOWED_ACTIONS = ("beep", "move", "stop", "gimbal", "photo", "unknown")
+ALLOWED_ACTIONS = ("beep", "move", "drive", "stop", "gimbal", "photo", "unknown")
+# 會讓車子移動、必須通過移動字護欄的 action
+MOTION_ACTIONS = ("move", "drive")
 
 # 夾限值對應 SPEC.md「指令 JSON」表格
 BEEP_MS_MIN, BEEP_MS_MAX = 0, 60000
@@ -54,6 +56,9 @@ TILT_MIN, TILT_MAX = -45, 0
 # 起因：「鏡頭往左看」被 STT 辨識成「小車進頭往。」，LLM 卻猜成前進
 MOVE_WORDS = ("前進", "後退", "往前", "往後", "向前", "向後", "前", "後", "退", "走",
               "左轉", "右轉", "轉彎", "轉圈", "轉", "倒車")
+# drive 的「持續」修飾詞本身不算移動字：只說「小車一直」不能讓車子出發。
+# 護欄比對前先把它們從原文拿掉，避免日後有人把含移動字的詞（例如「一直走」）加進來時混淆
+DRIVE_WORDS = ("一直", "持續", "繼續", "不要停")
 
 ENV_PATH = Path(__file__).resolve().parent / ".env"
 
@@ -64,6 +69,11 @@ SYSTEM_PROMPT = """你是 Yahboom 麥克納姆輪小車的指令解析器，把�
    只有句子清楚表達移動方向（前進、後退、左轉、右轉、轉圈等）才可以用 move。
    速度對照：linear 一般 0.1、「慢」「慢一點」0.05、「快」「快一點」0.15；
    angular 轉彎一般 0.5、快 0.8、慢 0.3。seconds 沒講用 2。只前進後退時 angular=0，只轉彎時 linear=0。
+2b. 持續移動：action=drive，只有 linear、angular，沒有 seconds（車子會一直動，直到使用者說停）。
+   只有句子明確帶「一直」「持續」「繼續」「不要停」字樣才可以用 drive：
+   「一直前進」「持續前進」「一直走」「不要停」「繼續往前走」→ linear 0.1（慢 0.05、快 0.15）、angular 0；
+   「一直後退」→ linear -0.1、angular 0；「一直轉圈」「原地一直轉」→ linear 0、angular 0.5。
+   只說「前進」「往前走」而沒有這些字樣時，仍然用 move。
 3. 停車：action=stop。
 4. 雲台（鏡頭／雲台／攝影機／相機／「看」）：action=gimbal，pan、tilt 都是絕對角度（度）。
    往左看 pan=45、往右看 pan=-45、最左 pan=90、最右 pan=-90；
@@ -77,6 +87,7 @@ SYSTEM_PROMPT = """你是 Yahboom 麥克納姆輪小車的指令解析器，把�
 CAR_COMMAND_TOOL = {
     "name": "car_command",
     "description": ("輸出一個要給小車執行的指令。move 只在句子清楚表達移動方向時使用；"
+                    "有「一直／持續／繼續／不要停」的移動 → drive；"
                     "鏡頭／雲台／相機／看 → gimbal；拍照 → photo；聽不清楚 → unknown"),
     "input_schema": {
         "type": "object",
@@ -84,9 +95,9 @@ CAR_COMMAND_TOOL = {
             "action": {"type": "string", "enum": list(ALLOWED_ACTIONS)},
             "ms": {"type": "integer", "description": "beep 響的毫秒數，0 表示停止"},
             "linear": {"type": "number",
-                       "description": "move 線速度 m/s，前進正、後退負；一般 0.1、慢 0.05、快 0.15"},
+                       "description": "move／drive 線速度 m/s，前進正、後退負；一般 0.1、慢 0.05、快 0.15"},
             "angular": {"type": "number",
-                        "description": "move 角速度 rad/s，左轉正、右轉負；一般 0.5、慢 0.3、快 0.8"},
+                        "description": "move／drive 角速度 rad/s，左轉正、右轉負；一般 0.5、慢 0.3、快 0.8"},
             "seconds": {"type": "number", "description": "move 持續秒數"},
             "pan": {"type": "integer",
                     "description": "gimbal 水平絕對角度 -90～90：往左看 45、往右看 -45、最左 90、最右 -90、回正 0"},
@@ -249,6 +260,15 @@ def _sanitize_move(cmd):
     }
 
 
+def _sanitize_drive(cmd):
+    """drive 沒有秒數（由節點的 30 秒上限與「停」結束）；兩軸都是 0 等於停車。"""
+    linear = _clamp(_to_finite_float(cmd.get("linear"), 0.0), -LINEAR_MAX, LINEAR_MAX)
+    angular = _clamp(_to_finite_float(cmd.get("angular"), 0.0), -ANGULAR_MAX, ANGULAR_MAX)
+    if linear == 0.0 and angular == 0.0:
+        return {"action": "stop"}
+    return {"action": "drive", "linear": linear, "angular": angular}
+
+
 def _sanitize_gimbal(cmd):
     """缺的軸保持缺（交給 voice_agent 用目前角度補）；有值才夾限，無效值視同缺。"""
     result = {"action": "gimbal"}
@@ -271,6 +291,8 @@ def sanitize(cmd):
         return {"action": "beep", "ms": int(_clamp(round(ms), BEEP_MS_MIN, BEEP_MS_MAX))}
     if action == "move":
         return _sanitize_move(cmd)
+    if action == "drive":
+        return _sanitize_drive(cmd)
     if action == "gimbal":
         return _sanitize_gimbal(cmd)
     if action in ("stop", "photo"):
@@ -279,12 +301,20 @@ def sanitize(cmd):
     return {"action": "unknown", "reason": str(reason) if reason is not None else ""}
 
 
+def _strip_drive_words(text):
+    for word in DRIVE_WORDS:
+        text = text.replace(word, "")
+    return text
+
+
 def apply_move_guard(text, cmd):
-    """LLM 回 move 但原文沒有任何移動字 → 改成 unknown；聽不清楚寧可不動，也不能猜成移動。"""
-    if cmd.get("action") != "move":
+    """LLM 回 move／drive 但原文沒有任何移動字 → 改成 unknown；聽不清楚寧可不動，也不能猜成移動。"""
+    if cmd.get("action") not in MOTION_ACTIONS:
         return cmd
-    if text is not None and any(word in text for word in MOVE_WORDS):
-        return cmd
+    if text is not None:
+        core_text = _strip_drive_words(text)
+        if any(word in core_text for word in MOVE_WORDS):
+            return cmd
     return {"action": "unknown", "reason": "guard: 沒有移動字"}
 
 
@@ -365,6 +395,7 @@ def run_selftest():
     assert handle_text("小車 停") == {"action": "stop", "via": "shortcut"}
     _selftest_gimbal_photo()
     _selftest_move_guard()
+    _selftest_drive()
     print("PASS")
 
 
@@ -392,12 +423,30 @@ def _selftest_move_guard():
     assert apply_move_guard("小車鏡頭往左看", gimbal) == gimbal
 
 
+def _selftest_drive():
+    drive = sanitize({"action": "drive", "linear": 9, "angular": -9, "seconds": 5, "reason": "x"})
+    assert drive == {"action": "drive", "linear": 0.15, "angular": -0.8}, drive
+    drive = sanitize({"action": "drive", "linear": float("nan"), "angular": float("inf")})
+    assert drive == {"action": "stop"}, drive
+    assert sanitize({"action": "drive"}) == {"action": "stop"}
+    assert sanitize({"action": "drive", "linear": -0.1})["linear"] == -0.1
+    # 護欄：「一直／持續／繼續」不算移動字，必須還有前／後／走／轉
+    drive = {"action": "drive", "linear": 0.1, "angular": 0.0}
+    assert apply_move_guard("小車一直前進", drive) == drive
+    assert apply_move_guard("小車原地一直轉", drive) == drive
+    assert apply_move_guard("小車一直", drive)["action"] == "unknown"
+    assert apply_move_guard("小車持續繼續", drive)["action"] == "unknown"
+    assert apply_move_guard(None, drive)["action"] == "unknown"
+
+
 # 需要 LLM 的固定案例：(文字, 預期 action)
 LLM_SELFTEST_CASES = (
     ("小車進頭往", "unknown"),
     ("小車鏡頭往左看", "gimbal"),
     ("小車拍一張照片", "photo"),
     ("小車往前走", "move"),
+    ("小車一直前進", "drive"),
+    ("小車一直後退", "drive"),
 )
 
 

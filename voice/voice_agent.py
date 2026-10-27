@@ -58,8 +58,8 @@ RECONNECT_SEC = 3.0
 NODE_EXIT_TIMEOUT = 3.0
 
 # 送給節點時只保留這些欄位；via / llm_sec / reason 是主機端除錯用，節點不需要
-NODE_FIELDS = {"beep": ("ms",), "move": ("linear", "angular", "seconds"), "stop": (),
-               "gimbal": ("pan", "tilt")}
+NODE_FIELDS = {"beep": ("ms",), "move": ("linear", "angular", "seconds"),
+               "drive": ("linear", "angular"), "stop": (), "gimbal": ("pan", "tilt")}
 
 DEFAULT_CAMERA = "/dev/video0"
 PHOTO_DIR = Path(__file__).parent / "photos"
@@ -69,6 +69,8 @@ TONES_OK = [(1200, 0.15)]
 TONES_FAIL = [(400, 0.15), (400, 0.15)]
 TONES_PHOTO = [(1600, 0.1), (2000, 0.1)]
 TONES_READY_FALLBACK = [(1200, 0.1)] * 3  # TTS 失敗時的備援：三聲短高音
+# 車子自己停（防撞／drive 到時限）：兩聲低音，讓使用者知道不是自己下的停
+TONES_AUTO_STOP = [(400, 0.2), (400, 0.2)]
 
 READY_TEXT = "小車已經準備好了，可以開始用語音下命令。"
 TTS_VOICE = "zh-TW-HsiaoChenNeural"
@@ -99,6 +101,29 @@ def run_cmd(cmd, desc):
 
 
 # ── ROS 節點連線 ─────────────────────────────────────
+def parse_ack(line):
+    """把節點的 `ACK {json}` 行解析成 dict；不是 ACK 或 JSON 壞掉回 None。"""
+    if not line.startswith("ACK "):
+        return None
+    try:
+        payload = json.loads(line[4:])
+    except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def is_auto_stop(ack):
+    """節點自己停車時才提示。
+
+    drive_done 的 obstacle 原因前面已有 obstacle_stop 響過，不重複播；
+    cancel 是使用者自己下的停／新指令，也不播。
+    """
+    action = ack.get("action")
+    if action == "obstacle_stop":
+        return True
+    return action == "drive_done" and ack.get("reason") not in ("cancel", "obstacle")
+
+
 class NodeLink:
     """包裝容器內 ros_cmd_node.py 的子程序；dry_run 時只印出要送的 JSON。"""
 
@@ -134,7 +159,13 @@ class NodeLink:
 
     def _pump_stdout(self):
         for line in self.proc.stdout:
-            log(f"[node] {line.rstrip()}")
+            text = line.rstrip()
+            log(f"[node] {text}")
+            ack = parse_ack(text)
+            if ack is not None and is_auto_stop(ack):
+                log(f"車子自己停了：{json.dumps(ack, ensure_ascii=False)}")
+                # 另開 thread 播：pacat 會阻塞，不能卡住節點輸出的讀取
+                threading.Thread(target=play_tones, args=(TONES_AUTO_STOP,), daemon=True).start()
         log("[node] 節點輸出已結束")
 
     def send(self, cmd):
