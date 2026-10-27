@@ -135,5 +135,6 @@ python ycar.py host 'sudo systemctl disable --now pi5-wifi-fallback; sudo nmcli 
 | `01-architecture.mp3`／`.txt` | 現在的連線架構、熱點是不是另一個硬體、早上為什麼連不上、要改什麼、會不會影響、改壞怎麼救 |
 | `02-hotspot-offline.mp3`／`.txt` | 拍五自己當熱點時沒有網路，還能做什麼 |
 | `03-drill-connection.mp3`／`.txt` | 之前演練時是怎麼連的、為什麼跟教材不一樣 |
+| `04-boot-desktop.mp3`／`.txt` | 開機時發生什麼事：VNC 桌面上的兩個終端、`~/.config/autostart` 兩個捷徑檔、怎麼確認、手把控制沒自動啟動 |
 
 播放：`python ~/.claude/skills/tts/scripts/tts_play.py play drill/network-explain/01-architecture.txt`，或直接開 mp3。
