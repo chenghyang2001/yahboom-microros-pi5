@@ -136,5 +136,12 @@ python ycar.py host 'sudo systemctl disable --now pi5-wifi-fallback; sudo nmcli 
 | `02-hotspot-offline.mp3`／`.txt` | 拍五自己當熱點時沒有網路，還能做什麼 |
 | `03-drill-connection.mp3`／`.txt` | 之前演練時是怎麼連的、為什麼跟教材不一樣 |
 | `04-boot-desktop.mp3`／`.txt` | 開機時發生什麼事：VNC 桌面上的兩個終端、`~/.config/autostart` 兩個捷徑檔、怎麼確認、手把控制沒自動啟動 |
+| `05-boot-panes` | 開機逐步演練：螢幕 3 tmux 三格、容器是什麼、兩個開機腳本的用途 |
+| `06-boot-agent-script` | `start_agent_rpi5.sh` 逐行說明 |
+| `07-boot-step2`／`08-...-result` | 第二步：按 ESP32 Reset，小腦連上翻譯官、登記 8 個話題 |
+| `09-boot-step3`／`10-...-result` | 第三步：`ros2_humble.sh` 逐行說明、打開 ROS 2 容器，`docker ps` 從 1 個變 2 個 |
+| `11-boot-step4`／`12-...-result` | 第四步：`ros2 node list`／`topic list`／讀電池，確認資料流通 |
 
 播放：`python ~/.claude/skills/tts/scripts/tts_play.py play drill/network-explain/01-architecture.txt`，或直接開 mp3。
+
+逐步重現開機流程的做法（2026-10-28）：在 Pi 桌面開一個 `lxterminal`，裡面用 tmux session `boot` 切成三格（① agent、② ROS 2 容器、③ 主機檢查），用 `tmux send-keys` 送指令。先關掉開機自動開的兩個終端，再照順序跑 `start_agent_rpi5.sh` → 按 ESP32 Reset → `ros2_humble.sh` → `ros2 topic list`。重開 agent 後，ESP32 不會自己重連，要按 Reset。
