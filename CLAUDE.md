@@ -45,6 +45,8 @@ PYTHONUTF8=1 python tools/build_site.py
 PYTHONUTF8=1 python tools/make_lesson_videos.py
 ```
 
+**上電檢查**（代號「拍五」＝這台車）：照 **`drill/POWER-ON-CHECK.md`** 1～10 步。
+
 語音指令的部署（PC → SFTP → 車上）、啟動與停止方式，見 **`voice/DEPLOY.md`**。
 
 ## 重要規則與踩坑
