@@ -45,7 +45,7 @@ PYTHONUTF8=1 python tools/build_site.py
 PYTHONUTF8=1 python tools/make_lesson_videos.py
 ```
 
-**上電檢查**（代號「拍五」＝這台車）：照 **`drill/POWER-ON-CHECK.md`** 1～10 步。
+**上電檢查**（代號「拍五」＝這台車）：照 **`drill/POWER-ON-CHECK.md`** 1～10 步。網路架構、Wi-Fi 備援看門狗、與教材連法的差別見 **`drill/NETWORK.md`**。
 
 語音指令的部署（PC → SFTP → 車上）、啟動與停止方式，見 **`voice/DEPLOY.md`**。
 
@@ -63,6 +63,7 @@ PYTHONUTF8=1 python tools/make_lesson_videos.py
 - 傳檔用 paramiko SFTP。用 base64 經 `ycar.py host` 傳，大檔會被截斷。
 - 低電量時，ESP32 的蜂鳴器會一直叫，即使 Pi 已經關機。充電前要先讓 Pi 正常關機，再關總開關。
 - 演練視窗與錄影不放螢幕 1。
+- **Wi-Fi 備援**：車上跑 `pi5-wifi-fallback` 服務。連不上 AnPing 2 分鐘後開 `Micro_ros` 熱點（10.42.0.1），熱點閒置 5 分鐘就關掉、回頭找 AnPing。`Micro_ros` 已改成不自動連線，不要改回去。
 
 ## 技術堆疊
 

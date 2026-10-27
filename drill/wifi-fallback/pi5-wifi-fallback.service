@@ -1,0 +1,17 @@
+[Unit]
+Description=拍五 Wi-Fi 備援看門狗（連不上手機熱點時開 Micro_ros 熱點）
+After=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/pi5-wifi-fallback.sh
+Restart=always
+RestartSec=10
+# 參數可在此覆寫（預設值見腳本開頭）
+#Environment=CHECK_INTERVAL=15
+#Environment=CLIENT_GRACE=120
+#Environment=AP_IDLE=300
+
+[Install]
+WantedBy=multi-user.target
