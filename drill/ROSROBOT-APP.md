@@ -81,6 +81,17 @@ python ycar.py kill usb_cam
 python ycar.py kill yahboomcar_bringup_launch
 ```
 
+⚠️ 2026-10-27 實測：上面只殺掉 `ros2 launch` 本身，它開出來的子程式（ekf、rosbridge、gmapping、laserscan_to_point 等 12 個）會變成孤兒繼續跑。要再清一次：
+
+```bash
+# 列出 PPID=1 的殘留程式（PID 1 的 bash 和 ros2-daemon 要留著）
+python ycar.py ros "ps -eo pid,ppid,comm --no-headers | grep -vE 'ps|grep|bash|timeout'"
+python ycar.py ros "kill -TERM <PID...>"
+# rosbridge_websocket 收到 TERM 不會結束，要再補 kill -INT 或 kill -KILL
+```
+
+停完以後，`ros2 node list` 可能還會列出舊節點名稱。那是 ros2-daemon 的快取，以 `ps` 看到的程式為準。
+
 ## 5. App 用到的節點與話題
 
 App 本身不懂 ROS，它透過 WebSocket 連到車上的 **`/rosbridge_websocket`** 節點，由這個節點代為訂閱和發布。下表是 2026-10-27 用 `ros2 node info /rosbridge_websocket` 實際查到的。
