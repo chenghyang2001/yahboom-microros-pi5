@@ -42,6 +42,7 @@ cd voice && PYTHONUTF8=1 python intent_proto.py --selftest && PYTHONUTF8=1 pytho
 
 # 教材
 PYTHONUTF8=1 python tools/build_site.py
+git subtree push --prefix site origin gh-pages   # 網站部署：GitHub Pages 讀 gh-pages 分支，推 main 不會更新網站
 PYTHONUTF8=1 python tools/make_lesson_videos.py
 ```
 
