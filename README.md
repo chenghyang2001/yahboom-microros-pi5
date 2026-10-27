@@ -8,6 +8,7 @@
 - **學習規劃**：[LEARNING-PLAN.md](LEARNING-PLAN.md)
 - **講義原稿**：`lessons/*.md`（格式見 `lessons/LESSON-FORMAT.md`）
 - **研究筆記**：`research/notes/`（A 入門與控制、B 視覺、C1 光達、C2 系統、D ROS 2 基礎、E ESP32/micro-ROS、F 原始碼分析）
+- **藍牙耳機語音指令**：`voice/`（部署與操作見 [voice/DEPLOY.md](voice/DEPLOY.md)，測試報告見 `voice/reports/`）
 - **電腦模擬套件**：`sim/microros_pi5_sim/`（ROS 2 Jazzy + Gazebo Harmonic，官方 3D 模型＋光達、相機、IMU、四輪差速）
 
 ## 四級課程
