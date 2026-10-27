@@ -128,3 +128,47 @@ python ycar.py ros 'S=$(timeout 5 ros2 topic echo --once /scan --field header.st
 | --- | --- |
 | 2026-10-27 | 1～9 全部 ✅：溫度 42.8 °C、throttled 0x0、磁碟 55%、電池 70、/scan 12.4 Hz、/imu 21.5 Hz。第 10 步 ❌，時鐘差 5409 秒。 |
 | 2026-10-28 | 熱點自動關閉導致 Pi 斷線，改用 adb 關閉自動關閉並重開車後恢復。1～9 ✅：41.1 °C、0x0、電池 79、/scan 12.5 Hz、/imu 21.1 Hz、耳機 K200 Pro 已連線（HFP 16 kHz）。第 10 步 ❌，時鐘差 42582 秒。 |
+
+## 附錄：有線備援（Wi-Fi／手機壞掉時）
+
+拍五的有線網卡（eth0）已經設成「**自動取得 IP＋備援固定 IP `192.168.77.2/24`**」（2026-10-28 設定）。
+
+- 自動取得 IP 會一直重試，不會因為逾時就斷開連線。
+- 固定 IP 只用在區網，不設預設閘道（route-metric 700），不會搶走 Wi-Fi 的上網路由。
+- Wi-Fi 設定完全沒動，原本的熱點流程照用。
+
+### 接法
+
+| 接法 | 筆電要做什麼 | 拍五的位址 |
+| --- | --- | --- |
+| 兩邊都接**路由器**（會發 IP） | 什麼都不用做 | `raspberrypi.local`，或到路由器的裝置清單查 |
+| **一般 hub／交換器**，或網路線直接對接 | 有線網卡手動設成 `192.168.77.10`，遮罩 `255.255.255.0`，閘道留空 | `192.168.77.2` |
+
+筆電設定固定 IP（Windows，用系統管理員身分開 PowerShell。網卡名稱用 `Get-NetAdapter` 查）：
+
+```powershell
+New-NetIPAddress -InterfaceAlias "乙太網路" -IPAddress 192.168.77.10 -PrefixLength 24
+# 用完改回自動：
+Remove-NetIPAddress -InterfaceAlias "乙太網路" -IPAddress 192.168.77.10 -Confirm:$false
+Set-NetIPInterface -InterfaceAlias "乙太網路" -Dhcp Enabled
+```
+
+### 連線
+
+```bash
+ping 192.168.77.2
+ssh pi@192.168.77.2                       # SSH
+# VNC：TigerVNC 連 192.168.77.2:5900
+cd ~/workspace/yahboom-microros-pi5/drill
+YCAR_HOST=192.168.77.2 YCAR_PORT=22 YCAR_PASS=yahboom PYTHONUTF8=1 python ycar.py status
+```
+
+有線連上以後，上電檢查的第 1～3 步（adb、熱點、手機轉接）都跳過，從第 4 步開始做。ROS 2 容器用的是主機網路，送指令（`ycar.py ros`／`rospy`）跟走 Wi-Fi 時一樣。
+
+### 還原（拿掉備援固定 IP）
+
+```bash
+python ycar.py host 'sudo nmcli con mod "Wired connection 1" ipv4.addresses "" ipv4.dhcp-timeout 0 ipv4.route-metric -1'
+```
+
+⚠️ 設定當下沒有接網路線，所以只確認了設定有存進去（`nmcli` 讀回 `192.168.77.2/24`），**還沒有接線實測**。第一次用有線時，請照上面的「連線」步驟驗證一次。
