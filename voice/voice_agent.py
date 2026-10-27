@@ -3,15 +3,20 @@
 流程：
     parec（耳機 HFP 麥克風）→ RMS 斷句 → wav → intent_proto.transcribe
     → intent_proto.handle_text → JSON 一行寫入容器內 ros_cmd_node.py 的 stdin
+    （photo 例外：在主機用 ffmpeg 直接拍，不送節點；dry-run 也會真的拍，因為拍照不會動車）
 
 用法（主機上）：
     ~/voice/.venv/bin/python voice_agent.py                 # 正式收音
     ~/voice/.venv/bin/python voice_agent.py --dry-run       # 不啟動容器節點，只印 JSON
     ~/voice/.venv/bin/python voice_agent.py --dry-run --wav a.wav   # 冒煙測試
+    ~/voice/.venv/bin/python voice_agent.py --camera /dev/video2    # 指定拍照用的相機
+    ~/voice/.venv/bin/python voice_agent.py --allow-gimbal          # 允許雲台（預設停用）
+    ~/voice/.venv/bin/python voice_agent.py --no-ready-voice        # 不播「準備好了」語音
 """
 import argparse
 import array
 import collections
+import hashlib
 import json
 import math
 import os
@@ -53,7 +58,23 @@ RECONNECT_SEC = 3.0
 NODE_EXIT_TIMEOUT = 3.0
 
 # 送給節點時只保留這些欄位；via / llm_sec / reason 是主機端除錯用，節點不需要
-NODE_FIELDS = {"beep": ("ms",), "move": ("linear", "angular", "seconds"), "stop": ()}
+NODE_FIELDS = {"beep": ("ms",), "move": ("linear", "angular", "seconds"), "stop": (),
+               "gimbal": ("pan", "tilt")}
+
+DEFAULT_CAMERA = "/dev/video0"
+PHOTO_DIR = Path(__file__).parent / "photos"
+PHOTO_TIMEOUT_SEC = 10
+
+TONES_OK = [(1200, 0.15)]
+TONES_FAIL = [(400, 0.15), (400, 0.15)]
+TONES_PHOTO = [(1600, 0.1), (2000, 0.1)]
+TONES_READY_FALLBACK = [(1200, 0.1)] * 3  # TTS 失敗時的備援：三聲短高音
+
+READY_TEXT = "小車已經準備好了，可以開始用語音下命令。"
+TTS_VOICE = "zh-TW-HsiaoChenNeural"
+TTS_CACHE_DIR = Path(__file__).parent / "tts_cache"
+TTS_GEN_TIMEOUT_SEC = 20
+TTS_PLAY_TIMEOUT_SEC = 30  # 語音比提示音長很多，pacat 逾時要放寬
 
 
 def log(msg):
@@ -84,6 +105,8 @@ class NodeLink:
     def __init__(self, dry_run):
         self.dry_run = dry_run
         self.proc = None
+        # 雲台目前角度：LLM 只講一軸時用來補另一軸；開機假設回正（0, 0）
+        self.gimbal = {"pan": 0, "tilt": 0}
 
     def start(self):
         if self.dry_run:
@@ -268,24 +291,167 @@ def tone_bytes(freq, seconds, volume=0.4):
     return samples.tobytes()
 
 
+def play_pcm(pcm, timeout=5):
+    """把 16k 單聲道 s16le PCM 用 pacat 播到預設 sink（HFP 時就是耳機）；失敗只警告。"""
+    try:
+        subprocess.run(["pacat", "--playback", "--format=s16le", f"--rate={RATE}",
+                        "--channels=1"], input=pcm, timeout=timeout, check=True,
+                       stderr=subprocess.DEVNULL)
+    except FileNotFoundError:
+        log("警告：找不到 pacat，略過播放")
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        log(f"警告：播放音訊失敗：{exc}")
+
+
 def play_tones(tones):
     """tones：[(頻率, 秒數), ...]，中間插 0.08 秒靜音；失敗只警告，不影響主流程。"""
     gap = bytes(int(RATE * 0.08) * 2)
-    pcm = gap.join(tone_bytes(freq, sec) for freq, sec in tones)
+    play_pcm(gap.join(tone_bytes(freq, sec) for freq, sec in tones))
+
+
+# ── 語音通知（TTS）────────────────────────────────────
+def tts_cache_path(text):
+    # 用文字雜湊當檔名：改了文字自然換新檔，同一句第二次啟動就不需要網路
+    digest = hashlib.sha1(text.encode("utf-8")).hexdigest()[:12]
+    return TTS_CACHE_DIR / f"{digest}.mp3"
+
+
+def _stderr_text(exc):
+    return (exc.stderr or b"").decode("utf-8", "replace").strip()
+
+
+def ensure_tts_mp3(text):
+    """取得這句話的 mp3（有快取就直接用）；失敗回傳 None（已印警告）。"""
+    mp3_path = tts_cache_path(text)
+    if mp3_path.is_file() and mp3_path.stat().st_size > 0:
+        return mp3_path
+    # 先寫暫存檔再改名：edge-tts 中途斷網時不會留下半個 mp3 被當成快取
+    part_path = mp3_path.with_suffix(".part")
+    edge_tts = Path(sys.executable).parent / "edge-tts"
+    cmd = [str(edge_tts), "--voice", TTS_VOICE, "--text", text, "--write-media", str(part_path)]
     try:
-        subprocess.run(["pacat", "--playback", "--format=s16le", f"--rate={RATE}",
-                        "--channels=1"], input=pcm, timeout=5, check=True,
-                       stderr=subprocess.DEVNULL)
+        TTS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        subprocess.run(cmd, capture_output=True, timeout=TTS_GEN_TIMEOUT_SEC, check=True)
+        part_path.replace(mp3_path)
     except FileNotFoundError:
-        log("警告：找不到 pacat，略過提示音")
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-        log(f"警告：播放提示音失敗：{exc}")
+        log(f"警告：找不到 edge-tts（{edge_tts}）")
+        return None
+    except subprocess.TimeoutExpired:
+        log(f"警告：edge-tts 逾時 {TTS_GEN_TIMEOUT_SEC} 秒（沒網路？）")
+        return None
+    except subprocess.CalledProcessError as exc:
+        log(f"警告：edge-tts 失敗（code={exc.returncode}）：{_stderr_text(exc)}")
+        return None
+    except OSError as exc:
+        log(f"警告：寫入 TTS 快取失敗：{exc}")
+        return None
+    finally:
+        part_path.unlink(missing_ok=True)
+    return mp3_path
+
+
+def mp3_to_pcm(mp3_path):
+    """用 ffmpeg 把 mp3 解成 16k 單聲道 s16le，與提示音同格式；失敗回傳 None。"""
+    cmd = ["ffmpeg", "-nostdin", "-loglevel", "error", "-i", str(mp3_path),
+           "-f", "s16le", "-ar", str(RATE), "-ac", "1", "-"]
+    try:
+        done = subprocess.run(cmd, capture_output=True, timeout=TTS_GEN_TIMEOUT_SEC, check=True)
+    except FileNotFoundError:
+        log("警告：找不到 ffmpeg，無法播放語音")
+        return None
+    except subprocess.TimeoutExpired:
+        log(f"警告：ffmpeg 解碼逾時（{mp3_path}）")
+        return None
+    except subprocess.CalledProcessError as exc:
+        log(f"警告：ffmpeg 解碼失敗（code={exc.returncode}）：{_stderr_text(exc)}")
+        return None
+    return done.stdout or None
+
+
+def announce_ready(args):
+    """在耳機播「準備好了」語音；任何一步失敗就改播三聲短高音，不中斷收音。"""
+    if args.no_ready_voice:
+        return
+    mp3_path = ensure_tts_mp3(args.ready_text)
+    pcm = mp3_to_pcm(mp3_path) if mp3_path is not None else None
+    if pcm is None:
+        log("警告：語音通知失敗，改播備援提示音")
+        play_tones(TONES_READY_FALLBACK)
+        return
+    log(f"播放語音通知：「{args.ready_text}」")
+    play_pcm(pcm, timeout=TTS_PLAY_TIMEOUT_SEC)
+
+
+# ── 拍照 ─────────────────────────────────────────────
+def take_photo(camera):
+    """用 ffmpeg 從 v4l2 相機抓一張 jpg；成功回傳路徑，失敗回傳 None（已印錯誤）。"""
+    try:
+        PHOTO_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        log(f"錯誤：無法建立相片目錄 {PHOTO_DIR}：{exc}")
+        return None
+    photo_path = PHOTO_DIR / f"{time.strftime('%Y%m%d-%H%M%S')}.jpg"
+    cmd = ["ffmpeg", "-nostdin", "-y", "-loglevel", "error", "-f", "v4l2",
+           "-video_size", "1280x720", "-i", camera, "-frames:v", "1", "-update", "1",
+           str(photo_path)]
+    try:
+        done = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", timeout=PHOTO_TIMEOUT_SEC, check=False)
+    except FileNotFoundError:
+        log("錯誤：找不到 ffmpeg（請 sudo apt install ffmpeg）")
+        return None
+    except subprocess.TimeoutExpired:
+        log(f"錯誤：拍照逾時 {PHOTO_TIMEOUT_SEC} 秒（相機 {camera}）")
+        return None
+    if done.returncode != 0 or not photo_path.is_file():
+        log(f"錯誤：拍照失敗（code={done.returncode}，相機 {camera}）：{done.stderr.strip()}")
+        return None
+    return photo_path
+
+
+def handle_photo(args):
+    photo_path = take_photo(args.camera)
+    if photo_path is None:
+        play_tones(TONES_FAIL)
+        return
+    log(f"拍照完成：{photo_path}")
+    play_tones(TONES_PHOTO)
 
 
 # ── 處理一句 ─────────────────────────────────────────
 def node_command(result):
     action = result.get("action")
     return {"action": action, **{k: result[k] for k in NODE_FIELDS[action] if k in result}}
+
+
+def fill_gimbal(cmd, current):
+    """LLM 只改一軸時，缺的那軸補成目前角度（節點端每次都要收到兩軸）。"""
+    return {**cmd, **{axis: cmd.get(axis, current[axis]) for axis in ("pan", "tilt")}}
+
+
+def dispatch_result(result, args, link):
+    """依 action 分派：ignore 靜默、photo 主機拍、白名單送節點、其餘播失敗音。"""
+    action = result.get("action")
+    if action == "ignore":
+        return
+    if action == "photo":
+        handle_photo(args)
+        return
+    if action not in NODE_FIELDS:
+        play_tones(TONES_FAIL)
+        return
+    if action == "gimbal" and not args.allow_gimbal:
+        # 使用者要求測試期間雲台完全不能動，必須明確加 --allow-gimbal 才放行
+        log(f"雲台已停用，略過：{json.dumps(result, ensure_ascii=False)}")
+        play_tones(TONES_FAIL)
+        return
+    cmd = node_command(result)
+    if action == "gimbal":
+        cmd = fill_gimbal(cmd, link.gimbal)
+    link.send(cmd)
+    if action == "gimbal":
+        link.gimbal = {"pan": cmd["pan"], "tilt": cmd["tilt"]}
+    play_tones(TONES_OK)
 
 
 def process_wav(wav_path, args, link):
@@ -296,17 +462,10 @@ def process_wav(wav_path, args, link):
         result = handle_text(text, use_llm=not args.no_llm)
     except Exception as exc:  # STT／LLM 任何失敗都不能讓代理整個掛掉
         log(f"錯誤：處理音檔失敗：{exc!r}")
-        play_tones([(400, 0.15), (400, 0.15)])
+        play_tones(TONES_FAIL)
         return
     log(f"結果：{json.dumps(result, ensure_ascii=False)}（總耗時 {time.perf_counter() - start:.2f}s）")
-    action = result.get("action")
-    if action == "ignore":
-        return
-    if action not in NODE_FIELDS:
-        play_tones([(400, 0.15), (400, 0.15)])
-        return
-    link.send(node_command(result))
-    play_tones([(1200, 0.15)])
+    dispatch_result(result, args, link)
 
 
 def handle_utterance(pcm, args, link):
@@ -351,7 +510,8 @@ def listen_forever(args, link, state):
             if noise is not None:
                 segmenter = Segmenter(max(noise * NOISE_FACTOR, args.threshold))
                 log(f"背景 RMS {noise:.0f}，門檻 {segmenter.threshold:.0f}，開始聆聽")
-        if segmenter is not None:
+        # 首次啟動與每次斷線重連後都要通知；回傳 True 代表播放期間來源就斷了
+        if segmenter is not None and not announce_and_flush(chunk_queue, segmenter, args):
             listen_until_eof(chunk_queue, segmenter, args, link)
         log("收音中斷（耳機斷線？），先送 stop 再重連")
         link.send({"action": "stop"})
@@ -359,6 +519,14 @@ def listen_forever(args, link, state):
         drain(chunk_queue)
         time.sleep(RECONNECT_SEC)
         set_headset_profile(PROFILE_HFP)
+
+
+def announce_and_flush(chunk_queue, segmenter, args):
+    """播準備好語音後丟掉播放期間收到的音訊（含耳機回授），回傳是否遇到 EOF。"""
+    announce_ready(args)
+    time.sleep(0.2)
+    segmenter.reset()
+    return drain(chunk_queue)
 
 
 def listen_until_eof(chunk_queue, segmenter, args, link):
@@ -385,6 +553,10 @@ def parse_args():
     parser.add_argument("--no-llm", action="store_true", help="不呼叫 Claude，只走規則")
     parser.add_argument("--dry-run", action="store_true", help="不啟動 docker 節點")
     parser.add_argument("--wav", help="直接處理這個 wav 一次後結束")
+    parser.add_argument("--camera", default=DEFAULT_CAMERA, help=f"拍照用的 v4l2 裝置（預設 {DEFAULT_CAMERA}）")
+    parser.add_argument("--allow-gimbal", action="store_true", help="允許雲台指令（預設停用，安全考量）")
+    parser.add_argument("--ready-text", default=READY_TEXT, help="準備好時要念的語音文字")
+    parser.add_argument("--no-ready-voice", action="store_true", help="不播準備好語音通知")
     return parser.parse_args()
 
 

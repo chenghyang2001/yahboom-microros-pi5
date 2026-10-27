@@ -1,4 +1,4 @@
-"""容器內的 ROS 2 指令節點：從 stdin 一行讀一個 JSON 指令，轉成 /beep 與 /cmd_vel 發布。
+"""容器內的 ROS 2 指令節點：從 stdin 一行讀一個 JSON 指令，轉成 /beep、/cmd_vel、/servo_s1、/servo_s2 發布。
 
 由 Pi 主機的 voice_agent.py 透過下列方式啟動（stdin/stdout 當作簡單的 IPC 管道）：
     docker exec -i <容器> bash -c 'source /opt/ros/humble/setup.bash; \
@@ -7,7 +7,8 @@
 指令格式（每行一個 JSON）：
     {"action":"beep","ms":30000}
     {"action":"move","linear":0.1,"angular":0.0,"seconds":2}
-    {"action":"stop"}
+    {"action":"stop"}                     # 只停車與蜂鳴器，不動雲台
+    {"action":"gimbal","pan":45,"tilt":-30}   # 絕對角度（度）
 
 回報：每處理一筆印 `ACK <json>`，錯誤印 `ERR <訊息>`；主機端逐行讀取。
 只依賴 rclpy 與標準庫，方便直接 docker cp 進容器執行。
@@ -22,13 +23,16 @@ import time
 import rclpy
 from geometry_msgs.msg import Twist
 from rclpy.node import Node
-from std_msgs.msg import UInt16
+from std_msgs.msg import Int32, UInt16
 
 # 夾限值與 intent_proto.py／SPEC.md 一致；節點端再夾一次，避免主機端被繞過時車子暴衝
 BEEP_MS_MIN, BEEP_MS_MAX = 0, 60000
 LINEAR_MAX = 0.15
 ANGULAR_MAX = 0.8
 SECONDS_MIN, SECONDS_MAX = 0.5, 3.0
+# 雲台安全鐵律：/servo_s2 大於 0 會抬頭扯掉相機 USB 線，只准 -45（低頭到底）～0（平視）
+PAN_MIN, PAN_MAX = -90, 90
+TILT_MIN, TILT_MAX = -45, 0
 
 # 底盤韌體約 0.5 秒沒收到 cmd_vel 就可能停下，0.1 秒重發確保移動連續
 REPUBLISH_SEC = 0.1
@@ -85,6 +89,8 @@ class RosCmdNode(Node):
         super().__init__("voice_cmd_node")
         self.beep_pub = self.create_publisher(UInt16, "/beep", 10)
         self.cmd_vel_pub = self.create_publisher(Twist, "/cmd_vel", 10)
+        self.pan_pub = self.create_publisher(Int32, "/servo_s1", 10)
+        self.tilt_pub = self.create_publisher(Int32, "/servo_s2", 10)
         self.move_twist = None
         self.move_deadline = 0.0
         self.next_publish = 0.0
@@ -100,6 +106,11 @@ class RosCmdNode(Node):
         msg.data = int(ms)
         self.beep_pub.publish(msg)
 
+    def publish_angle(self, publisher, angle):
+        msg = Int32()
+        msg.data = int(angle)
+        publisher.publish(msg)
+
     def send_zero(self):
         """連發數次零速度：UDP/DDS 偶爾掉封包，單發不保險。"""
         for _ in range(STOP_REPEAT):
@@ -114,7 +125,7 @@ class RosCmdNode(Node):
     def handle_command(self, cmd):
         """依 action 分派；新指令一律先取消舊 move。回傳要 ACK 的 dict。"""
         action = cmd.get("action")
-        if action not in ("beep", "move", "stop"):
+        if action not in ("beep", "move", "stop", "gimbal"):
             raise ValueError(f"不支援的 action：{action!r}")
         if self.cancel_move() and action != "stop":
             self.send_zero()
@@ -122,12 +133,22 @@ class RosCmdNode(Node):
             return self._do_stop()
         if action == "beep":
             return self._do_beep(cmd)
+        if action == "gimbal":
+            return self._do_gimbal(cmd)
         return self._do_move(cmd)
 
     def _do_stop(self):
+        # 刻意不動雲台：停車是安全動作，鏡頭角度維持使用者最後的設定
         self.send_zero()
         self.publish_beep(0)  # 嘗試中斷正在響的蜂鳴器
         return {"action": "stop"}
+
+    def _do_gimbal(self, cmd):
+        pan = int(round(_clamp(_finite_float(cmd.get("pan")), PAN_MIN, PAN_MAX)))
+        tilt = int(round(_clamp(_finite_float(cmd.get("tilt")), TILT_MIN, TILT_MAX)))
+        self.publish_angle(self.pan_pub, pan)
+        self.publish_angle(self.tilt_pub, tilt)
+        return {"action": "gimbal", "pan": pan, "tilt": tilt}
 
     def _do_beep(self, cmd):
         ms = int(_clamp(_finite_float(cmd.get("ms"), 0.0), BEEP_MS_MIN, BEEP_MS_MAX))
