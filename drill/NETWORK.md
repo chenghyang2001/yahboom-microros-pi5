@@ -145,3 +145,5 @@ python ycar.py host 'sudo systemctl disable --now pi5-wifi-fallback; sudo nmcli 
 播放：`python ~/.claude/skills/tts/scripts/tts_play.py play drill/network-explain/01-architecture.txt`，或直接開 mp3。
 
 逐步重現開機流程的做法（2026-10-28）：在 Pi 桌面開一個 `lxterminal`，裡面用 tmux session `boot` 切成三格（① agent、② ROS 2 容器、③ 主機檢查），用 `tmux send-keys` 送指令。先關掉開機自動開的兩個終端，再照順序跑 `start_agent_rpi5.sh` → 按 ESP32 Reset → `ros2_humble.sh` → `ros2 topic list`。重開 agent 後，ESP32 不會自己重連，要按 Reset。
+
+影片版（截圖＋語音，約 19 分鐘，YouTube 私人）：<https://youtu.be/br1-xZYNp-A>。原檔在本機 `videos-out/boot-sequence-drill.mp4`，不進 git。
