@@ -12,6 +12,12 @@
     "desc": "連線、agent、話題、手把遙控、OpenCV、MediaPipe、自己的避障節點"
   },
   {
+    "group": "實車演練",
+    "title": "拍五開機流程演練（約 19 分鐘，YouTube 私人）",
+    "url": "https://youtu.be/br1-xZYNp-A",
+    "desc": "一步一步重現開機：翻譯官 agent、按 ESP32 Reset 連線、ROS 2 容器、讀電池；兩個開機腳本逐行說明"
+  },
+  {
     "group": "NotebookLM 產物",
     "title": "NotebookLM 產物總覽頁（語音、影片、簡報、資訊圖表、心智圖）",
     "url": "https://187-127-109-145.sslip.io/yahboom-microros-pi5/",
