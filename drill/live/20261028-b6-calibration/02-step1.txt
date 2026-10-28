@@ -1,0 +1,11 @@
+第一步，啟動底層程式，看 odom 出現。這一步車子不會動。
+
+上一場我們查過，現在只有 odom raw，沒有 odom。這一步要把「融合」打開。
+
+左上角第一格，打 ros2 launch yahboomcar bringup，yahboomcar bringup launch 點 py。launch 檔是一張開機清單，這張清單上有四樣東西：一個 IMU 濾波器，把原始的 imu 去雜訊，變成 imu 斜線 data；一個 EKF 融合節點，叫 ekf filter node，把輪子和陀螺儀合在一起，輸出 odom；一個靜態座標轉換，告訴系統陀螺儀裝在車身中心偏哪裡；最後是載入車子的 URDF 模型，就是暖身第四單元看過的那份身體說明書。啟動時畫面會印出一大串 INFO，還會有一行 robot type 等於 x3，那是沿用別款車的程式留下的字，不用理它。
+
+等它跑起來，右上角第二格打兩個指令。第一個，ros2 node list，預期除了 YB Car Node，會多出好幾個節點，包括 ekf filter node、IMU 濾波節點、robot state publisher。講義說 IMU 濾波可能是 madgwick，也可能是 complementary，到底是哪一個要實車確認，等一下就知道。
+
+第二個，ros2 topic list，接 grep，只看名字有 odom 或 imu 的。預期這次會看到四個：imu、imu 斜線 data、odom raw，還有新出現的 odom。
+
+我念完以後就開始執行。
