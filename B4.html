@@ -66,6 +66,14 @@
 </table>
 <div class="callout callout-tip"><div class="callout-title">💡 小提示</div>
 <p>練習場地要空曠，地上不要有電線。第一次用新的控制方式時，先把車架空試一下方向，再放到地上。</p>
+</div>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<p><strong>2026-10-28 實車驗證（1×1 公尺小場地）</strong>
+- 這台車開機<strong>不會</strong>自動啟動手把（<code>ros2_humble.sh</code> 已沒有 <code>/root/1.sh</code>），<code>ros2 node list</code> 只有 <code>/YB_Car_Node</code>，要用手把得自己啟動 <code>joy_node</code> 和 <code>yahboom_joy</code>。
+- <code>yahboom_joy</code> 啟動時會送 <code>/servo_s2</code> = −60，Y／A 鍵也會動 S2，可能扯到相機線。演練時用 <code>-r servo_s1:=servo_s1_off -r servo_s2:=servo_s2_off</code> 把雲台話題改名，節點就碰不到雲台。
+- 手把速度＝搖桿 × 上限 × 檔位（預設線速 1/3、角速 1/4）。上限設 0.1 時推到底只有 0.033 m/s，<strong>馬達推不動</strong>；設 <code>xspeed_limit:=0.30 angular_speed_limit:=3.2</code> 推到底約 0.10 m/s、0.8 rad/s，可正常開。
+- 鍵盤按 <code>x</code> 6 次、<code>c</code> 3 次降到 0.106 m/s、0.729 rad/s 可正常開；從遠端送鍵時每個方向實際走了約 2.3 秒。
+- 手機 App 只開 <code>ros2 launch rosbridge_server rosbridge_websocket_launch.xml</code> 就能連線開車（不需建圖、攝影機）。<strong>輪盤沒有限速</strong>，實測輕推就出現 0.73 m/s，小場地不安全，需另加限速。</p>
 </div></div>
 </section>
 <section class="sec card-box" id="sec-2" data-audio="audio/B4-2.mp3">

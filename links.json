@@ -42,6 +42,12 @@
     "desc": "聽光達、手推看 odom_raw、cmd_vel 原地轉圈（Ctrl+C 不會停，要送零）、蜂鳴器毫秒自停、雲台 S2 扯斷相機線的教訓"
   },
   {
+    "group": "實車演練",
+    "title": "B4 遙控：鍵盤、手把、手機 App（約 26 分鐘，YouTube 私人）",
+    "url": "https://youtu.be/kSFRabO9FCE",
+    "desc": "1×1 公尺小場地：鍵盤降速、手把速度＝搖桿×上限×檔位、雲台話題改名、App 輪盤 0.73 m/s 被看門狗擋下"
+  },
+  {
     "group": "NotebookLM 產物",
     "title": "NotebookLM 產物總覽頁（語音、影片、簡報、資訊圖表、心智圖）",
     "url": "https://187-127-109-145.sslip.io/yahboom-microros-pi5/",
