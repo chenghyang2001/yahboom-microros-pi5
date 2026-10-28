@@ -48,6 +48,12 @@
     "desc": "電腦 WSL＋turtlesim：節點、話題、服務、參數、launch、ROS_DOMAIN_ID，每步先語音說明再下指令"
   },
   {
+    "group": "本教材影片（YouTube 私人）",
+    "title": "W4 在電腦上看這台車：URDF、RViz、TF、Gazebo 逐步演練（約 37 分鐘）",
+    "url": "https://youtu.be/6GyK4SovhKE",
+    "desc": "電腦 WSL＋模擬套件：URDF 骨頭與關節、RViz 3D 模型、送角度轉雲台、tf2_echo 查位置、Gazebo 轉圈停車"
+  },
+  {
     "group": "本教材",
     "title": "GitHub repo（講義原稿、研究筆記、模擬套件）",
     "url": "https://github.com/chenghyang2001/yahboom-microros-pi5",
