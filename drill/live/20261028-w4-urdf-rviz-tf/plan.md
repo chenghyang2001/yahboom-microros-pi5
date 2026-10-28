@@ -15,12 +15,17 @@
 
 改法：關節滑桿靠滑鼠點擊在 WSLg 上不可靠，改用 `ros2 topic pub /joint_states`。
 
-## 進度（2026-10-28 08:58 收工暫停）
+## 進度（2026-10-28 11:00 全部完成）
 
-- ✅ 準備：tmux session `w4` 三格（已 source `~/yahboom_ws`）、ros2 daemon 已啟動、W4 終端擺在螢幕 3
-- ✅ 開場語音 `01-intro`（播了兩次）
-- ⬜ 第一步～第六步都還沒做
+| 步驟 | 結果 | 備註 |
+| --- | --- | --- |
+| 準備＋開場 | ✅ | 第 1 段錄影（只有開場）；第 2 段從第一步開始 |
+| 1 URDF | ✅ | 實際 11 link／10 joint（模擬多 `base_footprint`、`camera_link`）；送指令工具一開始壞掉（`wslpath` 在 Git Bash 叫不到），晚約 30 秒補送 |
+| 2 RViz | ✅（重開一次） | `display.rviz` 視窗太高、鏡頭太近，改成 Height 600、Distance 0.6 後重開；`Hide Left Dock` 沒生效 |
+| 3 關節 | ✅ | 姿勢 A 約 5 秒生效；姿勢 B 約 60 秒才生效（新節點探索延遲），中間座標軸變灰 |
+| 4 TF | ✅ | 光達 [0,0,0.079]；攝影機 [0.101,-0.038,0.042]→回正 [0.117,0,0.042]；TF 樹用 `dot` 轉 PNG，Chrome 開在螢幕 3 |
+| 5 Gazebo | ✅ | 轉圈約 15 秒生效；說明稿「紅點跟著轉」說錯，結果稿更正（fixed frame 是 odom）；`/odom` 沒填 twist，停車改用兩張截圖比對確認 |
+| 6 總結 | ✅ | `12-summary` |
 
-接續：重開 tmux `w4` 和終端（電腦重開過的話要重建），開新一段錄影，從第一步的說明語音開始。
-開始前測過：RViz 只要不改視窗大小就能移到螢幕 3；Gazebo 可以用；關節滑桿改用 `ros2 topic pub /joint_states`。
-第 1 段錄影（只有開場）：`~/Videos/pi5-drill/<rec_name.txt>.mp4`。
+錄影：`rec_name.txt` 兩段，影片要接起來剪（第 1 段只留開場）。
+改過的設定：repo `sim/.../display.rviz`、`sim.rviz`（已同步到 WSL）；WSL `~/.gz/sim/8/gui.config` 改 640×560（備份 `gui.config.bak-w4`，沒生效）。
