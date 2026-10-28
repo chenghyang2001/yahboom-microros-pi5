@@ -29,3 +29,10 @@
 
 錄影：`rec_name.txt` 兩段，影片要接起來剪（第 1 段只留開場）。
 改過的設定：repo `sim/.../display.rviz`、`sim.rviz`（已同步到 WSL）；WSL `~/.gz/sim/8/gui.config` 改 640×560（備份 `gui.config.bak-w4`，沒生效）。
+
+## 影片
+
+- YouTube（私人）：<https://youtu.be/6GyK4SovhKE>，約 36 分 44 秒（兩段錄影 56＋分鐘剪成，長空檔壓縮成頭 20 秒＋尾 15 秒，保留每張截圖前後的畫面）
+- 與 W2 一起放進私人播放清單「Yahboom MicroROS-Pi5 逐步演練」
+- 剪輯計畫 `video_plan.json`、章節 `chapters.json`；本機成品 `~/Videos/pi5-drill/w4-urdf-rviz-tf-drill.mp4`
+- 實際花費：第 2 段演練約 56 分鐘（10:07～11:03），加剪輯上傳約 15 分鐘
