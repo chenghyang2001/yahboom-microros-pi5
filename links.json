@@ -24,6 +24,12 @@
     "desc": "VNC 加 tmux 三格全程錄影：翻譯官、按 Reset 後的 session established、docker ps 從 0 到 2 個容器、時鐘差歸零"
   },
   {
+    "group": "實車演練",
+    "title": "W1 認識這台車：實車導覽三層架構（約 30 分鐘，YouTube 私人）",
+    "url": "https://youtu.be/0TUN2ofL1t4",
+    "desc": "車子不動，一層一層走進去：Pi 5 身分、容器裡是 Ubuntu、lsusb 看硬體、node info 看小腦頻道、IMU 量到地心引力"
+  },
+  {
     "group": "NotebookLM 產物",
     "title": "NotebookLM 產物總覽頁（語音、影片、簡報、資訊圖表、心智圖）",
     "url": "https://187-127-109-145.sslip.io/yahboom-microros-pi5/",

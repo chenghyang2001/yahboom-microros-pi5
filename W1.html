@@ -124,7 +124,7 @@
 <li>看提示符號分辨：容器內通常是 <code>root@...</code>，主機上是 <code>pi@...</code></li>
 </ul>
 <div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
-<p>官方的 Docker 課範例映像寫 <code>yahboomtechnology/ros-foxy</code>、帳號寫 <code>jetson</code>，那是其他產品的共用教材。<strong>本車容器是 ROS 2 Humble</strong>（原始碼中 <code>ros2_humble.sh</code> 用的映像是 <code>yahboomtechnology/ros-humble:4.0.3</code>），帳號是 <code>pi</code>。</p>
+<p>官方的 Docker 課範例映像寫 <code>yahboomtechnology/ros-foxy</code>、帳號寫 <code>jetson</code>，那是其他產品的共用教材。<strong>本車容器是 ROS 2 Humble</strong>（原始碼中 <code>ros2_humble.sh</code> 用的映像是 <code>yahboomtechnology/ros-humble:4.0.3</code>；2026-10-28 實車是 <code>4.1.2</code>，原廠有更新），帳號是 <code>pi</code>。</p>
 </div></div>
 </section>
 <section class="sec card-box" id="sec-4" data-audio="audio/W1-4.mp3">
@@ -142,7 +142,7 @@
 <tbody>
 <tr>
 <td>MS200 光達（LiDAR，雷射測距儀）</td>
-<td>TOF 單線、360°、10 Hz、0.03～12 m、4500 點/秒、角解析度 0.8°</td>
+<td>TOF 單線、360°、10 Hz（實車 <code>ros2 topic hz /scan</code> 約 12.5 Hz）、0.03～12 m、4500 點/秒、角解析度 0.8°</td>
 <td>ESP32 的雷達介面（UART1）</td>
 <td>發布 <code>/scan</code></td>
 </tr>
@@ -262,6 +262,11 @@
 <td><code>nav_msgs/msg/Odometry</code></td>
 <td>輪速里程計原始值</td>
 </tr>
+<tr>
+<td><code>/battery</code></td>
+<td><code>std_msgs/msg/UInt16</code></td>
+<td>電池電壓×10（例：78＝7.8 V）；官方清單沒寫，實車 <code>ros2 node info</code> 有</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Pi 5 這邊另外會出現的話題</strong></p>
@@ -282,7 +287,7 @@
 <tr>
 <td><code>/rpi5_ip</code></td>
 <td>Pi 5</td>
-<td>回報自己目前的 IP，換到家裡 WiFi 時用來找車</td>
+<td>回報自己目前的 IP，換到家裡 WiFi 時用來找車（2026-10-28 手機熱點接法下實測<strong>沒有</strong>這個話題，B2 再確認）</td>
 </tr>
 <tr>
 <td>相機影像</td>
@@ -292,7 +297,7 @@
 </tbody>
 </table>
 <div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
-<p>官方 05-1 文件的發布清單寫車子發布 <code>/odom</code>，但同一頁查詢指令用的是 <code>ros2 topic echo /odom_raw</code>，狀態估測課也說 EKF 是訂閱 <code>/odom_raw</code> 再輸出 <code>/odom</code>。<strong>結論：ESP32 發的是 <code>/odom_raw</code>，<code>/odom</code> 是 Pi 端融合後的產物</strong>（需實車以 <code>ros2 topic list</code> 確認）。</p>
+<p>官方 05-1 文件的發布清單寫車子發布 <code>/odom</code>，但同一頁查詢指令用的是 <code>ros2 topic echo /odom_raw</code>，狀態估測課也說 EKF 是訂閱 <code>/odom_raw</code> 再輸出 <code>/odom</code>。<strong>結論：ESP32 發的是 <code>/odom_raw</code>，<code>/odom</code> 是 Pi 端融合後的產物</strong>（2026-10-28 實車 <code>ros2 node info /YB_Car_Node</code> 已確認：發布 <code>/battery</code>、<code>/imu</code>、<code>/odom_raw</code>、<code>/scan</code>，沒有 <code>/odom</code>）。</p>
 </div></div>
 </section>
 <section class="sec card-box" id="sec-6" data-audio="audio/W1-6.mp3">
