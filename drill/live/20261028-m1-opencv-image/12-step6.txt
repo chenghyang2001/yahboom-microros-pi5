@@ -1,0 +1,11 @@
+第六步，也是最後一步：訂閱影像、用 cv bridge 翻譯、再轉發出去。
+
+這一步有三個動作。
+
+第一個動作在右上角第二格，執行 ros2 run yahboomcar visual pub image。這個節點的程式很短，核心只有四件事。第一，訂閱 image raw。第二，每收到一張，就呼叫 cv bridge 的 imgmsg to cv2，指定 bgr8，把剛才看到的 yuv422 格式，翻譯成 OpenCV 的藍綠紅數字表格。第三，用 resize 統一成寬六百四十、高四百八十。第四，再用 cv2 to imgmsg 翻譯回 ROS 的影像訊息，發布到一個新話題，叫 斜線 image。這個節點跑起來以後不會印任何東西，安靜地在背景工作。
+
+第二個動作在下面第三格，執行 ros2 topic info 斜線 image raw，加上 減減 verbose。它會列出誰在發布、誰在訂閱。預期發布者是 usb cam，訂閱者是 pub image node。接著再量一次 斜線 image 的頻率，看看轉發出來的速度有沒有跟上。
+
+第三個動作，也在第三格，打開 rqt image view，這是一個看影像話題的小工具。視窗出來以後，我會在左上角的下拉選單選 斜線 image，畫面上就會看到經過兩次 cv bridge 轉換的相機畫面。
+
+我念完以後就開始執行。
