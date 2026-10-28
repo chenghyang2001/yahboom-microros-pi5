@@ -42,3 +42,8 @@
 - **Pi 的 IP 變成 `10.169.179.1`**（手機熱點換網段），nc 轉接改用新 IP
 - 準備：VNC 開到螢幕 3；`pkill -x lxterminal` 關掉自動開的兩個終端，ROS 2 容器跟著停，**agent 容器沒停**，另外 `docker stop`；tmux `drill` 三格
 - 第 2 段錄影開始 11:17:16；接續開場語音 `04-resume`
+- ✅ 第一步（重做）：③ `docker ps` 空 → `cat -n start_agent_rpi5.sh` → ① `running...`（重播 `02-step1`、`03-step1-result`，截圖 `05`）
+- ✅ 第二步：使用者按 Reset，11:26:21 `session established`；1 participant、8 topic、4 publisher、4 subscriber、1 client（`06-step2`、`07-step2-result`）；手機轉接沒斷
+- ✅ 第三步：`ros2_humble.sh` 12 行（無 `--rm`，Pi 上累積 14 個停止的容器；第 8 行 `/tem` 筆誤）；② 變 `root@`、`MY_DOMAIN_ID: 20`；`docker ps` 2 個（`08`、`09`）
+- ✅ 第四步：`/YB_Car_Node`、10 個話題、`/battery` 78；時鐘差 15083 → **0 秒**（Reset 後重新對時）（`10`、`11`）
+- ✅ 總結 `12-summary`；第 2 段錄影 11:17～11:42
