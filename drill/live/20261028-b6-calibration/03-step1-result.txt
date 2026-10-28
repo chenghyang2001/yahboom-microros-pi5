@@ -1,0 +1,11 @@
+第一步的結果，底層程式起來了，odom 出現了。
+
+左上角第一格，bringup 啟動了六個程式，畫面上一行一行印出 robot state publisher 讀到的骨頭：base link、imu Link、jq1、jq2、radar Link，還有四個輪子 zq、yq、yh、zh，跟暖身第四單元看到的 URDF 一樣。
+
+右上角第二格，node list 從原本只有 YB Car Node，變成八個節點。其中三個最重要：complementary filter gain node，是 IMU 濾波器；ekf filter node，是融合節點；robot state publisher，是身體廣播員。
+
+這裡回答了講義上「需實車確認」的一題：這台車用的 IMU 濾波器是 complementary，互補濾波，不是官方文件寫的 madgwick。兩個做的事一樣，都是把原始的 imu 變成比較乾淨的 imu 斜線 data。
+
+最下面的 topic list 加 grep，印出四個話題：imu、imu 斜線 data、odom，和 odom raw。odom 這次出現了，就是 EKF 融合以後的輸出。
+
+下一步，第二步，我們看 EKF 到底拿了哪些資料、輸出了什麼，再用 TF 工具問「車子現在在哪」。等你說繼續。
