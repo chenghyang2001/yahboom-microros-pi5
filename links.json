@@ -18,6 +18,12 @@
     "desc": "一步一步重現開機：翻譯官 agent、按 ESP32 Reset 連線、ROS 2 容器、讀電池；兩個開機腳本逐行說明"
   },
   {
+    "group": "實車演練",
+    "title": "拍五開機流程逐步演練・螢幕實錄版（約 27 分鐘，YouTube 私人）",
+    "url": "https://youtu.be/WSqQgIOrT24",
+    "desc": "VNC 加 tmux 三格全程錄影：翻譯官、按 Reset 後的 session established、docker ps 從 0 到 2 個容器、時鐘差歸零"
+  },
+  {
     "group": "NotebookLM 產物",
     "title": "NotebookLM 產物總覽頁（語音、影片、簡報、資訊圖表、心智圖）",
     "url": "https://187-127-109-145.sslip.io/yahboom-microros-pi5/",
