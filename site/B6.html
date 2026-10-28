@@ -121,7 +121,7 @@ ros2 topic list | grep -E &quot;odom|imu&quot;</code></pre>
 </tbody>
 </table>
 <div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
-<p>IMU 濾波用哪個套件，文件與原始碼不一致：官方 05-4 文件寫的是 <code>imu_filter_madgwick</code> 的 <code>imu_filter.launch.py</code>；但官方原始碼包裡的 <code>yahboomcar_bringup_launch.py</code> 改成了 <code>imu_complementary_filter</code> 的 <code>complementary_filter.launch.py</code>（節點名 <code>complementary_filter_gain_node</code>）。兩者都把 <code>/imu</code> 轉成 <code>/imu/data</code>，功能相同；你的車是哪一個，用 <code>ros2 node list</code> 看（需實車確認）。另外文件寫「launch 檔位置以配套虛擬機為例」，但列的是容器內路徑 <code>/root/yahboomcar_ws/...</code>，在車上請以容器內為準。</p>
+<p>IMU 濾波用哪個套件，文件與原始碼不一致：官方 05-4 文件寫的是 <code>imu_filter_madgwick</code> 的 <code>imu_filter.launch.py</code>；但官方原始碼包裡的 <code>yahboomcar_bringup_launch.py</code> 改成了 <code>imu_complementary_filter</code> 的 <code>complementary_filter.launch.py</code>（節點名 <code>complementary_filter_gain_node</code>）。兩者都把 <code>/imu</code> 轉成 <code>/imu/data</code>，功能相同。<strong>2026-10-28 實車確認：這台車是 <code>complementary_filter_gain_node</code>（互補濾波）</strong>。另外文件寫「launch 檔位置以配套虛擬機為例」，但列的是容器內路徑 <code>/root/yahboomcar_ws/...</code>，在車上請以容器內為準。</p>
 </div></div>
 </section>
 <section class="sec card-box" id="sec-3" data-audio="audio/B6-3.mp3">
@@ -264,6 +264,11 @@ ros2 topic list | grep -E &quot;odom|imu&quot;</code></pre>
 <li>程式用 <code>copysign(speed, error)</code> 決定方向，起點時誤差是負的，<strong>車子可能是往後倒退 1 公尺</strong>而不是往前。所以前後都要留空間。</li>
 <li>這個係數只存在校準節點裡，原始碼沒有把它寫回 ESP32 或 EKF。它的用途是「量出你這台車的里程偏差有多大」，請把最後的數字抄下來，之後自己寫控制程式（M5）時可以用。</li>
 </ol>
+</div>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p><strong>2026-10-28 實車結果（電池 7.0 V）</strong>
+- 原始碼預設 <code>speed</code> 0.5 m/s 太快，用 <code>ros2 run yahboomcar_bringup calibrate_linear --ros-args -p speed:=0.1</code> 降速；不開 rqt_reconfigure，直接 <code>ros2 param set /calibrate_linear start_test true</code> 也能啟動。
+- <strong>確認車子往後倒退</strong>（推論 2 正確），11 秒停。捲尺量約 70 cm；TF（<code>odom→base_footprint</code>）70.4 cm，側偏 6.3 cm。里程誤差 &lt; 1%，預設係數 1.5 讓車只走 2/3 公尺 → 這台車應約 <strong>1.05</strong>。</p>
 </div></div>
 </section>
 <section class="sec card-box" id="sec-5" data-audio="audio/B6-5.mp3">
@@ -283,6 +288,9 @@ ros2 topic list | grep -E &quot;odom|imu&quot;</code></pre>
 <pre><code class="language-bash">ros2 run rqt_reconfigure rqt_reconfigure</code></pre>
 </div>
 <p>操作同線速度：<strong>Refresh</strong> → 選 <strong><code>calibrate_angular</code></strong> → 勾 <strong><code>start_test</code></strong> → 看車頭轉完是否對齊膠帶 → 調整 <strong><code>odom_angular_scale_correction</code></strong> → 點空白處 → 再測。</p>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p><strong>2026-10-28 實車結果</strong>：預設 <code>speed</code> 2.0 rad/s 太快，用 <code>-p speed:=0.8</code>。11 秒停，車頭停在膠帶<strong>左邊約 10°</strong>（實轉約 370°）；程式自己累加到 478° × 0.75 = 358.5° 判定完成；TF 顯示約 385°。這台車的角速度係數應約 <strong>0.77</strong>（0.75 × 370 ÷ 358.5）。</p>
+</div>
 <table>
 <thead>
 <tr>
