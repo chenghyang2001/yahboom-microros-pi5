@@ -27,3 +27,5 @@
 | 5 參數 | ✅ | 一次成功 |
 | 6 全貌 | ⚠️ 部分 | rqt_graph 在 WSLg 上畫面凍住、圖空白，改用 `topic info --verbose` 文字說明；launch 正常 |
 | 7 ROS_DOMAIN_ID | ✅（重做兩次） | listener 要 15～20 秒才收到，前兩次只等 9 秒就判斷錯了 |
+
+影片（私人）：<https://youtu.be/E2xuUzat6B8>（約 39 分鐘，從 63.5 分鐘的錄影剪成）。

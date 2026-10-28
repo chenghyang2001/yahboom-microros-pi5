@@ -42,6 +42,12 @@
     "desc": "每單元一支，和網頁同一份語音，適合通勤時看"
   },
   {
+    "group": "本教材影片（YouTube 私人）",
+    "title": "W2 ROS 2 最小必學逐步演練（約 39 分鐘）",
+    "url": "https://youtu.be/E2xuUzat6B8",
+    "desc": "電腦 WSL＋turtlesim：節點、話題、服務、參數、launch、ROS_DOMAIN_ID，每步先語音說明再下指令"
+  },
+  {
     "group": "本教材",
     "title": "GitHub repo（講義原稿、研究筆記、模擬套件）",
     "url": "https://github.com/chenghyang2001/yahboom-microros-pi5",
