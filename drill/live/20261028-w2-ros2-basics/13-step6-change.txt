@@ -1,0 +1,13 @@
+第六步改一下做法。
+
+剛才的關係圖工具 rqt graph，在這台電腦的 WSL 上顯示不出來，畫面會卡住，我們先跳過它，改用文字來看同一張關係圖。
+
+我會先把關係圖程式關掉，然後在下面第三格執行 ros2 topic info 斜線 turtle1 斜線 cmd vel，後面加上減減 verbose，意思是要詳細資料。它會分成兩段列出來：Publisher，發送的一方，節點名稱是 teleop turtle，也就是遙控器；Subscription，接收的一方，節點名稱是 turtlesim，也就是烏龜。
+
+把這兩段接起來，就是那張關係圖：遙控器，透過 turtle1 cmd vel 這個話題，把速度送給烏龜。rqt graph 只是把這段文字畫成圖而已。
+
+接著是 launch 檔的部分。我會在第一格和第二格按 Ctrl C，把原本的烏龜和遙控器關掉，紫紅色的烏龜視窗會消失。然後在第一格執行 ros2 launch turtlesim multisim 點 launch 點 py，一個指令開出兩個烏龜視窗，我會把兩個視窗並排擺好。
+
+最後在第三格打 ros2 node list，你會看到兩個烏龜節點，名字前面分別是 turtlesim1 和 turtlesim2，這叫做命名空間，用來區分兩個同樣的程式。
+
+我念完以後就開始執行。

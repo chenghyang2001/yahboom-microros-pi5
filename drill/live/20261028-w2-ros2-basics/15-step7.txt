@@ -1,0 +1,15 @@
+第七步，ROS DOMAIN ID：誰聽得到誰。這是最後一步。
+
+同一個網路上的 ROS 2 程式，會自動互相發現，就像同一棟大樓的人都聽得到廣播。但如果教室裡有十台車，大家的廣播全混在一起就亂了。ROS DOMAIN ID 就像樓層號碼，只有同一層樓的程式才看得到彼此。
+
+我們做個小實驗。先在第一格按 Ctrl C，把兩隻烏龜關掉，兩個烏龜視窗會消失。我會把上面兩格的標題改成「說話的人」和「聽的人」。
+
+第一格執行 ROS DOMAIN ID 等於五，ros2 run demo nodes cpp talker。talker 是一個示範用的說話節點，每秒說一句 Hello World，後面帶一個編號。
+
+第二格執行 ROS DOMAIN ID 等於五，ros2 run demo nodes cpp listener。listener 是聽的節點。兩邊都在五號樓，所以第二格會一行一行印出 I heard，Hello World，編號跟第一格一樣。
+
+接著把第二格按 Ctrl C，改成 ROS DOMAIN ID 等於七，再執行一次 listener。這次它在七號樓，聽不到五號樓的廣播。第一格還在一直說，但第二格什麼都不會印出來。
+
+對應到拍五：這台車預設是二十號。以後電腦要和車子互相溝通，電腦這邊也要設成二十號才行。
+
+我念完以後就開始執行。

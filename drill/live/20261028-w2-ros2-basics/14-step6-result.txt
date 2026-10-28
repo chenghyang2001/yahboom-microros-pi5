@@ -1,0 +1,11 @@
+第六步的結果：我們用文字看懂了關係圖，也用一個 launch 指令開出了兩隻烏龜。
+
+先說關係圖。ros2 topic info 加上減減 verbose 的輸出很長，第三格只放得下最後一段，畫面上看到的是 Endpoint type SUBSCRIPTION，也就是接收端的詳細資料，前面發送端那一段被捲上去了。把我們前面幾步看到的資料拼起來：第一步烏龜的名片說，它在聽 turtle1 cmd vel；第二步的 topic info 說，這個話題有一個發布者、一個訂閱者。所以關係圖就是：遙控器 teleop turtle，透過 turtle1 cmd vel，把速度送給烏龜 turtlesim。
+
+另外要說明，圖形化的 rqt graph 這次沒有做出來，它在這台電腦的 WSL 上畫面會卡住。之後如果在車上，或是在一般的 Linux 電腦上，它可以正常顯示。
+
+再來是 launch。第一格和第二格按 Ctrl C 以後，原本紫紅色的烏龜視窗消失了。接著在第一格執行 ros2 launch turtlesim multisim 點 launch 點 py，一個指令就開出了兩個藍色的烏龜視窗。第一格印出的訊息前面，分別標著 turtlesim node 一號和二號，代表 launch 同時啟動了兩個程式。
+
+最後在第三格打 ros2 node list，列出兩個節點：斜線 turtlesim1 斜線 turtlesim，和斜線 turtlesim2 斜線 turtlesim。名字後半段一樣，前面多了 turtlesim1 和 turtlesim2，這就是命名空間，讓兩個一樣的程式可以同時存在、互不干擾。
+
+下一步，第七步，也是最後一步，我們來看 ROS DOMAIN ID：誰聽得到誰。等你說繼續，我會先念第七步的說明。

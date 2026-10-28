@@ -1,0 +1,15 @@
+第一步，節點：叫出小烏龜。
+
+節點就是一個只做一件事的小程式，也就是比喻裡的員工。這一步我們要叫出兩個員工，然後看看他們的名片。
+
+第一件，在左上角第一格，執行 ros2 run turtlesim turtlesim node。ros2 run 的格式是：ros2 run，後面接套件名稱，再接執行檔名稱。這裡的套件是 turtlesim，執行檔是 turtlesim node。執行以後，螢幕右邊會跳出一個藍色視窗，中間有一隻小烏龜。這個節點負責把烏龜畫出來。
+
+第二件，在右上角第二格，執行 ros2 run turtlesim turtle teleop key。這是鍵盤遙控器節點。平常要用滑鼠點一下這個格子，再按方向鍵，烏龜就會動。今天我會直接幫你把方向鍵送進這一格，你只要看烏龜有沒有動就好。
+
+第三件，在下面第三格，執行 ros2 node list，列出現在有哪些節點。你應該會看到兩個名字：teleop turtle 和 turtlesim，就是剛剛那兩個員工。
+
+最後，執行 ros2 node info 斜線 turtlesim，看烏龜節點的名片。名片會分成幾段：Subscribers 是它在聽的話題，裡面有速度指令 cmd vel；Publishers 是它在說的話題，例如烏龜的位置 pose；Service Servers 是它提供的服務，例如等一下會用到的 spawn，生出新烏龜。
+
+對應到拍五：小烏龜節點就像車上的 YB Car Node，也就是小腦 ESP32；鍵盤遙控器就像車上的 yahboom keyboard。
+
+我念完以後就開始執行。

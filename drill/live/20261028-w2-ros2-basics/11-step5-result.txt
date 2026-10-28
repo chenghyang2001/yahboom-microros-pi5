@@ -1,0 +1,13 @@
+第五步的結果：我們改了烏龜的設定單，背景變成了紫紅色。
+
+ros2 param list 列出了烏龜節點的參數，最上面三個就是背景顏色：background b、g、r。另外還有 holonomic、use sim time 這些系統參數。
+
+ros2 param get 查到紅色現在是六十九。
+
+ros2 param set 把紅色改成二五五，第三格回答 Set parameter successful。右邊的背景馬上從藍色變成紫紅色，因為原本藍色就是二五五，再加上滿格的紅色，就混出紫紅色。這一次畫面直接就變了，不需要再呼叫 clear。
+
+ros2 param describe 印出了這個參數的說明：型別是整數，用途是背景的紅色通道，最小值零、最大值二五五，每次調一格。
+
+最後，ros2 param dump 把設定單存成檔案，cat 印出內容。可以看到 background r 已經是二五五，綠色八十六，藍色二五五，這就是現在的設定。以後要恢復這組顏色，就用 param load 把這個檔案載回去。
+
+下一步，第六步，我們用 rqt graph 畫一張關係圖，看看節點和話題怎麼連在一起，再用 launch 檔一個指令開出兩隻烏龜。等你說繼續，我會先念第六步的說明。

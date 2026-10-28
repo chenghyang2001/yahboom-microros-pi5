@@ -1,0 +1,19 @@
+第五步，參數：節點的設定單。
+
+每個節點都可以有自己的參數，就像貼在員工桌上的設定單，程式執行中也能隨時修改。小烏龜的背景顏色，就是三個參數：background r、background g、background b，分別是紅、綠、藍，數值從零到二五五。
+
+這一步全部在下面第三格操作。
+
+第一個，ros2 param list 斜線 turtlesim，列出烏龜節點有哪些參數。你會看到三個背景顏色，還有幾個系統參數。
+
+第二個，ros2 param get 斜線 turtlesim background r，查紅色現在是多少。預設是六十九，所以背景是藍色。
+
+第三個，ros2 param set 斜線 turtlesim background r 二五五，把紅色調到最大。執行以後會回答 Set parameter successful，右邊的背景會從藍色變成紫紅色。如果顏色沒有馬上變，我會再呼叫一次 clear 服務讓畫面重畫。
+
+第四個，ros2 param describe，看這個參數的說明和可以設定的範圍。
+
+第五個，ros2 param dump 斜線 turtlesim，把整張設定單存成一個 YAML 檔，再用 cat 把檔案內容印出來。以後要恢復這組設定，可以用 param load 把檔案載回去。
+
+對應到拍五：參數在車上非常常用。例如光達避障程式有一個參數叫回應距離，決定障礙物多近才閃避；校準里程的時候，也是在調整一個比例係數參數。
+
+我念完以後就開始執行。
