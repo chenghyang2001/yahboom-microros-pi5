@@ -39,7 +39,7 @@ Visualization Manager:
     Current:
       Class: rviz_default_plugins/Orbit
       Name: Current View
-      Distance: 0.45
+      Distance: 0.6
       Focal Point:
         X: 0
         Y: 0
@@ -50,5 +50,6 @@ Visualization Manager:
       Value: Orbit (rviz)
     Saved: ~
 Window Geometry:
-  Height: 690
+  Height: 600
+  Hide Left Dock: true
   Width: 640
