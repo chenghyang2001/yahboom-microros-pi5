@@ -13,3 +13,10 @@
 | 6 | 總結 | — | 語音 | 兩條路徑 |
 
 試跑發現與講義不同：`/battery` 是 `/YB_Car_Node` 發布的（講義發布表漏列）；沒有 `/rpi5_ip` 話題。
+
+## 結果
+
+- 六步全部完成（12:03～12:36），車子全程不動
+- 影片（YouTube 私人）：<https://youtu.be/0TUN2ofL1t4>，29 分 33 秒；播放清單第 4 位
+- 講義 `lessons/W1.md` 依實測修正 5 處
+- 小插曲：螢幕 3 被全螢幕的教材簡報 Chrome 蓋住，移到螢幕 2；容器 bash 會改 tmux 格子標題，用 `unset PROMPT_COMMAND; PS1=...` 擋掉（tmux 3.3a 沒有 allow-set-title）
