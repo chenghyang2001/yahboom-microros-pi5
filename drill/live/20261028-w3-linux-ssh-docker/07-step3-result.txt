@@ -1,0 +1,9 @@
+第三步的結果，藍圖、房子、空屋都看到了。
+
+先看第一張畫面。docker images 列出三份藍圖：ros humble 4.1.2 和 4.1.0，各 13.6 GB，建立時間都是兩年前；micro ros agent，404 MB，三年前。藍圖做好就不會變，所以時間很久是正常的。兩個版本的 ros humble 裡，實際在用的是 4.1.2，4.1.0 是舊版，留著佔了十三 GB 多。
+
+docker ps 列出兩個正在跑的容器：ros humble 4.1.2，跑了大約一小時；micro ros agent，跑了兩小時。最右邊的 NAMES 欄，vibrant satoshi、fervent williams，是 Docker 自動取的隨機名字，因為啟動腳本沒有指定名字，所以每次都不一樣，這也是講義說「每次都要先 docker ps 查 ID」的原因。
+
+現在畫面上是 docker ps 減 a，因為很長，最上面幾行被擠出畫面了。一整排都是 ros humble 4.1.2 的容器，STATUS 寫著 Exited，已經停止，括號裡的數字是結束代碼。CREATED 從幾小時前、幾天前，一直到四週前。這些就是一排空屋：每次跑 ros2 humble 點 sh、離開時都留下一個。它們不會自動消失，但會佔一點點空間。要清掉，可以用 docker container prune，只會刪掉已停止的，不會碰正在跑的兩個。
+
+下一步，第四步，我們用 docker exec，從第三格「走進」右上角那棟正在跑的工作桌，而不是再蓋一棟新的。這是講義裡最常見錯誤的正確解法。等你說繼續。
