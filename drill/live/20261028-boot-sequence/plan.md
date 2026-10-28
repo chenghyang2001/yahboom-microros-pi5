@@ -47,3 +47,10 @@
 - ✅ 第三步：`ros2_humble.sh` 12 行（無 `--rm`，Pi 上累積 14 個停止的容器；第 8 行 `/tem` 筆誤）；② 變 `root@`、`MY_DOMAIN_ID: 20`；`docker ps` 2 個（`08`、`09`）
 - ✅ 第四步：`/YB_Car_Node`、10 個話題、`/battery` 78；時鐘差 15083 → **0 秒**（Reset 後重新對時）（`10`、`11`）
 - ✅ 總結 `12-summary`；第 2 段錄影 11:17～11:42
+
+## 影片
+
+- YouTube（私人）：<https://youtu.be/WSqQgIOrT24>，26 分 45 秒（第 1 段只留開場，第 2 段 26.5 分鐘剪成 24.7 分鐘）
+- 加入私人播放清單「Yahboom MicroROS-Pi5 逐步演練」第 3 位；網站「實車演練」區新增一筆（舊的截圖版 br1-xZYNp-A 保留）
+- 剪輯計畫 `video_plan.json`、章節 `chapters.json`；本機成品 `~/Videos/pi5-drill/pi5-boot-sequence-drill.mp4`
+- 現場保留：翻譯官＋ROS 2 容器在跑、tmux `drill` 三格留著
