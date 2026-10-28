@@ -1,0 +1,13 @@
+第四步的結果，我們成功走進了同一棟房子。
+
+下面第三格，docker exec 減 i t e f 5 6 bash，只打了 ID 的前四碼，Docker 就認出是工作桌。進去以後印出 MY DOMAIN ID 二十，提示字元變成 root 小老鼠 raspberrypi。
+
+接著 ros2 node list，直接印出 YB Car Node，不需要另外 source 環境。講義上標著「需實車確認」的那一題，答案是：可以直接用。原因是工作桌的 bashrc 已經把 ROS 環境設好了，用 docker exec 開互動式的 bash，會自動讀進來。
+
+然後 exit，提示字元變回 pi 小老鼠，回到主機。最後 docker ps，還是兩個容器，ID 跟剛才一模一樣，沒有多出新的。右上角第二格的工作桌也完全沒受影響，還好好地開著。
+
+順帶一提，進到容器以後，下面第三格的標題被改成了 root 小老鼠 raspberrypi，這是容器裡的 bash 自動改的，我已經把它改回「主機」了。
+
+記住這個對照：要開第一個工作桌，用 ros2 humble 點 sh；要再開第二、第三個終端機進同一個工作桌，先 docker ps 查 ID，再 docker exec 減 i t 進去。
+
+下一步，第五步，我們做一次健康檢查：記憶卡空間、處理器溫度、供電有沒有問題。等你說繼續。
