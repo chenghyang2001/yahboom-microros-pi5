@@ -6,8 +6,8 @@
 | 步驟 | 主題 | 格子 | 做法 | 使用者 |
 | --- | --- | --- | --- | --- |
 | 1 | 三種遙控都是 /cmd_vel | ①② | ① `ros2 topic echo /cmd_vel`；② `ros2 node list` | — |
-| 2 | 鍵盤 | ② | `ros2 run yahboomcar_ctrl yahboom_keyboard`；x×3、c×3 降到 0.146/0.73；i 約 1.5 秒、j 約 2 秒、空白、Ctrl-C | 看 |
-| 3 | 手把 | ② | `joy_node` ＋ `yahboom_joy --ros-args -p xspeed_limit:=0.15 -p angular_speed_limit:=0.8 -r servo_s1:=servo_s1_off -r servo_s2:=servo_s2_off` | 按 R1、慢慢開 |
+| 2 | 鍵盤 | ② | `ros2 run yahboomcar_ctrl yahboom_keyboard`；x×6、c×3 降到約 0.106／0.73；i 約 1 秒、`,` 約 1 秒回原位、j／l 各約 1 秒、空白、Ctrl-C | 看 |
+| 3 | 手把 | ② | `joy_node` ＋ `yahboom_joy --ros-args -p xspeed_limit:=0.10 -p angular_speed_limit:=0.8 -r servo_s1:=servo_s1_off -r servo_s2:=servo_s2_off` | 按 R1、慢慢開 |
 | 4 | 手機 App | ② | `ros2 launch rosbridge_server rosbridge_websocket_launch.xml` | App 連 10.169.179.1、ROS2、輕推輪盤 |
 | 5 | 總結 | — | 語音 | — |
 
@@ -17,3 +17,5 @@
 - 鍵盤起始 0.2／1.0 → 先按 x、c 各 3 次。
 - App 輪盤沒有限速保護 → 請使用者輕推。
 - 每步結束送零 /cmd_vel、node list 確認只剩 /YB_Car_Node。
+
+**2026-10-28 15:25 場地修正**：使用者說車子周圍只有 1×1 公尺 → 鍵盤降到約 0.1 m/s、前進後退各約 1 秒；手把上限 0.10 m/s；App 只輕點一下。以原地轉為主。
