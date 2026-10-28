@@ -54,6 +54,12 @@
     "desc": "bringup 讓 EKF 融合出 /odom、線速度校準倒退 70 cm（係數約 1.05）、角速度校準實轉 370°（係數約 0.77）"
   },
   {
+    "group": "實車演練",
+    "title": "M1 OpenCV 與 ROS 影像話題（約 31 分鐘，YouTube 私人）",
+    "url": "https://youtu.be/gL69VqADwG8",
+    "desc": "OpenCV 讀圖與開鏡頭、usb_cam 發布 /image_raw（30 Hz、yuv422）、鏡頭被佔用、pub_image 經 cv_bridge 轉發 /image"
+  },
+  {
     "group": "NotebookLM 產物",
     "title": "NotebookLM 產物總覽頁（語音、影片、簡報、資訊圖表、心智圖）",
     "url": "https://187-127-109-145.sslip.io/yahboom-microros-pi5/",

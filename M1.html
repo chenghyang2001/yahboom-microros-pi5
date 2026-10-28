@@ -369,8 +369,10 @@ ros2 run rqt_graph rqt_graph                  # 看節點與話題的連線圖</
 <div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
 <ul>
 <li>官方文件把 <code>ros2 topic list</code> 拼成 <code>ros2 topoic list</code>，照抄會說找不到指令。</li>
-<li>官方說 <code>/image_raw</code> 的 encoding 是 <code>rgb8</code>，同一句又說「表示 yuv422」，互相矛盾。實際以 <code>ros2 topic echo /image_raw --no-arr</code> 看到的 <code>encoding</code> 欄位為準；程式裡統一指定 <code>"bgr8"</code> 讓 cv_bridge 幫你轉。</li>
-<li>官方另有一段寫 <code>sudo apt-get install ros-humble-usb-cam</code>：出廠映像已裝好（位置 <code>/opt/ros/humble/share/usb_cam/</code>），不需要重裝。新做的容器才要在啟動檔加 <code>-v /dev/video0:/dev/video0</code> 掛載相機（需實車確認 <code>ros2_humble.sh</code> 內容）。</li>
+<li>官方說 <code>/image_raw</code> 的 encoding 是 <code>rgb8</code>，同一句又說「表示 yuv422」，互相矛盾。<strong>實車確認（2026-10-28）</strong>：<code>ros2 topic echo --once --no-arr /image_raw</code> 看到 <code>encoding: yuv422_yuy2</code>、<code>width: 640</code>、<code>height: 480</code>、<code>step: 1280</code>（每像素 2 位元組），<code>ros2 topic hz</code> 約 29.8 Hz。程式裡統一指定 <code>"bgr8"</code> 讓 cv_bridge 幫你轉；<code>pub_image</code> 轉發出來的 <code>/image</code> 約 29.5 Hz，Pi 5 跟得上。</li>
+<li><code>usb_cam_node_exe</code> 啟動時印 <code>unknown control 'exposure_auto'</code>、<code>unknown control 'focus_auto'</code>：這支相機不支援這兩個設定，只是警告，不影響發布。</li>
+<li><code>ros2 topic list</code> 除了 <code>/image_raw</code>，還會看到 <code>/image_raw/compressed</code>、<code>/image_raw/compressedDepth</code>、<code>/image_raw/theora</code>，是 image_transport 自動多開的壓縮版。</li>
+<li>官方另有一段寫 <code>sudo apt-get install ros-humble-usb-cam</code>：出廠映像已裝好（位置 <code>/opt/ros/humble/share/usb_cam/</code>），不需要重裝。新做的容器要在啟動檔加 <code>-v /dev/video0:/dev/video0</code> 掛載相機；實車確認出廠的 <code>~/ros2_humble.sh</code> 已經有這一行。</li>
 </ul>
 </div></div>
 </section>
@@ -389,12 +391,27 @@ ros2 run rqt_graph rqt_graph                  # 看節點與話題的連線圖</
 <tr>
 <td><code>cannot connect to X server</code>、視窗沒出現</td>
 <td>用純 SSH 執行有 <code>imshow</code> 的程式</td>
-<td>改在 VNC 桌面開終端執行；容器需要 X11 顯示轉發（出廠腳本已設，需實車確認）</td>
+<td>改在 VNC 桌面開終端執行；容器需要 X11 顯示轉發（出廠腳本已設，實車確認在 VNC 桌面跑 <code>imshow</code>、<code>rqt_image_view</code> 都能顯示）</td>
 </tr>
 <tr>
 <td>畫面全黑、<code>ret</code> 一直是 False</td>
 <td>鏡頭編號不對，或被別的程式占用</td>
 <td>主機上 <code>ls /dev/video*</code> 看編號；先關掉 <code>usb_cam_node_exe</code> 再跑 <code>python3 1_3.py</code></td>
+</tr>
+<tr>
+<td><code>can't open camera by index</code>、<code>Camera index out of range</code>，程式馬上結束</td>
+<td>實車確認：<code>usb_cam_node_exe</code> 正開著鏡頭時就是這個訊息，看起來像編號錯，其實是被占用</td>
+<td>關掉相機節點，或改成訂閱 <code>/image_raw</code></td>
+</tr>
+<tr>
+<td><code>QRcode_Parsing.py</code> 一直讀不到紙本 QR code</td>
+<td>實車（2026-10-28）一直沒讀到，只誤讀到一個 <code>I25</code> 一維條碼；相機裝得低又是廣角，QR code 在畫面裡太小，加上室內偏暗</td>
+<td>QR code 拿近一點、放正、停住不動，光線要夠；M3 用 QR code 控車前先調好</td>
+</tr>
+<tr>
+<td>容器裡開 <code>rqt_image_view</code> 印 <code>libGL error</code>、<code>V3D 7.1 not supported</code></td>
+<td>容器沒辦法用 Pi 的顯示卡加速，改用軟體繪圖</td>
+<td>畫面照樣出來，可忽略（實車確認）</td>
 </tr>
 <tr>
 <td>Windows 上打不開鏡頭</td>
