@@ -30,6 +30,12 @@
     "desc": "車子不動，一層一層走進去：Pi 5 身分、容器裡是 Ubuntu、lsusb 看硬體、node info 看小腦頻道、IMU 量到地心引力"
   },
   {
+    "group": "實車演練",
+    "title": "W3＋B2 Linux、SSH、Docker 速成與正確關機（約 34 分鐘，YouTube 私人）",
+    "url": "https://youtu.be/f1iO97zIU9M",
+    "desc": "基本指令、ss 看 SSH 從哪連進來、映像／容器／空屋、docker exec 進同一個容器、健康檢查、sudo shutdown 正確關機"
+  },
+  {
     "group": "NotebookLM 產物",
     "title": "NotebookLM 產物總覽頁（語音、影片、簡報、資訊圖表、心智圖）",
     "url": "https://187-127-109-145.sslip.io/yahboom-microros-pi5/",
