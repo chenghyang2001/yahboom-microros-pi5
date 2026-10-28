@@ -36,6 +36,12 @@
     "desc": "基本指令、ss 看 SSH 從哪連進來、映像／容器／空屋、docker exec 進同一個容器、健康檢查、sudo shutdown 正確關機"
   },
   {
+    "group": "實車演練",
+    "title": "B5 讀懂車的話題（約 30 分鐘，YouTube 私人）",
+    "url": "https://youtu.be/b-A144Ayd7o",
+    "desc": "聽光達、手推看 odom_raw、cmd_vel 原地轉圈（Ctrl+C 不會停，要送零）、蜂鳴器毫秒自停、雲台 S2 扯斷相機線的教訓"
+  },
+  {
     "group": "NotebookLM 產物",
     "title": "NotebookLM 產物總覽頁（語音、影片、簡報、資訊圖表、心智圖）",
     "url": "https://187-127-109-145.sslip.io/yahboom-microros-pi5/",
