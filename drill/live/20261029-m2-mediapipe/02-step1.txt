@@ -1,0 +1,11 @@
+第一步，確認車上的 MediaPipe 環境，再看程式裡最核心的三行。
+
+這一步全部在下面第三格做，會打三個指令。
+
+第一個指令是 python3 減 c，後面一小段程式：import mediapipe，印出它的版本，以及它有沒有 solutions 這個屬性。為什麼要看 solutions？因為官方程式全部用的是 MediaPipe 舊版的寫法，叫做 solutions。最新版的 MediaPipe 已經把這套寫法拿掉了，如果在新版上跑官方程式，會直接報錯說找不到 solutions。我們預期會印出零點一零點九，以及 True，代表車上是舊版、官方程式可以直接跑。
+
+第二個指令是 ros2 pkg executables yahboomcar 底線 mediapipe，列出這個套件登記了哪些 ROS 節點。預期會看到零一號手部偵測、零二號姿態偵測，一路到零五號臉和眼睛偵測，這些就是接下來要用 ros2 run 啟動的節點。
+
+第三個指令用 grep，在零一號手部偵測的原始碼裡找出三行關鍵程式。第一行是 cvtColor，把影像從 BGR 轉成 RGB，因為相機和 OpenCV 用的是藍綠紅的順序，MediaPipe 要的是紅綠藍。第二行是 hands 點 process，把影像丟進模型。第三行是把每個關鍵點的 x、y、z 存起來。這三行就是用 MediaPipe 的全部套路：轉色、丟模型、讀點。
+
+我念完以後就開始執行。
