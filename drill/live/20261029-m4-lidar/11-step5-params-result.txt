@@ -1,0 +1,11 @@
+前三個動作做完了。
+
+左上角第一格，避障程式已經啟動，印出 start it，但下面沒有任何判斷訊息，因為 Switch 是 true，程式在每一圈都直接停車、不做判斷。車子現在沒有動。
+
+左下角第三格，ros2 param list 列出了這個節點的六個參數：Laser Angle、Response Dist、Switch、angular、linear，還有每個節點都有的 use sim time。ros2 param get 查到 Response Dist 原本是零點五五，型別是 Double，也就是浮點數。接著 ros2 param set 改成零點三，回覆 Set parameter successful，再 get 一次，已經變成零點三。程式完全沒有重開。
+
+右上角第二格多了幾行看門狗的紀錄，那是程式啟動、暫停的時候短暫送了速度又停下來，限速閥補送的零速度，屬於正常現象。
+
+電池現在是七點零伏。
+
+下一個動作，我會用 ros2 param set 把 Switch 改成 false，車子就會開跑，反應距離大約四十五公分。請把手把拿在手上，準備好了說繼續。

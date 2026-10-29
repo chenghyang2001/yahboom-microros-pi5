@@ -1,0 +1,7 @@
+前兩個動作做完了，車子還沒動。
+
+左下角第三格，bringup 已經丟到背景執行，節點清單裡多了陀螺儀濾波 complementary filter、EKF filter node、robot state publisher 這些底層資料處理。我用 tf2 echo 查了 odom 到 base footprint，位置是零、零、零，方向也是零，代表 TF 已經出來了，車子目前就在起點。
+
+左上角第一格，巡邏程式也啟動了，一直印 Switch False，代表它在等開始的訊號。
+
+電池還是七點零伏。請再確認一次，車子前方和左邊大約七十公分沒有東西，手把拿在手上。準備好了說繼續，我就把 Switch 改成 true，開始走正方形。
