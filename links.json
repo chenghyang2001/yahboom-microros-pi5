@@ -78,6 +78,12 @@
     "desc": "車頭相機跑手部 21 點（兩隻手 42）、姿態 33 點、臉部網格 468 點（topic echo 預設截到 128）、規則式手勢辨識的對與錯、空中畫筆；相機畫面已打碼"
   },
   {
+    "group": "實車演練",
+    "title": "M3 視覺互動：顏色追蹤、人臉追蹤、手勢控車（約 31 分鐘，YouTube 私人）",
+    "url": "https://youtu.be/BEsUQO7zsO8",
+    "desc": "雲台守門員攔下 276 次低頭指令；紅色跨在色相 0／180 接縫的陷阱；控制器飽和；手勢控車左右轉不動的原因（限速閥看門狗）與修正；巡線待補；相機畫面已打碼"
+  },
+  {
     "group": "NotebookLM 產物",
     "title": "NotebookLM 產物總覽頁（語音、影片、簡報、資訊圖表、心智圖）",
     "url": "https://187-127-109-145.sslip.io/yahboom-microros-pi5/",
@@ -181,7 +187,7 @@
   },
   {
     "group": "逐步演練精華版（每支約 3～4 分鐘）",
-    "title": "精華版播放清單（10 支，YouTube 私人）",
+    "title": "精華版播放清單（13 支，YouTube 私人）",
     "url": "https://www.youtube.com/playlist?list=PLBB8VkgBCQ7M",
     "desc": "每支演練濃縮成 3～4 分鐘：重新配的短旁白，等待畫面快轉；說明欄附完整版連結與章節"
   },
@@ -244,5 +250,23 @@
     "title": "M4 光達應用：警衛、避障、跟隨、巡邏（4 分鐘）",
     "url": "https://youtu.be/gn-7rYAEb1s",
     "desc": "完整版：https://youtu.be/SCftI8V7Atw"
+  },
+  {
+    "group": "逐步演練精華版（每支約 3～4 分鐘）",
+    "title": "M5 寫自己的第一個控制節點：遇障礙就停（2 分鐘）",
+    "url": "https://youtu.be/W6IAOGiunRs",
+    "desc": "完整版：https://youtu.be/oy_Q1QeHzf8"
+  },
+  {
+    "group": "逐步演練精華版（每支約 3～4 分鐘）",
+    "title": "M2 MediaPipe：手、臉、姿態偵測（2 分鐘）",
+    "url": "https://youtu.be/Ox9w9o6hCj0",
+    "desc": "完整版：https://youtu.be/CwEc_1CCXV0"
+  },
+  {
+    "group": "逐步演練精華版（每支約 3～4 分鐘）",
+    "title": "M3 視覺互動：顏色追蹤、人臉追蹤、手勢控車（2 分鐘）",
+    "url": "https://youtu.be/WxT4lfDpmUU",
+    "desc": "完整版：https://youtu.be/BEsUQO7zsO8"
   }
 ]
