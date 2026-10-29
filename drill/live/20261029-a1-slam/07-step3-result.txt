@@ -1,0 +1,7 @@
+第三步完成，RViz 開起來了，就是現在蓋在終端機上面的這個視窗。
+
+左邊是顯示清單，右邊是畫面。畫面上只有灰色的格線，還沒有地圖，這是正常的。左邊的 Global Status 是紅色的錯誤，寫著 Frame map does not exist，意思是找不到 map 這個座標。因為 map 座標要由 Gmapping 發布，我們還沒開，所以 RViz 不知道地圖放在哪裡。RobotModel 和 Map 也是紅色或黃色，原因一樣。只有 LaserScan 是綠色的 Status Ok，代表光達資料有收到。
+
+第二格一直印 Message Filter dropping message，也是同一個原因：RViz 拿到光達資料，卻找不到 map 座標可以放，只好丟掉。
+
+下一步開 Gmapping，這些紅字應該就會消失，地圖會出現。等你說繼續。

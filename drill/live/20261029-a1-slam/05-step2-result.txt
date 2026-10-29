@@ -1,0 +1,7 @@
+第二步完成，底層開起來了。
+
+左上角第一格是 bringup 的訊息。最後幾行看到 robot state publisher 讀到車子模型的每一個零件，例如 radar 底線 Link 就是光達；還有 complementary filter 啟動，這是 IMU 濾波器。最後一行說 joint state publisher 在等模型描述，這是它啟動時的提示，不影響建圖。
+
+右上角第二格的 tf2 echo 每秒印一次車身在 odom 座標裡的位置。平移是零、零、零，旋轉也是零度，因為車子還在原點沒動。這條 odom 到 base 底線 footprint 的座標變換，就是 Gmapping 需要的第二樣材料：車子覺得自己走到哪裡。我已經按 Ctrl C 停掉它了。
+
+下一步是打開 RViz，在樹莓派桌面上看畫面。等你說繼續。
