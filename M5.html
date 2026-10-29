@@ -366,10 +366,19 @@ ros2 param set /obstacle_stop forward_speed 0.2
 <ol>
 <li>終端 2 先印 <code>obstacle_stop 已啟動，等待 /scan ...</code>。</li>
 <li>車往前走；靠近牆時印 <code>前方 0.29 m 有障礙，停車</code>，<code>/cmd_vel</code> 變成 0。</li>
-<li>在模擬器裡把車拖開或轉個方向，印 <code>前方淨空 ... m，繼續前進</code>。</li>
+<li>在模擬器裡把車拖開或轉個方向，印 <code>前方淨空 ... m，繼續前進</code>。拖不動時，改用終端 4 <code>ros2 param set /obstacle_stop stop_distance 0.2</code>，一樣會看到「淨空 → 再前進 → 停車」。</li>
 <li>終端 2 按 Ctrl+C，車立刻停下、沒有錯誤訊息。</li>
 <li>關掉終端 1 的模擬車，約 0.5 秒後終端 2 印 <code>超過 ... 秒沒收到 /scan，先停車</code>。</li>
-</ol></div>
+</ol>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p><strong>實測（2026-10-29 第 8 場演練，WSL Jazzy＋Gazebo Harmonic）</strong></p>
+<ul>
+<li>模擬車從原點出發，在 <code>/odom</code> x = 1.146 m 停下，印「前方 0.30 m 有障礙，停車」。不開 Gazebo 畫面（<code>gui:=false</code>）約 13 秒走到；開了畫面模擬變慢，約 30 秒。</li>
+<li>開畫面時偶爾印「超過 0.5～0.9 秒沒收到 /scan」：模擬跑得比真實時間慢，光達資料會晚到。模擬時先 <code>ros2 param set /obstacle_stop scan_timeout 1.0</code>。</li>
+<li><code>stop_distance</code> 改 0.2 後印「前方淨空 0.28 m，繼續前進」，約 3 秒後在 0.18 m 停車，<code>/odom</code> x 變 1.266 m。每 0.1 秒才判斷一次，所以會比設定值多滑一點。</li>
+<li>關掉模擬車後，節點每 2 秒印一次「超過 1.0／3.0／4.8／7.4 秒沒收到 /scan」，持續送零速度。</li>
+</ul>
+</div></div>
 </section>
 <section class="sec card-box" id="sec-6" data-audio="audio/M5-6.mp3">
 <div class="sec-head"><h2>6. 搬到實車：在 Docker 容器內編譯執行</h2><button class="btn play-one" type="button">▶ 播放旁白</button></div>
@@ -403,9 +412,21 @@ ros2 run my_obstacle_stop obstacle_stop</code></pre>
 <p><strong>步驟 4：架高測試 → 落地測試</strong>：</p>
 <ol>
 <li>車架高，用手或紙板放在光達<strong>正前方</strong> 20 公分，應印 <code>前方 0.2x m 有障礙，停車</code>，輪子停。</li>
-<li>若手放在<strong>車後方</strong>才停，代表光達 0° 不在正前方：Ctrl+C 後改用 <code>ros2 run my_obstacle_stop obstacle_stop --ros-args -p angle_offset_deg:=180.0</code> 再試（需實車確認 MS200 的安裝方向）。</li>
+<li>若手放在<strong>車後方</strong>才停，代表光達 0° 不在正前方：Ctrl+C 後改用 <code>ros2 run my_obstacle_stop obstacle_stop --ros-args -p angle_offset_deg:=180.0</code> 再試。這台車實測 MS200 的 0° 就是車頭（2026-10-29），<code>angle_offset_deg</code> 維持 0.0。</li>
 <li>放到空曠地面，速度維持 0.1 m/s，前方放紙箱，確認在約 30 公分處停下。</li>
 </ol>
+<div class="callout callout-info"><div class="callout-title">ℹ️ 補充</div>
+<p><strong>實測（2026-10-29 第 8 場演練，車上 Humble 容器）</strong></p>
+<ul>
+<li>演練時把速度改名經過 M4 的限速閥：<code>ros2 run my_obstacle_stop obstacle_stop --ros-args -r /cmd_vel:=/cmd_vel_raw</code>，另一格跑 <code>python3 cmd_vel_limiter.py</code>（<code>drill/live/20261029-m4-lidar/</code>）。程式不用改。</li>
+<li><code>colcon build</code> 約 3 秒，同樣印 <code>SetuptoolsDeprecationWarning: setup.py install is deprecated</code>，可忽略。</li>
+<li>架高：手放正前方 → 0.29 m 停車、0.37 m 繼續前進；手在掃描扇形邊緣快速進出時，會在 1 秒內「停、走、停」跳好幾次（0.13 ↔ 0.61 m），遲滯擋不住這種情況。手放車後方 18 秒都沒有停車。</li>
+<li>Ctrl+C：節點直接回到提示字元；限速閥 0.5 秒後再補送一次零速度。</li>
+<li>落地：前方約 1.1 m 放紙箱，約 8 秒後在 0.29 m 停下；紙箱拿開後印「前方淨空 1.81 m，繼續前進」。</li>
+<li>容器裡沒有 <code>/root/my_ws</code> 的 build 與 install；電腦是 Jazzy、車上是 Humble，只搬原始碼、在車上重編。</li>
+<li>電腦經「USB → 手機轉接 8022 → Pi SSH」連車時，WSL（mirrored 網路）可直接 <code>scp -P 8022 my_obstacle_stop.tgz pi@127.0.0.1:~/</code>。</li>
+</ul>
+</div>
 <p><strong>步驟 5（選做）：保存容器</strong>：</p>
 <div class="code-block">
 <div class="code-head"><span class="code-title">在 Pi 5 主機</span><button class="copy-btn" type="button">複製</button></div>
@@ -474,8 +495,18 @@ docker images</code></pre>
 </tr>
 <tr>
 <td><code>colcon build</code> 出現 <code>SetuptoolsDeprecationWarning</code></td>
-<td>Jazzy 較新的 setuptools</td>
+<td>setuptools 不建議用 <code>setup.py install</code>（Jazzy 與車上 Humble 都會印）</td>
 <td>警告可忽略，只要最後是 <code>Finished</code></td>
+</tr>
+<tr>
+<td><code>ros2 topic echo</code>／<code>node list</code> 卡住，最後印 <code>TimeoutError: [Errno 110] Connection timed out</code></td>
+<td>ROS 2 背景的 daemon 卡住（WSL 常見），<code>ros2 daemon stop</code> 也會卡</td>
+<td>結束 <code>_ros2_daemon</code> 程序後 <code>ros2 daemon start</code>；或指令加 <code>--no-daemon</code></td>
+</tr>
+<tr>
+<td>模擬時偶爾印「超過 0.5～0.9 秒沒收到 /scan」</td>
+<td>開 Gazebo 畫面後模擬變慢，光達資料晚到</td>
+<td>模擬時 <code>scan_timeout</code> 設 1.0；或 <code>gui:=false</code></td>
 </tr>
 <tr>
 <td>Ctrl+C 後車還在動</td>
