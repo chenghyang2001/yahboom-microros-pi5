@@ -1,0 +1,1 @@
+第五步換成 Gazebo 物理模擬器。裡面的 bridge 橋接節點，就像真車上的 micro ROS agent，負責把模擬器和 ROS 2 話題接起來。

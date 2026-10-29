@@ -1,0 +1,1 @@
+第一步，看 URDF。用 grep 印出所有 link 和 joint。link 是骨頭，joint 是關節。模擬車有十一根骨頭、十個關節：輪子是 continuous，可以一直轉；雲台是 revolute，有角度限制；光達是 fixed，焊死不動。
