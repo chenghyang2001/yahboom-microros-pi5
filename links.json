@@ -60,6 +60,12 @@
     "desc": "OpenCV 讀圖與開鏡頭、usb_cam 發布 /image_raw（30 Hz、yuv422）、鏡頭被佔用、pub_image 經 cv_bridge 轉發 /image"
   },
   {
+    "group": "實車演練",
+    "title": "M4 光達應用：警衛、避障、跟隨、巡邏（約 48 分鐘，YouTube 私人）",
+    "url": "https://youtu.be/SCftI8V7Atw",
+    "desc": "/scan 360 點角度公式、自製限速閥擋下官方 PID 的 7.5 rad/s、ros2 param set 改反應距離、巡邏 0.5 m 正方形沒停下來（待查）"
+  },
+  {
     "group": "NotebookLM 產物",
     "title": "NotebookLM 產物總覽頁（語音、影片、簡報、資訊圖表、心智圖）",
     "url": "https://187-127-109-145.sslip.io/yahboom-microros-pi5/",
