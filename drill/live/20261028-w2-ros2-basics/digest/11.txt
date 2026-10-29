@@ -1,0 +1,1 @@
+第六步看全貌。rqt graph 在 WSL 上凍住，改用 topic info 減減 verbose，確認遙控器透過 cmd vel 把速度送給烏龜。

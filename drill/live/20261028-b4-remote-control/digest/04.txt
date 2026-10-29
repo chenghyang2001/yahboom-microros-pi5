@@ -1,0 +1,1 @@
+最後空白鍵停車、Ctrl C 離開，node list 又只剩 YB Car Node，方向盤空出來了。

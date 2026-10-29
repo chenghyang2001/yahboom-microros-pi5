@@ -1,0 +1,88 @@
+{
+  "title": "開機流程 精華版：翻譯官、小腦、工作桌",
+  "subtitle": "Yahboom MicroROS-Pi5 逐步演練｜實車 Pi 5",
+  "recordings": [
+    "~/Videos/pi5-drill/pi5drill-boot-sequence-20261028-065224.mp4",
+    "~/Videos/pi5-drill/pi5drill-boot-sequence-seg2-20261028-111715.mp4"
+  ],
+  "full_version": "https://youtu.be/WSqQgIOrT24",
+  "full_minutes": 27,
+  "yt_title": "【精華版】拍五開機流程：一步一步拆開開機（4 分鐘）",
+  "rate": "+5%",
+  "beats": [
+    {
+      "id": "00",
+      "label": "開場",
+      "rec": 0,
+      "from": 5,
+      "key": 36,
+      "text": "拍五開機流程精華版。每次開機，車子三十秒內會自動做完三件事：打開翻譯官 agent、讓小腦 ESP32 連上來、再打開 ROS 2 工作桌容器。今天把它們拆開，一步一步手動做一次。"
+    },
+    {
+      "id": "01",
+      "label": "① 翻譯官：一個容器都沒有",
+      "rec": 1,
+      "from": 140,
+      "key": 246,
+      "text": "中途因為手機沒電暫停，車子充好電重開機，電池八點一伏特。第一步，先在主機打 docker ps，只有一行標題，一個容器都沒有。"
+    },
+    {
+      "id": "02",
+      "label": "① 翻譯官：running 等小腦",
+      "key": 257,
+      "text": "再用 cat 減 n 印出 start agent rpi5 點 sh，真正執行的是第五行 docker run，透過 USB 序列線等小腦。執行以後出現 running，翻譯官打開序列埠，正在空等。"
+    },
+    {
+      "id": "03",
+      "label": "② 按 Reset：小腦握手",
+      "from": 405,
+      "key": 547,
+      "text": "第二步，請使用者按 ESP32 擴展板上的 Reset，讓小腦重新開機，去找新的翻譯官握手。第一格先出現 session established，接著刷出一長串 created。"
+    },
+    {
+      "id": "04",
+      "label": "② 小腦登記八個話題",
+      "key": 600,
+      "text": "數一數：一個 participant、八個 topic，四個 publisher 發布電池、IMU、光達、里程計，四個 subscriber 訂閱速度、蜂鳴器和雲台，還有一個 client。"
+    },
+    {
+      "id": "05",
+      "label": "③ 工作桌：開機腳本",
+      "from": 740,
+      "key": 898,
+      "text": "第三步，打開 ROS 2 工作桌。cat 減 n 印出 ros2 humble 點 sh，一共十二行，是一個長長的 docker run。它沒有減減 rm，所以拍五上已經累積了十四個停止的容器。"
+    },
+    {
+      "id": "06",
+      "label": "③ 工作桌：pi 變成 root",
+      "key": 908,
+      "text": "執行 sh ros2 humble 點 sh 以後，提示字元從 pi 變成 root，還印出 MY DOMAIN ID 二十。拍五上所有 ROS 2 程式，都約定用二十號網域。"
+    },
+    {
+      "id": "07",
+      "label": "③ docker ps：兩個容器",
+      "key": 919,
+      "text": "再打一次 docker ps，這次有兩個容器：剛打開的工作桌 ros humble，和第一步的翻譯官 micro ros agent。容器從零個、一個，變成兩個。"
+    },
+    {
+      "id": "08",
+      "label": "④ 一個節點、十個話題",
+      "from": 1112,
+      "key": 1256,
+      "text": "第四步，在工作桌裡確認資料。ros2 node list 只有一個斜線 YB Car Node，就是小腦。ros2 topic list 有十個話題，扣掉系統自帶的兩個，剛好是小腦登記的八個。"
+    },
+    {
+      "id": "09",
+      "label": "④ 電池 78、時鐘對齊",
+      "key": 1274,
+      "text": "ros2 topic echo 減減 once 斜線 battery，讀到 data 七十八，也就是七點八伏特。時鐘差也從一萬五千多秒變成零秒，Reset 讓小腦重新對時，跑 SLAM 前記得先做。"
+    },
+    {
+      "id": "10",
+      "label": "總結",
+      "from": 1474,
+      "key": 1480,
+      "text": "總結：小腦量資料、驅動馬達，翻譯官把小腦的話翻成 ROS 2，工作桌讓我們下指令。話題收不到時，就照翻譯官、小腦、工作桌、時鐘的順序，一層一層查。完整版的連結在說明欄。"
+    }
+  ]
+}

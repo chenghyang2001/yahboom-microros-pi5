@@ -1,0 +1,1 @@
+第一步，四個最常用的 Linux 指令。pwd，站在斜線 home 斜線 pi；ls，看到兩個開機腳本；ls 斜線 dev 斜線 tty USB 星號，找到通往小腦的 tty USB 零；hostname 減大寫 I，車子的位址是 10.169.179.1。

@@ -1,0 +1,1 @@
+第六步跑 pub image，訂閱 image raw，用 cv bridge 翻成藍綠紅，再發布到斜線 image。topic info 顯示 image raw 的訂閱者正是 pub image node，轉發後仍有每秒二十九點五張。

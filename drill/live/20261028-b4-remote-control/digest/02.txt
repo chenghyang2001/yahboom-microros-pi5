@@ -1,0 +1,1 @@
+第二步用鍵盤，ros2 run yahboomcar ctrl yahboom keyboard。原廠起始速度每秒零點二公尺太快，先按六下 x、三下 c，降到零點一零六公尺和零點七三弧度。

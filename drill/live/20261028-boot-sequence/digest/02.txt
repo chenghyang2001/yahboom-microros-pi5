@@ -1,0 +1,1 @@
+再用 cat 減 n 印出 start agent rpi5 點 sh，真正執行的是第五行 docker run，透過 USB 序列線等小腦。執行以後出現 running，翻譯官打開序列埠，正在空等。

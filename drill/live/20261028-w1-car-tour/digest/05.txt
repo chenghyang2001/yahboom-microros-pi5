@@ -1,0 +1,1 @@
+第四步，ros2 node info 斜線 YB Car Node。小腦聽四個話題：cmd vel、beep 和兩個雲台舵機；說四個：battery、imu、odom raw、scan。講義漏了 battery，而且是 odom raw，不是 odom。

@@ -1,0 +1,1 @@
+數一數：一個 participant、八個 topic，四個 publisher 發布電池、IMU、光達、里程計，四個 subscriber 訂閱速度、蜂鳴器和雲台，還有一個 client。

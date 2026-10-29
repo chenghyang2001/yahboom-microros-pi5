@@ -1,0 +1,121 @@
+{
+  "title": "M1 精華版：OpenCV 與 ROS 影像話題",
+  "subtitle": "Yahboom MicroROS-Pi5 逐步演練｜實車 Pi 5",
+  "recordings": [
+    "~/Videos/pi5-drill/pi5drill-m1-20261028-190805.mp4"
+  ],
+  "full_version": "https://youtu.be/gL69VqADwG8",
+  "full_minutes": 31,
+  "yt_title": "【精華版】M1 OpenCV 與 ROS 影像話題（5 分鐘）",
+  "rate": "+5%",
+  "beats": [
+    {
+      "id": "00",
+      "label": "開場",
+      "rec": 0,
+      "from": 5,
+      "key": 60,
+      "text": "M1 精華版：OpenCV 與 ROS 影像話題。車子和雲台全程不動，只用車頭那支 USB 相機，搞懂兩件事：影像在電腦眼中是什麼，以及影像怎麼透過 ROS 話題分給好幾個程式。"
+    },
+    {
+      "id": "01",
+      "label": "① 影像：一張數字表格",
+      "from": 168,
+      "key": 370,
+      "text": "第一步，用 OpenCV 的 imread 讀範例圖。shape 是一百六十九、三百四十三、三，先高後寬、三個顏色通道。取一個像素是三個兩百五十五，藍綠紅都最大，就是白色。"
+    },
+    {
+      "id": "02",
+      "label": "① 影像：灰階與邊緣",
+      "key": 383.2,
+      "text": "3 底線 3 點 py 跳出原圖、灰階和 Canny 邊緣三個視窗，邊緣圖只剩字母的白色輪廓。按 q 離開時跳出 AttributeError，因為官方範例對圖片呼叫了 release，刪掉那行就好。"
+    },
+    {
+      "id": "03",
+      "label": "② OpenCV 直接開鏡頭",
+      "from": 559,
+      "key": 664,
+      "text": "第二步，執行 1 底線 3 點 py，用 VideoCapture 零直接打開車頭相機，看到貼著地板的廣角即時畫面。它一樣是數字表格，只是每十毫秒換一張。按 q 乾淨結束，相機還給系統。"
+    },
+    {
+      "id": "04",
+      "label": "③ QR code：這次沒讀到",
+      "from": 1137,
+      "key": 1140,
+      "text": "第三步試 QR code 辨識，這次沒成功。紙上的 QR code 一直沒被讀到，只誤讀一個一維條碼 I25，八八零六二二。相機低、畫面小、光線暗都是可能原因，先跳過。"
+    },
+    {
+      "id": "05",
+      "label": "④ 相機節點 image raw",
+      "from": 1309,
+      "key": 1498.4,
+      "text": "第四步換成 ROS 的做法。ros2 run usb cam 啟動相機節點，只有它打開鏡頭，把影像發布到 image raw。ros2 topic hz 斜線 image raw 量到每秒二十九點八張，很穩定。"
+    },
+    {
+      "id": "06",
+      "label": "④ 影像格式是 yuv422",
+      "from": 1450,
+      "key": 1456.9,
+      "text": "再用 topic echo 加減減 no arr，只看表頭：寬六百四十、高四百八十，格式是 yuv422，不是 OpenCV 習慣的藍綠紅。所以才需要 cv bridge 來翻譯。"
+    },
+    {
+      "id": "07",
+      "label": "⑤ 鏡頭被佔用",
+      "from": 1689,
+      "key": 1805.9,
+      "text": "第五步，相機節點開著時，再用 OpenCV 開同一支鏡頭，結果印出 can't open camera by index。看似程式寫錯，其實是鏡頭被佔用，一支鏡頭只能給一個程式開。"
+    },
+    {
+      "id": "08",
+      "label": "⑥ cv bridge 轉發",
+      "from": 1956,
+      "key": 2100.4,
+      "text": "第六步跑 pub image，訂閱 image raw，用 cv bridge 翻成藍綠紅，再發布到斜線 image。topic info 顯示 image raw 的訂閱者正是 pub image node，轉發後仍有每秒二十九點五張。"
+    },
+    {
+      "id": "09",
+      "label": "⑥ rqt 看到即時畫面",
+      "key": 2125,
+      "text": "最後打 rqt image view 斜線 image，直接帶話題名稱就不用選下拉選單，看到經過 cv bridge 轉換的相機畫面。libGL 的錯誤只是沒用到顯示卡加速，可以忽略。"
+    },
+    {
+      "id": "10",
+      "label": "總結",
+      "from": 2278,
+      "key": 2290,
+      "text": "總結：一張影像就是一張數字表格。在 ROS 裡，鏡頭只讓相機節點開一次，其他程式都去訂閱話題，cv bridge 負責在 ROS 影像和 OpenCV 之間翻譯。完整版的連結在說明欄。"
+    }
+  ],
+  "blur": [
+    {
+      "t0": 655,
+      "t1": 690,
+      "box": [
+        456,
+        170,
+        640,
+        490
+      ]
+    },
+    {
+      "t0": 940,
+      "t1": 1140,
+      "box": [
+        456,
+        170,
+        640,
+        490
+      ]
+    },
+    {
+      "t0": 2110,
+      "t1": 99999,
+      "box": [
+        376,
+        276,
+        368,
+        284
+      ]
+    }
+  ]
+}

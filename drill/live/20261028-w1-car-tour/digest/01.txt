@@ -1,0 +1,1 @@
+第一步看大腦。在主機打 cat 斜線 proc 斜線 device tree 斜線 model、uname 減 m、free 減 h。答案是樹莓派五、ARM 64 位元、Debian 12，記憶體七點九 G，只用了七百多 M。

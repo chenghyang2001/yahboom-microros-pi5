@@ -1,0 +1,1 @@
+再用 topic echo 加減減 no arr，只看表頭：寬六百四十、高四百八十，格式是 yuv422，不是 OpenCV 習慣的藍綠紅。所以才需要 cv bridge 來翻譯。

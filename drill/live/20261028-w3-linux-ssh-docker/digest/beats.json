@@ -1,0 +1,82 @@
+{
+  "title": "W3 精華版：Linux、SSH、Docker 與正確關機",
+  "subtitle": "Yahboom MicroROS-Pi5 逐步演練｜實車 Pi 5",
+  "recordings": [
+    "~/Videos/pi5-drill/pi5drill-w3-linux-ssh-docker-20261028-124400.mp4"
+  ],
+  "full_version": "https://youtu.be/f1iO97zIU9M",
+  "full_minutes": 34,
+  "yt_title": "【精華版】W3 Linux、SSH、Docker 與正確關機（4 分鐘）",
+  "rate": "+5%",
+  "beats": [
+    {
+      "id": "00",
+      "label": "開場",
+      "rec": 0,
+      "from": 16,
+      "key": 40,
+      "text": "W3 精華版：Linux、SSH、Docker 速成，再加上健康檢查和正確關機。一樣在實車上做，車子不會動，最後一步會真的讓樹莓派關機。"
+    },
+    {
+      "id": "01",
+      "label": "① Linux 四個基本指令",
+      "from": 222,
+      "key": 364,
+      "text": "第一步，四個最常用的 Linux 指令。pwd，站在斜線 home 斜線 pi；ls，看到兩個開機腳本；ls 斜線 dev 斜線 tty USB 星號，找到通往小腦的 tty USB 零；hostname 減大寫 I，車子的位址是 10.169.179.1。"
+    },
+    {
+      "id": "02",
+      "label": "② SSH：連進來的是手機",
+      "from": 519,
+      "key": 643,
+      "text": "第二步看 SSH。ss 減 t n 列出 22 號門和 5900 號門的連線，對方都是 10.169.179.82，也就是手機。電腦經過 USB 到手機，手機再經過熱點連到車子。"
+    },
+    {
+      "id": "03",
+      "label": "③ Docker：藍圖與房子",
+      "from": 833,
+      "key": 952,
+      "text": "第三步，Docker 三個名詞：映像是藍圖，容器是照藍圖蓋好、有人住的房子，倉庫是放藍圖的地方。docker images 有三份藍圖，兩份 ros humble 各十三點六 G；docker ps 有兩個正在跑的容器。"
+    },
+    {
+      "id": "04",
+      "label": "③ docker ps 減 a：空屋",
+      "key": 967,
+      "text": "docker ps 減 a 連停止的也列出來，多出一整排 Exited 的空屋。因為開機腳本沒加減減 rm，每開一次工作桌就留下一棟。"
+    },
+    {
+      "id": "05",
+      "label": "④ docker exec 走進容器",
+      "from": 1191,
+      "key": 1343,
+      "text": "第四步，docker exec 減 i t，接容器 ID 前四碼 e f 5 6，走進正在跑的工作桌。進去直接打 ros2 node list，就看到 YB Car Node，不用另外 source。"
+    },
+    {
+      "id": "06",
+      "label": "④ exit 後還是兩個容器",
+      "key": 1351,
+      "text": "exit 離開，再 docker ps，還是同樣兩個容器。要多開終端機進工作桌，用 docker exec，不要再跑一次 ros2 humble 點 sh。"
+    },
+    {
+      "id": "07",
+      "label": "⑤ 健康檢查",
+      "from": 1541,
+      "key": 1646,
+      "text": "第五步健康檢查。df 減 h，記憶卡用了百分之五十五；處理器溫度四十六點三度；vcgencmd get throttled 是 0 x 0，從沒因為供電或過熱降速。"
+    },
+    {
+      "id": "08",
+      "label": "⑥ 正確關機",
+      "from": 1890,
+      "key": 1932,
+      "text": "第六步正確關機。直接關總開關可能弄壞記憶卡，所以先下 sudo shutdown 減 h now。VNC 視窗直接消失，三十秒後樹莓派不再回應 ping。等綠燈不閃，再關總開關充電。"
+    },
+    {
+      "id": "09",
+      "label": "總結",
+      "from": 1600,
+      "key": 1650,
+      "text": "總結：Linux 四個指令找位置和硬體，ss 看誰連進來，docker images、ps、exec 管藍圖和房子，三行指令做健康檢查，最後先關機、再斷電。電池掉到七伏特，就準備收工充電。完整版的連結在說明欄。"
+    }
+  ]
+}

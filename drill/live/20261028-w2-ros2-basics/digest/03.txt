@@ -1,0 +1,1 @@
+第二步，用 ros2 topic echo 斜線 turtle1 斜線 cmd vel 旁聽。按上，linear x 是二，往前走；按左，angular z 是二，往左轉。

@@ -1,0 +1,1 @@
+第六步，ros2 topic list 接 grep odom，只有斜線 odom raw。融合陀螺儀的 odom，要等下一單元啟動 bringup 才會出現。

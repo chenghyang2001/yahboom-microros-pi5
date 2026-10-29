@@ -1,0 +1,1 @@
+第一步聽光達，ros2 topic echo 斜線 scan，減減 once，減減 no arr。角度從負三點一四到正三點一四，剛好一整圈，每一度一點，ranges 長度三百六十。

@@ -1,0 +1,1 @@
+第一步，ros2 run turtlesim turtlesim node 叫出烏龜，再開 turtle teleop key 鍵盤遙控器。這兩個小程式，就是節點。

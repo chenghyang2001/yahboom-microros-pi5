@@ -1,0 +1,1 @@
+第四步用手機 App，它透過 rosbridge 這座橋連到九零九零號門。App 填入 IP、選 ROS2、按連接後，rosbridge 印出一串 Subscribed to，手機連上了。

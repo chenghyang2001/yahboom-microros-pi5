@@ -1,0 +1,1 @@
+第五步參數。param set 把 background r 從六十九改成二五五，背景從藍色變成紫紅色。

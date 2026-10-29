@@ -1,0 +1,1 @@
+再打一次 docker ps，這次有兩個容器：剛打開的工作桌 ros humble，和第一步的翻譯官 micro ros agent。容器從零個、一個，變成兩個。

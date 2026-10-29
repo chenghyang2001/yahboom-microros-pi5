@@ -1,0 +1,1 @@
+interface show 印出 Twist 格式：linear 和 angular，各有 x、y、z。拍五的 cmd vel 用的也是 Twist。

@@ -1,0 +1,127 @@
+{
+ "chapters": [
+  [
+   "00:00",
+   "片頭"
+  ],
+  [
+   "00:04",
+   "開場"
+  ],
+  [
+   "00:25",
+   "① 確認方向盤是空的"
+  ],
+  [
+   "00:45",
+   "② 鍵盤"
+  ],
+  [
+   "01:35",
+   "③ 手把"
+  ],
+  [
+   "02:12",
+   "④ App"
+  ],
+  [
+   "02:51",
+   "總結"
+  ]
+ ],
+ "clips": [
+  {
+   "id": "00",
+   "rec": 0,
+   "start": 5,
+   "key": 30,
+   "speed": 3.4,
+   "fast": 7.3,
+   "hold": 13.6
+  },
+  {
+   "id": "01",
+   "rec": 0,
+   "start": 270,
+   "key": 388,
+   "speed": 16.7,
+   "fast": 7.1,
+   "hold": 13.1
+  },
+  {
+   "id": "02",
+   "rec": 0,
+   "start": 527,
+   "key": 657,
+   "speed": 20.2,
+   "fast": 6.4,
+   "hold": 12.0
+  },
+  {
+   "id": "03",
+   "rec": 0,
+   "start": 660,
+   "key": 661,
+   "speed": 1.0,
+   "fast": 1,
+   "hold": 19.1
+  },
+  {
+   "id": "04",
+   "rec": 0,
+   "start": 664,
+   "key": 690,
+   "speed": 6.4,
+   "fast": 4.0,
+   "hold": 7.5
+  },
+  {
+   "id": "05",
+   "rec": 0,
+   "start": 951,
+   "key": 1131,
+   "speed": 28.2,
+   "fast": 6.4,
+   "hold": 11.9
+  },
+  {
+   "id": "06",
+   "rec": 0,
+   "start": 1222,
+   "key": 1284,
+   "speed": 9.1,
+   "fast": 6.8,
+   "hold": 12.6
+  },
+  {
+   "id": "07",
+   "rec": 0,
+   "start": 1646.5,
+   "key": 1888,
+   "speed": 40.0,
+   "fast": 6.0,
+   "hold": 11.2
+  },
+  {
+   "id": "08",
+   "rec": 0,
+   "start": 2250,
+   "key": 2267,
+   "speed": 2.3,
+   "fast": 7.5,
+   "hold": 14.0
+  },
+  {
+   "id": "09",
+   "rec": 0,
+   "start": 2400,
+   "key": 2500,
+   "speed": 13.2,
+   "fast": 7.6,
+   "hold": 14.1
+  }
+ ],
+ "output": "C:\\Users\\USER\\Videos\\pi5-drill\\digest\\b4\\b4-digest.mp4",
+ "duration": 193.3,
+ "youtube": "https://youtu.be/vLSIvZnH3RI"
+}

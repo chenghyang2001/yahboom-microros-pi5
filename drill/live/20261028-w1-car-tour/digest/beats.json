@@ -1,0 +1,81 @@
+{
+  "title": "W1 精華版：認識這台車，硬體與三層架構",
+  "subtitle": "Yahboom MicroROS-Pi5 逐步演練｜實車 Pi 5",
+  "recordings": [
+    "~/Videos/pi5-drill/pi5drill-w1-car-tour-20261028-120314.mp4"
+  ],
+  "full_version": "https://youtu.be/0TUN2ofL1t4",
+  "full_minutes": 30,
+  "yt_title": "【精華版】W1 認識這台車：實車導覽（4 分鐘）",
+  "rate": "+5%",
+  "beats": [
+    {
+      "id": "00",
+      "label": "開場",
+      "rec": 0,
+      "from": 15,
+      "key": 40,
+      "text": "W1 精華版：認識這台車。這台車分成三層，大腦樹莓派五、中間兩個 Docker 容器、最下面的小腦 ESP32。今天用指令一層一層走進去看，車子全程不動。"
+    },
+    {
+      "id": "01",
+      "label": "① 大腦：樹莓派五",
+      "from": 168,
+      "key": 285,
+      "text": "第一步看大腦。在主機打 cat 斜線 proc 斜線 device tree 斜線 model、uname 減 m、free 減 h。答案是樹莓派五、ARM 64 位元、Debian 12，記憶體七點九 G，只用了七百多 M。"
+    },
+    {
+      "id": "02",
+      "label": "② 容器：docker ps",
+      "from": 435,
+      "key": 568,
+      "text": "第二步看第二層。docker ps 列出兩個容器：ROS 2 工作桌，映像版本 4.1.2，比講義寫的新；另一個是翻譯官 micro ROS agent。"
+    },
+    {
+      "id": "03",
+      "label": "② 貨櫃屋裡是 Ubuntu",
+      "key": 580,
+      "text": "走進工作桌容器，打同一個 grep PRETTY 指令，答案變成 Ubuntu 22.04。外面是 Debian，貨櫃屋裡是 Ubuntu，ROS 2 Humble 才能在樹莓派上跑。網域號碼是二十。"
+    },
+    {
+      "id": "04",
+      "label": "③ 硬體：只插了三樣",
+      "from": 873,
+      "key": 1007,
+      "text": "第三步用 lsusb 看硬體。真正的裝置只有三個：CP210x 序列晶片，就是整塊小腦，還有相機和手把接收器。馬達、陀螺儀、光達都藏在小腦後面，大腦只看得到 tty USB 零這條線。"
+    },
+    {
+      "id": "05",
+      "label": "④ 小腦：聽四個、說四個",
+      "from": 1205,
+      "key": 1332,
+      "text": "第四步，ros2 node info 斜線 YB Car Node。小腦聽四個話題：cmd vel、beep 和兩個雲台舵機；說四個：battery、imu、odom raw、scan。講義漏了 battery，而且是 odom raw，不是 odom。"
+    },
+    {
+      "id": "06",
+      "label": "④ 話題清單：沒有 rpi5 ip",
+      "key": 1347,
+      "text": "ros2 topic list 列出十個話題。講義說的 rpi5 ip 不在裡面，用手機熱點的接法，它不存在。"
+    },
+    {
+      "id": "07",
+      "label": "⑤ 光達：12.5 赫茲",
+      "from": 1541,
+      "key": 1659,
+      "text": "第五步證明資料是活的。ros2 topic hz 斜線 scan，光達穩定在每秒十二點五次，比講義寫的十赫茲快一點。"
+    },
+    {
+      "id": "08",
+      "label": "⑤ 陀螺儀量到重力",
+      "key": 1674,
+      "text": "再讀一筆陀螺儀的線性加速度：x 和 y 接近零，z 是九點八。車子停著不動，加速度計量到的是地心引力。"
+    },
+    {
+      "id": "09",
+      "label": "總結",
+      "from": 1835,
+      "key": 1850,
+      "text": "總結：三層都走過了。速度指令從 cmd vel 出發，經過翻譯官和 tty USB 零送到小腦；光達資料沿同一條線反方向送上來。車子沒反應時，就沿這張圖一層一層往下查。完整版的連結在說明欄。"
+    }
+  ]
+}

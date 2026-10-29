@@ -1,0 +1,1 @@
+對 turtle2 斜線 cmd vel 發速度，只有第二隻在繞圈。最後 clear 清掉軌跡、kill 刪掉牠。

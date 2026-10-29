@@ -1,0 +1,1 @@
+第三步，Docker 三個名詞：映像是藍圖，容器是照藍圖蓋好、有人住的房子，倉庫是放藍圖的地方。docker images 有三份藍圖，兩份 ros humble 各十三點六 G；docker ps 有兩個正在跑的容器。

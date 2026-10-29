@@ -1,0 +1,1 @@
+第一步，確認沒人握方向盤。第一格 ros2 topic echo 斜線 cmd vel 當監視器，一筆都沒印；第二格 ros2 node list 只有 YB Car Node。場地只有一公尺見方，接下來全部降速。

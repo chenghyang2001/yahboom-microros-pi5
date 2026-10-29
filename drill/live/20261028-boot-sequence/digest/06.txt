@@ -1,0 +1,1 @@
+執行 sh ros2 humble 點 sh 以後，提示字元從 pi 變成 root，還印出 MY DOMAIN ID 二十。拍五上所有 ROS 2 程式，都約定用二十號網域。

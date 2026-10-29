@@ -1,0 +1,1 @@
+ros2 launch turtlesim multisim 點 launch 點 py，一個指令開出兩隻烏龜，各有自己的命名空間。

@@ -1,0 +1,1 @@
+第四步，docker exec 減 i t，接容器 ID 前四碼 e f 5 6，走進正在跑的工作桌。進去直接打 ros2 node list，就看到 YB Car Node，不用另外 source。

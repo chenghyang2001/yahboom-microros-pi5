@@ -1,0 +1,136 @@
+{
+ "chapters": [
+  [
+   "00:00",
+   "片頭"
+  ],
+  [
+   "00:04",
+   "開場"
+  ],
+  [
+   "00:25",
+   "① 翻譯官"
+  ],
+  [
+   "01:00",
+   "② 按 Reset"
+  ],
+  [
+   "01:34",
+   "③ 工作桌"
+  ],
+  [
+   "02:26",
+   "④ 一個節點、十個話題"
+  ],
+  [
+   "03:04",
+   "總結"
+  ]
+ ],
+ "clips": [
+  {
+   "id": "00",
+   "rec": 0,
+   "start": 5,
+   "key": 36,
+   "speed": 4.1,
+   "fast": 7.6,
+   "hold": 14.2
+  },
+  {
+   "id": "01",
+   "rec": 1,
+   "start": 140,
+   "key": 246,
+   "speed": 18.3,
+   "fast": 5.8,
+   "hold": 10.8
+  },
+  {
+   "id": "02",
+   "rec": 1,
+   "start": 249,
+   "key": 257,
+   "speed": 1.3,
+   "fast": 6.3,
+   "hold": 11.7
+  },
+  {
+   "id": "03",
+   "rec": 1,
+   "start": 405,
+   "key": 547,
+   "speed": 23.4,
+   "fast": 6.1,
+   "hold": 11.3
+  },
+  {
+   "id": "04",
+   "rec": 1,
+   "start": 550,
+   "key": 600,
+   "speed": 8.6,
+   "fast": 5.8,
+   "hold": 10.8
+  },
+  {
+   "id": "05",
+   "rec": 1,
+   "start": 740,
+   "key": 898,
+   "speed": 22.9,
+   "fast": 6.9,
+   "hold": 12.8
+  },
+  {
+   "id": "06",
+   "rec": 1,
+   "start": 901,
+   "key": 908,
+   "speed": 1.2,
+   "fast": 5.8,
+   "hold": 10.7
+  },
+  {
+   "id": "07",
+   "rec": 1,
+   "start": 911,
+   "key": 919,
+   "speed": 1.4,
+   "fast": 5.6,
+   "hold": 10.4
+  },
+  {
+   "id": "08",
+   "rec": 1,
+   "start": 1112,
+   "key": 1256,
+   "speed": 21.2,
+   "fast": 6.8,
+   "hold": 12.6
+  },
+  {
+   "id": "09",
+   "rec": 1,
+   "start": 1259,
+   "key": 1274,
+   "speed": 2.3,
+   "fast": 6.4,
+   "hold": 11.9
+  },
+  {
+   "id": "10",
+   "rec": 1,
+   "start": 1474,
+   "key": 1480,
+   "speed": 1.0,
+   "fast": 6,
+   "hold": 16.6
+  }
+ ],
+ "output": "C:\\Users\\USER\\Videos\\pi5-drill\\digest\\boot\\boot-digest.mp4",
+ "duration": 207.0,
+ "youtube": "https://youtu.be/cRKzkrInzpk"
+}

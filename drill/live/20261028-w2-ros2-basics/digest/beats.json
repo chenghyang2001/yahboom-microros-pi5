@@ -1,0 +1,119 @@
+{
+  "title": "W2 精華版：ROS 2 最小必學",
+  "subtitle": "Yahboom MicroROS-Pi5 逐步演練｜電腦 WSL＋ROS 2 Jazzy",
+  "recordings": [
+    "~/Videos/pi5-drill/drill-w2-ros2-basics-20261028-073119.mp4"
+  ],
+  "full_version": "https://youtu.be/E2xuUzat6B8",
+  "full_minutes": 39,
+  "yt_title": "【精華版】W2 ROS 2 最小必學：節點、話題、服務、參數（5 分鐘）",
+  "rate": "+5%",
+  "beats": [
+    {
+      "id": "00",
+      "label": "開場",
+      "rec": 0,
+      "from": 32,
+      "key": 40,
+      "text": "W2 精華版：ROS 2 最小必學。不用車子，在電腦 WSL 上用一隻小烏龜，練節點、話題、服務、參數，學會的指令可以直接搬到拍五上。"
+    },
+    {
+      "id": "01",
+      "label": "① 節點：叫出小烏龜",
+      "from": 193,
+      "key": 330,
+      "text": "第一步，ros2 run turtlesim turtlesim node 叫出烏龜，再開 turtle teleop key 鍵盤遙控器。這兩個小程式，就是節點。"
+    },
+    {
+      "id": "02",
+      "label": "① 節點：烏龜的名片",
+      "key": 419,
+      "text": "node list 一開始卡住，手動啟動 daemon 後列出兩個節點。node info 看烏龜的名片：聽 cmd vel，說 pose，還提供 spawn 等服務。"
+    },
+    {
+      "id": "03",
+      "label": "② 話題：旁聽速度",
+      "from": 960,
+      "key": 1020,
+      "text": "第二步，用 ros2 topic echo 斜線 turtle1 斜線 cmd vel 旁聽。按上，linear x 是二，往前走；按左，angular z 是二，往左轉。"
+    },
+    {
+      "id": "04",
+      "label": "② Twist 格式",
+      "key": 1053,
+      "text": "interface show 印出 Twist 格式：linear 和 angular，各有 x、y、z。拍五的 cmd vel 用的也是 Twist。"
+    },
+    {
+      "id": "05",
+      "label": "③ 過關題：烏龜轉圈",
+      "from": 1240,
+      "key": 1378,
+      "text": "第三步過關題。ros2 topic pub 減 r 1，linear x 二點零、angular z 一點八，每秒發一次，烏龜畫出一個圓。"
+    },
+    {
+      "id": "06",
+      "label": "③ once：只發一次",
+      "key": 1386,
+      "text": "改用減減 once 只發一次，烏龜直走一小段就停。真車上 Ctrl C 不一定會停，一定要再發一次零速度。"
+    },
+    {
+      "id": "07",
+      "label": "④ 服務：生出第二隻",
+      "from": 1755,
+      "key": 1774,
+      "text": "第四步服務，一問一答。service call 斜線 spawn，在二、二的位置生出 turtle2。第一次視窗太小看不到，放大後重做。"
+    },
+    {
+      "id": "08",
+      "label": "④ 每隻烏龜各有話題",
+      "key": 1785,
+      "text": "對 turtle2 斜線 cmd vel 發速度，只有第二隻在繞圈。最後 clear 清掉軌跡、kill 刪掉牠。"
+    },
+    {
+      "id": "09",
+      "label": "⑤ 參數：背景變紫紅",
+      "from": 1982,
+      "key": 2114,
+      "text": "第五步參數。param set 把 background r 從六十九改成二五五，背景從藍色變成紫紅色。"
+    },
+    {
+      "id": "10",
+      "label": "⑤ 設定單存成 YAML",
+      "key": 2125,
+      "text": "param dump 把整張設定單存成 YAML 檔，以後用 param load 載回來。"
+    },
+    {
+      "id": "11",
+      "label": "⑥ 關係圖改用文字看",
+      "from": 2763,
+      "key": 2866,
+      "text": "第六步看全貌。rqt graph 在 WSL 上凍住，改用 topic info 減減 verbose，確認遙控器透過 cmd vel 把速度送給烏龜。"
+    },
+    {
+      "id": "12",
+      "label": "⑥ launch 開兩隻烏龜",
+      "key": 2886,
+      "text": "ros2 launch turtlesim multisim 點 launch 點 py，一個指令開出兩隻烏龜，各有自己的命名空間。"
+    },
+    {
+      "id": "13",
+      "label": "⑦ 同號碼聽得到",
+      "from": 3400,
+      "key": 3455,
+      "text": "第七步 ROS DOMAIN ID。兩邊都用五號，聽的人收到一模一樣的編號。前兩次只等九秒就誤判，其實要等十幾秒才連上。"
+    },
+    {
+      "id": "14",
+      "label": "⑦ 不同號碼聽不到",
+      "key": 3500,
+      "text": "聽的人改成七號，等了二十幾秒一行都沒有。拍五用二十號，電腦要連車子，也要設二十。"
+    },
+    {
+      "id": "15",
+      "label": "總結",
+      "from": 3669,
+      "key": 3680,
+      "text": "總結：節點是員工，話題是群組廣播，服務是一問一答，參數是設定單。烏龜和拍五的 cmd vel 是同一種 Twist。完整版的連結在說明欄。"
+    }
+  ]
+}

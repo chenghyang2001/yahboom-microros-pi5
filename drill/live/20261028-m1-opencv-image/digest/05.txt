@@ -1,0 +1,1 @@
+第四步換成 ROS 的做法。ros2 run usb cam 啟動相機節點，只有它打開鏡頭，把影像發布到 image raw。ros2 topic hz 斜線 image raw 量到每秒二十九點八張，很穩定。

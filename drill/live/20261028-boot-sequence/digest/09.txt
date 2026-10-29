@@ -1,0 +1,1 @@
+ros2 topic echo 減減 once 斜線 battery，讀到 data 七十八，也就是七點八伏特。時鐘差也從一萬五千多秒變成零秒，Reset 讓小腦重新對時，跑 SLAM 前記得先做。

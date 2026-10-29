@@ -1,0 +1,1 @@
+走進工作桌容器，打同一個 grep PRETTY 指令，答案變成 Ubuntu 22.04。外面是 Debian，貨櫃屋裡是 Ubuntu，ROS 2 Humble 才能在樹莓派上跑。網域號碼是二十。

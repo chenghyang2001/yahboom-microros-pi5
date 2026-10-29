@@ -1,0 +1,1 @@
+第二步，請使用者按 ESP32 擴展板上的 Reset，讓小腦重新開機，去找新的翻譯官握手。第一格先出現 session established，接著刷出一長串 created。

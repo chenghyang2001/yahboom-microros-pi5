@@ -1,0 +1,1 @@
+node list 一開始卡住，手動啟動 daemon 後列出兩個節點。node info 看烏龜的名片：聽 cmd vel，說 pose，還提供 spawn 等服務。

@@ -1,0 +1,1 @@
+第二步看 EKF。它像裁判，同時聽輪子和陀螺儀兩個證人。ros2 node info 斜線 ekf filter node 顯示，它訂閱 imu 斜線 data 和 odom raw，發布 odom 和 tf。

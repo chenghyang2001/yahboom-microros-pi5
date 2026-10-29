@@ -1,0 +1,135 @@
+{
+ "chapters": [
+  [
+   "00:00",
+   "片頭"
+  ],
+  [
+   "00:04",
+   "開場"
+  ],
+  [
+   "00:21",
+   "① Linux 四個基本指令"
+  ],
+  [
+   "00:45",
+   "② SSH"
+  ],
+  [
+   "01:06",
+   "③ Docker"
+  ],
+  [
+   "01:42",
+   "④ docker exec 走進容器"
+  ],
+  [
+   "02:15",
+   "⑤ 健康檢查"
+  ],
+  [
+   "02:32",
+   "⑥ 正確關機"
+  ],
+  [
+   "02:52",
+   "總結"
+  ]
+ ],
+ "clips": [
+  {
+   "id": "00",
+   "rec": 0,
+   "start": 16,
+   "key": 40,
+   "speed": 3.9,
+   "fast": 6.2,
+   "hold": 11.4
+  },
+  {
+   "id": "01",
+   "rec": 0,
+   "start": 222,
+   "key": 364,
+   "speed": 16.8,
+   "fast": 8.5,
+   "hold": 15.7
+  },
+  {
+   "id": "02",
+   "rec": 0,
+   "start": 519,
+   "key": 643,
+   "speed": 17.0,
+   "fast": 7.3,
+   "hold": 13.5
+  },
+  {
+   "id": "03",
+   "rec": 0,
+   "start": 833,
+   "key": 952,
+   "speed": 16.2,
+   "fast": 7.4,
+   "hold": 13.7
+  },
+  {
+   "id": "04",
+   "rec": 0,
+   "start": 955,
+   "key": 967,
+   "speed": 2.3,
+   "fast": 5.2,
+   "hold": 9.7
+  },
+  {
+   "id": "05",
+   "rec": 0,
+   "start": 1191,
+   "key": 1343,
+   "speed": 25.3,
+   "fast": 6.0,
+   "hold": 11.1
+  },
+  {
+   "id": "06",
+   "rec": 0,
+   "start": 1346,
+   "key": 1351,
+   "speed": 1.0,
+   "fast": 5,
+   "hold": 10.4
+  },
+  {
+   "id": "07",
+   "rec": 0,
+   "start": 1541,
+   "key": 1646,
+   "speed": 17.7,
+   "fast": 5.9,
+   "hold": 11.0
+  },
+  {
+   "id": "08",
+   "rec": 0,
+   "start": 1890,
+   "key": 1932,
+   "speed": 5.8,
+   "fast": 7.2,
+   "hold": 13.4
+  },
+  {
+   "id": "09",
+   "rec": 0,
+   "start": 1600,
+   "key": 1650,
+   "speed": 5.9,
+   "fast": 8.5,
+   "hold": 15.7
+  }
+ ],
+ "output": "C:\\Users\\USER\\Videos\\pi5-drill\\digest\\w3\\w3-digest.mp4",
+ "duration": 196.9,
+ "youtube": "https://youtu.be/HOngaqT0nPs"
+}

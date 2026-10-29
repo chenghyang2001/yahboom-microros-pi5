@@ -1,0 +1,1 @@
+exit 離開，再 docker ps，還是同樣兩個容器。要多開終端機進工作桌，用 docker exec，不要再跑一次 ros2 humble 點 sh。

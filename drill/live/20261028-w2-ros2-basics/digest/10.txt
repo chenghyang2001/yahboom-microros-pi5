@@ -1,0 +1,1 @@
+param dump 把整張設定單存成 YAML 檔，以後用 param load 載回來。

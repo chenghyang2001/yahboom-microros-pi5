@@ -166,5 +166,71 @@
     "title": "K136 ROS 2 工具演練：小烏龜 ROS 2 指令（精華版）",
     "url": "https://www.youtube.com/playlist?list=PLb0N3K9nVtOg",
     "desc": "配合 W2：ros2 node／topic／service／param／action／bag 全部實際操作"
+  },
+  {
+    "group": "逐步演練精華版（每支約 3～4 分鐘）",
+    "title": "精華版播放清單（10 支，YouTube 私人）",
+    "url": "https://www.youtube.com/playlist?list=PLBB8VkgBCQ7M",
+    "desc": "每支演練濃縮成 3～4 分鐘：重新配的短旁白，等待畫面快轉；說明欄附完整版連結與章節"
+  },
+  {
+    "group": "逐步演練精華版（每支約 3～4 分鐘）",
+    "title": "拍五開機流程：一步一步拆開開機（3 分鐘）",
+    "url": "https://youtu.be/cRKzkrInzpk",
+    "desc": "完整版：https://youtu.be/WSqQgIOrT24"
+  },
+  {
+    "group": "逐步演練精華版（每支約 3～4 分鐘）",
+    "title": "W1 認識這台車：實車導覽（3 分鐘）",
+    "url": "https://youtu.be/PHIoX8vrbkk",
+    "desc": "完整版：https://youtu.be/0TUN2ofL1t4"
+  },
+  {
+    "group": "逐步演練精華版（每支約 3～4 分鐘）",
+    "title": "W2 ROS 2 最小必學：節點、話題、服務、參數（4 分鐘）",
+    "url": "https://youtu.be/Q0e-wp5vMOA",
+    "desc": "完整版：https://youtu.be/E2xuUzat6B8"
+  },
+  {
+    "group": "逐步演練精華版（每支約 3～4 分鐘）",
+    "title": "W3 Linux、SSH、Docker 與正確關機（3 分鐘）",
+    "url": "https://youtu.be/HOngaqT0nPs",
+    "desc": "完整版：https://youtu.be/f1iO97zIU9M"
+  },
+  {
+    "group": "逐步演練精華版（每支約 3～4 分鐘）",
+    "title": "W4 在電腦上看這台車：URDF、RViz、TF、Gazebo（4 分鐘）",
+    "url": "https://youtu.be/QCmbJK5I2fg",
+    "desc": "完整版：https://youtu.be/6GyK4SovhKE"
+  },
+  {
+    "group": "逐步演練精華版（每支約 3～4 分鐘）",
+    "title": "B4 遙控：鍵盤、手把、手機 App（3 分鐘）",
+    "url": "https://youtu.be/vLSIvZnH3RI",
+    "desc": "完整版：https://youtu.be/kSFRabO9FCE"
+  },
+  {
+    "group": "逐步演練精華版（每支約 3～4 分鐘）",
+    "title": "B5 讀懂車的話題：光達、里程、轉圈、蜂鳴器、雲台（4 分鐘）",
+    "url": "https://youtu.be/bV_VvZkEjBg",
+    "desc": "完整版：https://youtu.be/b-A144Ayd7o"
+  },
+  {
+    "group": "逐步演練精華版（每支約 3～4 分鐘）",
+    "title": "B6 狀態估測與校準（4 分鐘）",
+    "url": "https://youtu.be/JOofitGYKt4",
+    "desc": "完整版：https://youtu.be/2VVCQaLF4ME"
+  },
+  {
+    "group": "逐步演練精華版（每支約 3～4 分鐘）",
+    "title": "M1 OpenCV 與 ROS 影像話題（4 分鐘）",
+    "url": "https://youtu.be/vNSaA9rZt9s",
+    "desc": "完整版：https://youtu.be/gL69VqADwG8"
+  },
+  {
+    "group": "逐步演練精華版（每支約 3～4 分鐘）",
+    "title": "M4 光達應用：警衛、避障、跟隨、巡邏（4 分鐘）",
+    "url": "https://youtu.be/gn-7rYAEb1s",
+    "desc": "完整版：https://youtu.be/SCftI8V7Atw"
   }
 ]

@@ -1,0 +1,1 @@
+第四步，在工作桌裡確認資料。ros2 node list 只有一個斜線 YB Car Node，就是小腦。ros2 topic list 有十個話題，扣掉系統自帶的兩個，剛好是小腦登記的八個。
