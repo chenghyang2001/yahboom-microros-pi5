@@ -1,0 +1,268 @@
+{
+ "cmd": [
+  "ffmpeg",
+  "-nostdin",
+  "-y",
+  "-hide_banner",
+  "-loglevel",
+  "error",
+  "-loop",
+  "1",
+  "-framerate",
+  "10",
+  "-t",
+  "4.0",
+  "-i",
+  "C:\\Users\\USER\\Videos\\pi5-drill\\m4-title.png",
+  "-i",
+  "C:\\Users\\USER\\Videos\\pi5-drill\\pi5drill-m4-lidar-20261029-091945.mp4",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\01-opening.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\02-step1.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\03-step1-result.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\servo\\s1_0.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\servo\\s1_-10.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\servo\\s1_-20.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\servo\\s1_-30.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\servo\\s1_30.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\04-step2.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\05-step2-result.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\06-step3.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\07-step3-result.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\08-step4.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\09-step4-result.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\10-step5.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\11-step5-params-result.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\12-step5-result.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\13-step6.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\14-step6-result.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\15-step7.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\16-step7-ready.mp3",
+  "-i",
+  "C:\\Users\\USER\\workspace\\yahboom-microros-pi5\\drill\\live\\20261029-m4-lidar\\17-summary.mp3",
+  "-/filter_complex",
+  "C:\\Users\\USER\\Videos\\pi5-drill\\m4_fc.txt",
+  "-map",
+  "[vout]",
+  "-map",
+  "[aout]",
+  "-t",
+  "2884.86",
+  "-c:v",
+  "libx264",
+  "-preset",
+  "veryfast",
+  "-crf",
+  "28",
+  "-tune",
+  "stillimage",
+  "-c:a",
+  "aac",
+  "-b:a",
+  "96k",
+  "-movflags",
+  "+faststart",
+  "C:\\Users\\USER\\Videos\\pi5-drill\\pi5drill-m4-lidar-final.mp4"
+ ],
+ "speech": [
+  {
+   "file": "01-opening.mp3",
+   "s": 32.41700005531311,
+   "d": 138.624,
+   "new": 36.41700005531311
+  },
+  {
+   "file": "02-step1.mp3",
+   "s": 295.1909999847412,
+   "d": 107.4,
+   "new": 187.04100005531313
+  },
+  {
+   "file": "03-step1-result.mp3",
+   "s": 460.2869999408722,
+   "d": 109.464,
+   "new": 352.1370000114441
+  },
+  {
+   "file": "servo/s1_0.mp3",
+   "s": 906.941999912262,
+   "d": 2.112,
+   "new": 552.1010000114443
+  },
+  {
+   "file": "servo/s1_-10.mp3",
+   "s": 920.1119999885559,
+   "d": 2.28,
+   "new": 565.2710000877382
+  },
+  {
+   "file": "servo/s1_-20.mp3",
+   "s": 933.5859999656677,
+   "d": 2.448,
+   "new": 578.74500006485
+  },
+  {
+   "file": "servo/s1_-30.mp3",
+   "s": 946.989000082016,
+   "d": 2.448,
+   "new": 592.1480001811983
+  },
+  {
+   "file": "servo/s1_30.mp3",
+   "s": 960.0009999275208,
+   "d": 2.328,
+   "new": 605.1600000267031
+  },
+  {
+   "file": "04-step2.mp3",
+   "s": 1055.0759999752045,
+   "d": 109.632,
+   "new": 619.488000026703
+  },
+  {
+   "file": "05-step2-result.mp3",
+   "s": 1214.5610001087189,
+   "d": 73.44,
+   "new": 778.9730001602175
+  },
+  {
+   "file": "06-step3.mp3",
+   "s": 1350.1530001163483,
+   "d": 110.88,
+   "new": 864.4130001602175
+  },
+  {
+   "file": "07-step3-result.mp3",
+   "s": 1673.0969998836517,
+   "d": 65.304,
+   "new": 1101.060000043869
+  },
+  {
+   "file": "08-step4.mp3",
+   "s": 1742.8259999752045,
+   "d": 122.712,
+   "new": 1170.7890001354217
+  },
+  {
+   "file": "09-step4-result.mp3",
+   "s": 1978.1289999485016,
+   "d": 102.456,
+   "new": 1406.0920001087188
+  },
+  {
+   "file": "10-step5.mp3",
+   "s": 2111.3810000419617,
+   "d": 109.728,
+   "new": 1539.344000202179
+  },
+  {
+   "file": "11-step5-params-result.mp3",
+   "s": 2289.2539999485016,
+   "d": 76.872,
+   "new": 1717.2170001087188
+  },
+  {
+   "file": "12-step5-result.mp3",
+   "s": 2483.930000066757,
+   "d": 82.344,
+   "new": 1911.8930002269744
+  },
+  {
+   "file": "13-step6.mp3",
+   "s": 2600.053999900818,
+   "d": 104.448,
+   "new": 2028.017000061035
+  },
+  {
+   "file": "14-step6-result.mp3",
+   "s": 2825.9089999198914,
+   "d": 88.944,
+   "new": 2253.8720000801086
+  },
+  {
+   "file": "15-step7.mp3",
+   "s": 3037.1310000419617,
+   "d": 144.312,
+   "new": 2354.816000080109
+  },
+  {
+   "file": "16-step7-ready.mp3",
+   "s": 3268.7379999160767,
+   "d": 50.256,
+   "new": 2586.422999954224
+  },
+  {
+   "file": "17-summary.mp3",
+   "s": 3619.5280001163483,
+   "d": 127.896,
+   "new": 2731.8850000381462
+  }
+ ],
+ "keep": [
+  [
+   0.0,
+   177.0410000553131
+  ],
+  [
+   289.1909999847412,
+   575.7509999408721
+  ],
+  [
+   628.9,
+   696.6
+  ],
+  [
+   747.3,
+   758.1
+  ],
+  [
+   900.941999912262,
+   968.3289999275207
+  ],
+  [
+   1049.0759999752045,
+   1294.001000108719
+  ],
+  [
+   1344.1530001163483,
+   1580.8
+  ],
+  [
+   1667.0969998836517,
+   2920.8529999198913
+  ],
+  [
+   3031.1310000419617,
+   3381.4
+  ],
+  [
+   3446.4,
+   3473.2
+  ],
+  [
+   3613.5280001163483,
+   3772.5
+  ]
+ ],
+ "newlen": 2884.8569999217984
+}
