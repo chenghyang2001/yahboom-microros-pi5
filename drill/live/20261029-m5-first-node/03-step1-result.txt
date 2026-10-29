@@ -1,0 +1,9 @@
+第一步的結果。
+
+ros2 pkg create 印出一串 creating，一共幫我們建了四個資料夾、九個檔案。最後還有一個 WARNING，說授權寫的是 TODO，建議改成 Apache 2.0 或 MIT 這類標準授權。這只是提醒，不影響編譯，等一下我們會換成講義準備好的 package xml，裡面已經寫好 Apache 2.0。
+
+下面 find 印出的樹狀結構，正好對上剛才講的幾個重點。外層的 package xml、setup py、setup cfg 三個設定檔。resource 底下有一個跟套件同名的空檔案。內層有一個也叫 my obstacle stop 的資料夾，裡面是 init 點 py 和我們的節點 obstacle stop 點 py，現在只是一個印 Hi 的空殼。另外還有 test 資料夾，放了三個自動產生的程式風格測試，今天先不管它。
+
+注意到了嗎？套件名稱 my obstacle stop 同時出現在外層資料夾、內層資料夾、resource 的空檔名，等一下還會在 package xml 和 setup py 裡看到。這幾個地方必須完全一致，打錯一個字，ROS 就找不到套件。
+
+下一步，我們把講義寫好的程式放進這個骨架，並且看懂程式的三塊結構。等你說繼續。

@@ -1,0 +1,11 @@
+第三步，開模擬車，編譯並執行我們的節點。這一步三格都會用到，我先把三格的高度重新分配一下。
+
+第一個動作在最上面第一格：ros2 launch microros pi5 sim，sim 點 launch 點 xml，後面加 rviz 冒號等於 false，這次只開 Gazebo、不開 RViz。Gazebo 的視窗出來以後，我會把它移到畫面右邊。模擬世界是一間小屋，車子停在中間，車頭正前方大約一點四五公尺有一道牆。模擬車會發布光達的 scan，也會接收 cmd vel，跟真車用的是同樣的話題名稱。
+
+第二個動作在最下面第三格：ros2 topic echo 斜線 cmd vel，減減 field linear 點 x，只印出前進速度這一個數字。現在還沒有人送速度，所以它會先安靜地等著。
+
+第三個動作在中間第二格，分三個指令。先 cd 到 m5 底線 ws，執行 colcon build，減減 symlink install，減減 packages select my obstacle stop，只編譯我們這一個套件。symlink install 的意思是用捷徑安裝 Python 檔，之後只改程式內容就不用重新編譯。編譯完一定要 source install 斜線 setup 點 bash，這一格才認得新套件。最後 ros2 run my obstacle stop obstacle stop。第一個字是套件名，第二個字就是剛才 entry points 定義的指令名。
+
+預期會看到：第二格先印「obstacle stop 已啟動，等待 scan」。第三格開始一直印零點一，Gazebo 裡的車慢慢往前走。大約十三秒後，第二格印「前方零點二九公尺有障礙，停車」，第三格的數字變成零點零，車在牆前停下。
+
+我念完以後就開始執行。

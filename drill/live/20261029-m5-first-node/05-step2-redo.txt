@@ -1,0 +1,5 @@
+更正一下。剛才三個檔案都已經複製進去了，但是印程式骨架的那個 grep 指令，因為裡面有括號和直線符號，被我送指令的小工具弄壞，沒有送到第三格，所以畫面上只看到 entry points。
+
+我現在補送一次。先清掉畫面，再印出 obstacle stop 點 py 的骨架行。請注意看三塊：init 裡的六個 declare parameter 和三個 create，接著是 scan callback，最後是 control loop。
+
+我念完以後就補送。

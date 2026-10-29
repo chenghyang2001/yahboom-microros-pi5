@@ -1,0 +1,13 @@
+第一步，建立工作空間和套件。
+
+ROS 2 的程式不是一個個散落的檔案，而是放在「套件」裡，套件再放在「工作空間」的 src 資料夾。工作空間像一個專案資料夾，套件像專案裡的一個模組。
+
+這一步都在最下面第三格做。為了讓第三格看得清楚，我會先把上面兩格暫時縮小。
+
+第一個指令，mkdir 減 p，建立一個新的工作空間 m5 底線 ws，裡面有 src 資料夾，然後 cd 進去。我們故意開一個新的工作空間，不跟模擬車的工作空間混在一起。
+
+第二個指令是今天的主角之一：ros2 pkg create。後面接套件名稱 my obstacle stop。減減 build type ament python，表示這是用 Python 寫的套件。減減 dependencies，後面列出三個依賴：rclpy 是 ROS 2 的 Python 函式庫，sensor msgs 提供光達的 LaserScan 訊息，geometry msgs 提供速度的 Twist 訊息。最後減減 node name obstacle stop，請它順便幫我們建好一支節點程式的空殼，而且自動登記成可以執行的指令。
+
+預期會看到一串 creating 開頭的訊息，列出它幫我們產生的檔案。最後我再用 find 指令把整個套件的樹狀結構印出來，重點看這幾個：package 點 xml 記錄套件名稱和依賴，setup 點 py 記錄要安裝哪些可執行檔，setup 點 cfg 記錄安裝到哪裡，resource 底下有一個空檔案讓 ROS 找得到這個套件，還有內層資料夾裡的 obstacle stop 點 py，就是我們要寫的節點。
+
+我念完以後就開始執行。
