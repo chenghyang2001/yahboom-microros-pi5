@@ -72,6 +72,12 @@
     "desc": "ros2 pkg create 建套件、訂閱 /scan 發布 /cmd_vel、Gazebo 模擬車牆前 0.30 m 停、param set 即時改參數、docker cp 搬上車、實車紙箱前 0.29 m 停"
   },
   {
+    "group": "實車演練",
+    "title": "M2 MediaPipe：手、臉、姿態偵測（約 38 分鐘，YouTube 私人）",
+    "url": "https://youtu.be/CwEc_1CCXV0",
+    "desc": "車頭相機跑手部 21 點（兩隻手 42）、姿態 33 點、臉部網格 468 點（topic echo 預設截到 128）、規則式手勢辨識的對與錯、空中畫筆；相機畫面已打碼"
+  },
+  {
     "group": "NotebookLM 產物",
     "title": "NotebookLM 產物總覽頁（語音、影片、簡報、資訊圖表、心智圖）",
     "url": "https://187-127-109-145.sslip.io/yahboom-microros-pi5/",
