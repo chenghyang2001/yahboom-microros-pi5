@@ -66,6 +66,12 @@
     "desc": "/scan 360 點角度公式、自製限速閥擋下官方 PID 的 7.5 rad/s、ros2 param set 改反應距離、巡邏 0.5 m 正方形沒停下來（待查）"
   },
   {
+    "group": "實車演練",
+    "title": "M5 寫自己的第一個控制節點：遇障礙就停（約 48 分鐘，YouTube 私人）",
+    "url": "https://youtu.be/oy_Q1QeHzf8",
+    "desc": "ros2 pkg create 建套件、訂閱 /scan 發布 /cmd_vel、Gazebo 模擬車牆前 0.30 m 停、param set 即時改參數、docker cp 搬上車、實車紙箱前 0.29 m 停"
+  },
+  {
     "group": "NotebookLM 產物",
     "title": "NotebookLM 產物總覽頁（語音、影片、簡報、資訊圖表、心智圖）",
     "url": "https://187-127-109-145.sslip.io/yahboom-microros-pi5/",

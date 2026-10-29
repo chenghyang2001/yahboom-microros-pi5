@@ -52,3 +52,8 @@
 
 - 電池：81（開場）→ 73（第 5 步）→ 72（第 6、7 步）。
 - 收尾：使用者訂下規則「演練結束一律做影片上傳、現場全部關掉，不用再問」，已寫進 skill 與記憶。
+
+## 影片
+
+- YouTube（私人）：<https://youtu.be/oy_Q1QeHzf8>，約 47 分 49 秒（原始錄影 71 分鐘，超過 60 秒沒語音的空檔壓成頭 20 秒＋尾 15 秒）
+- 播放清單「Yahboom MicroROS-Pi5 逐步演練」第 11 支；本機成品 `~/Videos/pi5-drill/pi5-m5-first-node-drill.mp4`，剪輯指令 `video_plan.json`

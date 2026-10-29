@@ -17,6 +17,7 @@
 | B6 狀態估測與校準（第 5 場） | B6 | <https://youtu.be/2VVCQaLF4ME> |
 | M1 OpenCV 與影像話題（第 6 場） | M1 | <https://youtu.be/gL69VqADwG8> |
 | M4 光達應用：警衛、避障、跟隨、巡邏（第 7 場） | M4 | <https://youtu.be/SCftI8V7Atw> |
+| M5 寫自己的第一個控制節點：遇障礙就停（第 8 場） | M5 | <https://youtu.be/oy_Q1QeHzf8> |
 
 都在私人播放清單「Yahboom MicroROS-Pi5 逐步演練」，也登錄在書目總表 901 的「逐步演練（語音＋實錄）」。
 
