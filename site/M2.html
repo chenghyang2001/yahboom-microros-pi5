@@ -457,6 +457,47 @@ python3 11_GestureRecognition.py  # 7.10 手勢辨識</code></pre>
 <li>7.8 的文字把手指寫成「right and middle fingers」「middle and middle fingers」，正確規則是：食指＋中指伸直＝選色模式、只有食指＝畫畫模式。</li>
 <li>套件裡的 <code>mediapipe_points.launch.py</code> 引用了不存在的 <code>yahboomcar_point</code> 套件與 <code>/home/nx-ros2/...</code> 路徑（從其他產品複製），不要用它。</li>
 </ul>
+</div>
+<p><strong>實車實測（2026-10-29，演練影片 <a href="https://youtu.be/CwEc_1CCXV0">https://youtu.be/CwEc_1CCXV0</a>）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>容器內版本</td>
+<td><code>mediapipe 0.10.9</code>，<code>hasattr(mp, 'solutions')</code> 為 True，官方程式不用改就能跑</td>
+</tr>
+<tr>
+<td>視窗</td>
+<td>01～04 的 <code>dist</code> 視窗是「相機＋黑底骨架」左右並排，寬 1280；VNC 虛擬桌面只有 1184×641，右邊骨架圖會被切掉一截，也會蓋住終端機</td>
+</tr>
+<tr>
+<td>點數（<code>/mediapipe/points</code>）</td>
+<td>手：一隻 21、兩隻 42、沒手 0；姿態：33（只拍到上半身也是 33）；臉部網格：468</td>
+</tr>
+<tr>
+<td>FPS</td>
+<td>手部、姿態約 8～9；臉部網格約 20；手勢辨識、空中畫筆約 9（偶爾 14）</td>
+</tr>
+<tr>
+<td>手勢辨識</td>
+<td>Five、Zero、One、Two 很穩；<strong>OK 被判成 Three、讚被判成 Five（偶爾 Four）、手轉側面判成 Five</strong>；手太近、一半出畫面時連手都偵測不到</td>
+</tr>
+<tr>
+<td>空中畫筆</td>
+<td>兩指選色、一指畫線都正常；畫面<strong>沒有鏡像</strong>，手往自己右邊移，線往畫面左邊走</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
+<ul>
+<li>用 <code>ros2 topic echo /mediapipe/points | grep -c "x:"</code> 數臉部網格會得到 <strong>128</strong>，不是 468：<code>topic echo</code> 預設把陣列截到 128 筆（<code>--truncate-length</code> 預設 128）。加 <code>--full-length</code> 才是 468。</li>
+<li>第一次啟動 <code>01_HandDetector</code> 時相機 <code>select() timeout</code>，程式拿到空畫面直接噴 <code>AttributeError: 'NoneType' object has no attribute 'shape'</code> 結束；重跑一次就好。官方程式沒檢查 <code>ret</code>，自己寫時讀完相機要先 <code>if not ret: continue</code>。</li>
+</ul>
 </div></div>
 </section>
 <section class="sec card-box" id="sec-7" data-audio="audio/M2-7.mp3">
@@ -510,6 +551,16 @@ python3 11_GestureRecognition.py  # 7.10 手勢辨識</code></pre>
 <td>車上 <code>ros2 run ... 01_HandDetector</code> 沒有視窗</td>
 <td>在 SSH 文字終端執行</td>
 <td>改在 VNC 桌面的終端執行</td>
+</tr>
+<tr>
+<td>車上啟動就噴 <code>'NoneType' object has no attribute 'shape'</code></td>
+<td>相機第一次被開啟時逾時（<code>select() timeout</code>），官方程式沒檢查有沒有讀到畫面</td>
+<td>直接重跑；自己寫的程式加 <code>if not ret: continue</code></td>
+</tr>
+<tr>
+<td><code>ros2 topic echo</code> 數出來的點數剛好停在 128</td>
+<td><code>topic echo</code> 預設把陣列截到 128 筆</td>
+<td>加 <code>--full-length</code>（或 <code>-l 1000</code>）</td>
 </tr>
 </tbody>
 </table></div>

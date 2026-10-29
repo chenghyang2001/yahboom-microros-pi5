@@ -74,6 +74,7 @@ ros2 topic pub --once /servo_s2 std_msgs/msg/Int32 &quot;data: -30&quot;   # 俯
 <li>原始碼裡的話題名寫成 <code>servo_s1</code>、<code>servo_s2</code>（沒有前導斜線），因為節點沒有命名空間，實際就是 <code>/servo_s1</code>、<code>/servo_s2</code>，兩種寫法都對得上。</li>
 <li>這一單元的官方程式（<code>colorHSV</code>、<code>face_fllow</code>、<code>follow_line</code>、<code>qrTracker</code>、<code>HandCtrl</code> 等）<strong>都自己用 <code>cv.VideoCapture(0)</code> 打開鏡頭</strong>，所以<strong>不要同時開 <code>usb_cam_node_exe</code></strong>，否則會搶鏡頭、畫面全黑。</li>
 <li>所有程式都會開 OpenCV 視窗，請在 VNC 桌面的終端執行。手勢控車類的課，第一次先把車架高讓輪子離地。</li>
+<li><strong>實車實測（2026-10-29）</strong>：這幾支官方程式一啟動都會送俯仰角（<code>colorTracker</code> -50、<code>face_fllow</code> -60、<code>follow_line</code> -75、<code>HandCtrl</code> -45），追蹤時還會一路送到 -90 或 +20。本專案這台車的 S2 送 -10 就扯斷過相機線，所以演練時用 <code>-r servo_s1:=servo_s1_raw -r servo_s2:=servo_s2_raw</code> 改名，交給自己寫的守門員 <code>drill/live/20261029-m3-visual/servo_guard.py</code>：S2 一律攔下，S1 只准在正前方（這台是 -30）±10 度內轉。一場演練攔下 276 次 S2 指令。</li>
 </ul>
 </div></div>
 </section>
@@ -168,6 +169,14 @@ ros2 run rqt_reconfigure rqt_reconfigure     # 節點 monoIdentify，Kp/Ki/Kd �
 </div>
 <div class="callout callout-warn"><div class="callout-title">⚠️ 注意</div>
 <p><code>mono_Tracker.py</code> 的 <code>img_flip</code> 兩個分支寫得一模一樣（<code>target_servox -= x_Pid</code>、<code>target_servoy += y_Pid</code>），是官方複製貼上的小瑕疵；如果你翻轉了影像，雲台方向可能會反過來。</p>
+<p><strong>實車踩坑：框選紅色，遮罩卻整片變白（2026-10-29）</strong></p>
+<p>紅色剛好落在 HSV 色環的接縫：OpenCV 的 H 是 0～180 繞一圈，紅色一半在 0 附近、一半在 175 附近。框選區域裡兩種紅都有，<code>Roi_hsv</code> 只取最小、最大值，結果 H 變成 0～184，所有顏色都算進去。用 <code>rqt_reconfigure</code> 或 <code>ros2 param set</code> 改 Hmin／Hmax <strong>沒有效</strong>（<code>process()</code> 只用框選或檔案的範圍）。可行的改法是改檔案再按 <code>i</code>：</p>
+<div class="code-block">
+<div class="code-head"><span class="code-title">在車上 Docker 容器內</span><button class="copy-btn" type="button">複製</button></div>
+<pre><code class="language-bash">echo &quot;160, 90, 40, 180, 255, 255&quot; &gt; /root/yahboomcar_ws/src/yahboomcar_astra/yahboomcar_astra/colorHSV.text
+# 回到影像視窗按 i：辨識模式每張畫面都重讀這個檔</code></pre>
+</div>
+<p>另一個實測現象是<strong>控制器飽和</strong>：雲台被守門員限制只能轉 ±10 度，目標一直回不到畫面中央，PID 就把要求的角度一路加到程式上限 ±90。</p>
 </div>
 <p><strong>沒車先練</strong>：下面這支程式完全照官方的操作順序（r、框選、空白鍵），只是把雲台換成畫面上的「虛擬角度」。注意它的 PID 正負號只是示意，真車方向以官方程式為準。</p>
 <div class="code-block">
@@ -288,6 +297,7 @@ faces = face_patterns.detectMultiScale(frame, scaleFactor=1.1, minNeighbors=5, m
 <li>節點名 <code>face_fllow</code> 是官方拼錯（應為 follow），但 <code>setup.py</code> 就是這樣登記的，<strong>照打 <code>face_fllow</code></strong>。</li>
 <li>官方程式把臉框<strong>左上角</strong>（x, y）當目標，而不是臉的中心，所以雲台停下來時臉會偏右下；畫面有多張臉時只用最後一張。</li>
 <li><code>minSize=(100, 100)</code> 代表臉要夠大才偵測得到，請離鏡頭一公尺內。</li>
+<li>實測：9 張截圖只有 3 張框到臉，都是正對鏡頭的時候；側臉、低頭就找不到。</li>
 </ul>
 </div></div>
 </section>
@@ -361,6 +371,7 @@ ros2 run rqt_reconfigure rqt_reconfigure     # 節點 follow_line</code></pre>
 <li>PDF 說「以黃線為例」卻寫「框選藍色線區域」，前後不一致；什麼顏色都可以，重點是框到線本身。</li>
 <li>原始碼雖然宣告了 <code>LaserAngle</code> 參數，但避障判斷實際寫死看前方 ±90°，改 <code>LaserAngle</code> 不會有效果（以車上檔案為準）。</li>
 <li>第一次跑請把 <code>linear</code> 調到 0.1，地上用寬 2～3 公分、和地板顏色反差大的膠帶。</li>
+<li>2026-10-29 實車演練這一節<strong>還沒做</strong>（沒有色膠帶）。另外這台車 S2 不能用指令低頭，鏡頭朝前時大約只看得到車頭 30 公分外的地面，補做時線要從那裡開始貼。</li>
 </ul>
 </div></div>
 </section>
@@ -463,6 +474,7 @@ ros2 run yahboomcar_mediapipe control_shape  # 8.10 手掌控制雲台</code></p
 <li>8.8 原文把「右」寫成 bottom，是筆誤；而且左右其實是<strong>原地旋轉</strong>（角速度），不是橫移。</li>
 <li>官方提醒 8.8 在 Pi 5 上可能跑得很慢，先架高測試；手要慢慢動，太快影像處理跟不上。</li>
 <li><code>control_shape</code> 裡的 <code>ThumbTOforefinger</code> 原本是控制機械手爪開合用的（從機械臂課程沿用），這台車沒有手爪，可忽略。</li>
+<li><strong>實測（2026-10-29）</strong>：<code>HandCtrl</code> 四種手勢都認得出來（食指 26 次、比二 15 次），但它每認出一次只送一筆速度、然後 <code>sleep(0.5)</code>，兩筆間隔約 0.7 秒。如果你在中間加了「0.5 秒沒指令就停車」的看門狗，原地轉彎會轉不起來（實測平均角速度 0.02 rad/s；連續送則是 0.52）。看門狗放寬到 1.0 秒後恢復正常（0.27 rad/s）。安全裝置的逾時要配合上游程式的發送節奏。</li>
 </ul>
 </div></div>
 </section>
