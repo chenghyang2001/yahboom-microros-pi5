@@ -52,5 +52,5 @@
 - 電池：開場 81 → 第 3 步前 72 → 第 4 步中 70 → 停下後 71。第 4 步後暫停充電，第 5～7 步待續。
 - 第 5 步：Switch:=true 啟動確實不動（只印 start it）；param list 6 個參數；ResponseDist 0.55→0.3（Double）；Switch false 開跑。約 615 次判斷：10 直走 505（82%，上一步 70%）、9 78→60、6 38→20、2 30、8/7/4/1 都是 0。電池 70。
 - 第 6 步：Switch:=true 啟動後改 false 開跑。minDist 0.29～0.80 m；限速閥出手 52 次，官方要求最高 linear 0.65 m/s、angular 7.50 rad/s（上限的 4 倍、9 倍）。電池 70。
-- 第 7 步：bringup 後 TF odom→base_footprint 在 (0,0,0)；patrol 帶 Linear 0.15／Angular 0.8／Length 0.5，Switch true 開跑。**第一段沒有在 0.5 m 停**：`distance` 一路印到 4.2 m（中間一度降到 0.76 再升），最後印 `obstacles`；使用者喊停，Ctrl+C＋連送零速度 4 秒。停車後 TF 在 (-1.29, 3.15)、偏航 -20°，/odom 18 Hz、/odom_raw 11 Hz 都正常且不再飄 → 不是里程計壞掉，懷疑 `advancing()` 的 `abs(error) < LineTolerance(0.05)` 沒觸發（原因待查，先在 WSL 模擬重現）。`obstacles` 分支會送 `/beep data=1`，程式被關掉後蜂鳴器一直叫 → 補送 `/beep 0`。
+- 第 7 步：bringup 後 TF odom→base_footprint 在 (0,0,0)；patrol 帶 Linear 0.15／Angular 0.8／Length 0.5，Switch true 開跑。**第一段沒有在 0.5 m 停**：`distance` 一路印到 4.2 m（中間一度降到 0.76 再升），最後印 `obstacles`；使用者喊停，Ctrl+C＋連送零速度 4 秒。停車後 TF 在 (-1.29, 3.15)、偏航 -20°，/odom 18 Hz、/odom_raw 11 Hz 都正常且不再飄 → 不是里程計壞掉，懷疑 `advancing()` 的 `abs(error) < LineTolerance(0.05)` 沒觸發（原因待查，先在 WSL 模擬重現）。`obstacles` 分支會送 `/beep data=1`，程式被關掉後蜂鳴器一直叫 → 補送 `/beep 0` 後使用者確認蜂鳴器停了：原因是 patrol 的 `/beep data=1`，不是低電量（當時 6.9 V）。
 - 電池 69（6.9 V）結束演練，Pi 正常關機充電。
