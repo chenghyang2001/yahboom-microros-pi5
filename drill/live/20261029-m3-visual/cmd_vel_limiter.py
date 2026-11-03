@@ -52,7 +52,7 @@ def clamp_twist_values(lx, ly, az, max_lin, max_ang):
     """限幅純函式（不依賴 rclpy，方便本機測試）。
 
     linear.x、linear.y 各自夾在 ±max_lin；angular.z 夾在 ±max_ang。
-    麥克納姆輪會用到 linear.y 橫移，所以兩軸分開限制。
+    本車是四輪滑移轉向、不能橫移；linear.y 仍分開限制，防止誤發的橫移指令。
 
     回傳 (lx, ly, az) 限幅後的 tuple。
     """

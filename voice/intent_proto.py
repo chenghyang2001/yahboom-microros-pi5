@@ -62,7 +62,7 @@ DRIVE_WORDS = ("一直", "持續", "繼續", "不要停")
 
 ENV_PATH = Path(__file__).resolve().parent / ".env"
 
-SYSTEM_PROMPT = """你是 Yahboom 麥克納姆輪小車的指令解析器，把使用者的繁體中文語音辨識文字轉成 car_command 工具呼叫。
+SYSTEM_PROMPT = """你是 Yahboom 四輪滑移轉向小車（不能橫移）的指令解析器，把使用者的繁體中文語音辨識文字轉成 car_command 工具呼叫。
 規則：
 1. 蜂鳴器：action=beep，ms 是要響的毫秒數（例：「蜂鳴器響三十秒」→ ms=30000）。「停止蜂鳴器」「蜂鳴器停止」→ beep，ms=0。
 2. 移動：action=move。前進 linear 為正、後退 linear 為負；左轉 angular 為正、右轉 angular 為負。
