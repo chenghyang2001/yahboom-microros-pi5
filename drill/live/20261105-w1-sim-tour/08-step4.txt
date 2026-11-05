@@ -1,0 +1,9 @@
+第四步，看小腦的話題介面。
+
+真車上次在這一步打的是 ros2 node info 斜線 YB 底線 Car 底線 Node。那個節點就是小腦 ESP32 在 ROS 2 世界裡的身分，它訂閱四個話題，也就是接收命令：速度 cmd 底線 vel、蜂鳴器 beep、雲台的 servo 底線 s1 和 s2。它也發布四個話題，也就是回報資料：IMU、里程計 odom 底線 raw、光達 scan，還有電池 battery。
+
+模擬車沒有小腦節點，替它在 ROS 2 世界露臉的，就是上一步看到的翻譯官 hw 底線 bridge。所以我們在右下角第三格打 ros2 node info 斜線 hw 底線 bridge，看它的名片。名片分成幾段：Subscribers 是它訂閱、也就是收的話題；Publishers 是它發布、也就是送出的話題。
+
+接著我會打開 rqt 底線 graph，它會把節點畫成橢圓、話題畫成方框，用箭頭連起來。因為這台電腦的顯示卡在 WSL 裡畫 rqt 會凍住，所以前面要加 GALLIUM 底線 DRIVER 等於 llvmpipe，改用處理器來畫。視窗會出現在右邊螢幕，蓋在 Gazebo 上面。
+
+預期名片裡會看到：收的有 cmd 底線 vel、gimbal 斜線 pan、gimbal 斜線 tilt；送的有 scan、imu、odom、tf、joint 底線 states、clock。我念完以後就開始執行。

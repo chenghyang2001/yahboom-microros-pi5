@@ -1,0 +1,9 @@
+第四步的結果出來了。
+
+先看右下角第三格的名片。往上捲的部分，Subscribers 收的話題有：cmd 底線 vel 速度指令、gimbal 斜線 pan 和 gimbal 斜線 tilt 雲台角度，還有 clock 和 parameter 底線 events，這兩個是每個節點都會有的公用話題。下面的 Publishers 送出的話題有：clock 模擬時鐘、imu、joint 底線 states 關節角度、odom 里程計、scan 光達、tf 座標轉換，另外 camera 斜線 image 底線 raw 相機影像也在清單裡，只是今天沒開相機。
+
+跟真車的小腦節點比一比：收的部分，兩邊都有速度指令；真車用 servo 底線 s1、s2 控制雲台，模擬車改叫 gimbal 的 pan 和 tilt；真車還有蜂鳴器 beep，模擬車沒有。送的部分，兩邊都有 imu 和 scan；真車的里程計叫 odom 底線 raw，模擬車叫 odom；真車有電池 battery，模擬車沒有電池，永遠不會沒電。
+
+再看右邊螢幕的 rqt 底線 graph。我把顯示模式改成節點加話題，橢圓形是節點，方框是話題。中間的 hw 底線 bridge 往右送出 scan、odom、相機影像，箭頭最後都指到右邊的 rviz2，所以 RViz 才畫得出牆壁的紅點；hw 底線 bridge 也送出 joint 底線 states，交給 robot 底線 state 底線 publisher，它再算出 tf，給 RViz 的小幫手使用。最左邊那兩個名字很長的橢圓，是 ROS 的小管家 daemon 和 rqt 自己。你可能發現圖上沒有 cmd 底線 vel，那是因為現在還沒有任何人送速度指令，沒有人送的話題，rqt 底線 graph 預設會藏起來。
+
+下一步，第五步，我們證明這些資料是活的，量一量光達和 IMU 每秒更新幾次。等你說繼續。
